@@ -1,0 +1,35 @@
+{
+  "slug": "tonight-d3wbb",
+  "title": "Tonight in D3 WBB",
+  "description": "Live scores for every Division III women's basketball game that counts for the NPI, plus D3 games against Division I and II teams, sorted by how interesting each game is right now.",
+  "intro": "Every Division III women's basketball game that counts for the NCAA Power Index, sorted by how interesting it is right now. Close games, top teams, upsets, and games with tournament stakes rise to the top. D3 games against Division I and II teams appear too, marked D1 or D2.",
+  "domain": "www.tonightind3wbb.com",
+  "goatcounter": "tonightind3wbb",
+  "favicon": null,
+  "output": "docs/index.html",
+  "accent": {
+    "light": "#1f5fbf",
+    "dark": "#7fb0ff"
+  },
+  "timezones": [
+    {
+      "id": "America/New_York",
+      "label": "Eastern"
+    }
+  ],
+  "footer_credit": "This page is not affiliated with any organization it describes.",
+  "demo_sites": [
+    {
+      "name": "The Missing MIAA Hoops Dashboard",
+      "url": "https://www.themissingmiaahoopsdashboard.com/"
+    },
+    {
+      "name": "Alma Mater Saturday",
+      "url": "https://www.almamatersaturday.com/"
+    },
+    {
+      "name": "Chicago and North Central Kerfuffle",
+      "url": "https://www.chicagoandnorthcentralkerfuffle.com/"
+    }
+  ]
+}

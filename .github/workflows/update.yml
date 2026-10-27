@@ -1,0 +1,39 @@
+name: Update site
+
+on:
+  schedule:
+    - cron: "7 11,17,21 * * *"   # 6 a.m., noon, and 4 p.m. Eastern standard time: slates for today and tomorrow
+    - cron: "37 7 * 11,12,1,2,3 *"   # 2:37 a.m. Eastern standard time, November to March: final scores and newcomer lines
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One writer at a time. The Mac never commits generated files; it only pulls.
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Fetch data and build the page
+        run: |
+          python fetch_data.py || echo "fetch reported errors; building with what it got"
+          python build_site.py
+      - name: Commit and push when anything changed
+        run: |
+          git config user.name "tonight-d3wbb"
+          git config user.email "tonight-d3wbb@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Update $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi

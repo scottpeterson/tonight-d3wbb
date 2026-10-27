@@ -1,0 +1,611 @@
+#!/usr/bin/env python3
+"""Render docs/index.html from site.json, data/data.json, and data/slates/*.json.
+
+Project-specific code lives in the section renderers near the bottom
+(`sections()`) and in LIVE_JS. Everything above them is shared page furniture:
+tokens, theme and time zone controls, tables, twisties, footer.
+
+The page embeds the default night's slate and fetches other nights from
+docs/slates/. LIVE_JS reads each game's live stats feed in the browser at a
+pace set by the game's interest score (see PLAN.md and README.md).
+"""
+import html
+import json
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+BASE = Path(__file__).resolve().parent
+SITE = json.loads((BASE / "site.json").read_text())
+DATA = json.loads((BASE / "data" / "data.json").read_text())
+SLATES = BASE / "data" / "slates"
+OUT = BASE / SITE.get("output", "docs/index.html")
+HOME_TZ = ZoneInfo(SITE["timezones"][0]["id"])
+NOW = datetime.now(timezone.utc)
+
+
+def esc(value):
+    return html.escape("" if value is None else str(value), quote=True)
+
+
+def stamp(iso, fmt="%Y-%m-%d %-I:%M %p"):
+    """Format an ISO timestamp in the home time zone for footer text."""
+    return datetime.fromisoformat(iso).astimezone(HOME_TZ).strftime(fmt)
+
+
+def time_tag(iso, fmt="full"):
+    """A <time> the page re-renders in the viewer's chosen time zone."""
+    return f'<time datetime="{esc(iso)}" data-fmt="{fmt}">{esc(stamp(iso))}</time>'
+
+
+def link(href, text, cls=""):
+    """External links open in a new tab. Same-page anchors do not."""
+    if href.startswith("#"):
+        return f'<a href="{esc(href)}"{f" class={chr(34)}{cls}{chr(34)}" if cls else ""}>{esc(text)}</a>'
+    return f'<a href="{esc(href)}" target="_blank" rel="noopener"{f" class={chr(34)}{cls}{chr(34)}" if cls else ""}>{esc(text)}</a>'
+
+
+def table(headers, rows, lead_cols=1, caption=None, sortable=True):
+    """A table whose first `lead_cols` columns are left-aligned and whose data
+    columns are centered, header cells included. Headers sort on click unless
+    `sortable=False`. Pass cells as HTML strings; put a `data-sort` attribute
+    on a cell when its visible text is not what should sort (a date, a rank)."""
+    th = "".join(f'<th{" class=lead" if i < lead_cols else ""}{" role=button tabindex=0 aria-sort=none" if sortable else ""}>{h}</th>' for i, h in enumerate(headers))
+    body = []
+    for row in rows:
+        td = "".join(f'<td{" class=lead" if i < lead_cols else ""}>{c}</td>' for i, c in enumerate(row))
+        body.append(f"<tr>{td}</tr>")
+    cap = f"<caption>{esc(caption)}</caption>" if caption else ""
+    return f'<div class="tablewrap"><table{" class=sortable" if sortable else ""}>{cap}<thead><tr>{th}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
+
+
+def twisty(title, inner, count=None, open_=True):
+    """A section the reader can collapse. All twisties reopen on refresh."""
+    badge = f' <span class="count">{esc(count)}</span>' if count is not None else ""
+    return f'<details class="group"{" open" if open_ else ""}><summary><h2>{esc(title)}{badge}</h2></summary>{inner}</details>'
+
+
+def opinion_box(title, note, paragraphs):
+    """A clearly labeled opinion, set apart from the sourced content."""
+    body = "".join(f"<p>{esc(p)}</p>" for p in paragraphs)
+    return f'<section class="opinion"><h2>{esc(title)}</h2><p class="note">{esc(note)}</p><blockquote>{body}</blockquote></section>'
+
+
+CSS = r"""
+:root{color-scheme:light;--bg:#f4f3ef;--surface:#ffffff;--surface2:#ecebe5;--line:#d8d5cb;--ink:#1e2229;--muted:#616873;--faint:#8c939d;--link:#1f4e79;--pos:#2e8b57;--neg:#c0504d;--live:#d6323c;--warn:#9a5b00;--accent:ACCENT_LIGHT;--chip:#e9e7df;--gray:#ebeae5;
+--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:40px;--pill:36px;--fs-sm:.85rem;--fs-md:.95rem;--fs-base:1rem}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#15181d;--surface:#1d2128;--surface2:#252a32;--line:#363c46;--ink:#e7e9ec;--muted:#a7adb7;--faint:#7d848f;--link:#8ab8e6;--pos:#5fc08a;--neg:#e2807c;--live:#ff6b6b;--warn:#e8b04b;--accent:ACCENT_DARK;--chip:#2e343d;--gray:#252a32}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#15181d;--surface:#1d2128;--surface2:#252a32;--line:#363c46;--ink:#e7e9ec;--muted:#a7adb7;--faint:#7d848f;--link:#8ab8e6;--pos:#5fc08a;--neg:#e2807c;--live:#ff6b6b;--warn:#e8b04b;--accent:ACCENT_DARK;--chip:#2e343d;--gray:#252a32}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+a{color:var(--link)}img{max-width:100%}button{font:inherit;cursor:pointer}
+main{max-width:1080px;margin:0 auto;padding:var(--s5) var(--s4) 64px}
+h1{font-size:2.2rem;line-height:1.05;margin:0 0 var(--s2)}
+h2{font-size:1.5rem;margin:var(--s6) 0 var(--s3);padding-bottom:var(--s1);border-bottom:1px solid var(--line)}
+h3{font-size:1.2rem;margin:var(--s5) 0 var(--s2)}
+p{margin:0 0 var(--s3)}.sub{color:var(--muted);max-width:760px}.small{font-size:var(--fs-sm);color:var(--muted)}
+.muted{color:var(--muted)}.pos{color:var(--pos)}.neg{color:var(--neg)}
+.top{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s4)}
+.controls{display:flex;gap:var(--s4);align-items:flex-start;flex-wrap:wrap}.ctl{display:flex;flex-direction:column;gap:var(--s1)}
+.seglabel{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-left:2px}
+.seg{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--muted);padding:9px 14px;font-size:var(--fs-md);min-width:44px}.seg button+button{border-left:1px solid var(--line)}
+.seg button.active{background:var(--accent);color:#fff;font-weight:700}.seg button.active::before{content:"\2713\00a0"}
+:root[data-theme="dark"] .seg button.active{color:#15181d}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.active{color:#15181d}}
+.toggles{display:flex;gap:var(--s2)}.toggles button{height:var(--pill);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s4);font-size:var(--fs-md)}
+.group summary{list-style:none;cursor:pointer}.group summary::-webkit-details-marker{display:none}.group summary h2{display:inline-block;width:100%}
+.group summary h2::before{content:"\25BE";display:inline-block;width:1.1em;color:var(--muted)}.group:not([open]) summary h2::before{content:"\25B8"}
+.count{font-size:var(--fs-sm);font-weight:600;color:var(--muted);margin-left:var(--s2)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--s4)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:var(--s4)}
+.card h3{margin:0 0 var(--s2)}.card .big{font-size:1.8rem;font-weight:700;line-height:1.1}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s1) var(--s2)}.chip{display:inline-block;background:var(--chip);border-radius:999px;padding:1px 9px;font-size:var(--fs-sm);color:var(--ink)}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-md)}caption{text-align:left;padding:var(--s3) var(--s4) 0;font-weight:600}
+th,td{padding:var(--s2) var(--s3);border-top:1px solid var(--line);text-align:center;white-space:nowrap}
+thead th{border-top:0;background:var(--surface2);font-weight:600;color:var(--muted)}
+th.lead,td.lead{text-align:left}td.lead{font-weight:600}
+.sortable th{cursor:pointer;user-select:none}.sortable th::after{content:"";display:inline-block;width:.9em;color:var(--faint)}.sortable th[aria-sort="ascending"]::after{content:"\25B4"}.sortable th[aria-sort="descending"]::after{content:"\25BE"}
+.opinion{margin-top:var(--s6);padding:var(--s4) var(--s5);border-radius:12px;background:var(--gray)}
+.opinion h2{margin:0 0 var(--s2);border:0;padding:0;font-size:1.15rem}.opinion .note{margin:0 0 var(--s3);font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
+.opinion blockquote{margin:0;padding:0;font-style:italic}.opinion blockquote p::before{content:"\201C"}.opinion blockquote p::after{content:"\201D"}
+footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--line);font-size:var(--fs-sm);color:var(--muted)}
+.night{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin:var(--s5) 0 0}
+.night button{height:var(--pill);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s4);font-size:var(--fs-md)}
+.night button:disabled{color:var(--faint);cursor:default}.night .label{font-size:1.15rem;font-weight:700;min-width:12ch;text-align:center}
+.board td,.board th{vertical-align:middle}.board td.lead{font-weight:400}
+.team{font-weight:600}.rk{color:var(--muted);font-size:var(--fs-sm);font-weight:400;margin-right:var(--s1)}
+.matchup{display:flex;flex-direction:column;gap:2px;min-width:190px}.matchup .ln{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s3)}.matchup .pts{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem}.board td.game{white-space:normal}.board th.gameh span:last-child{float:right;margin-right:var(--s1)}.board th.gameh::after{display:none}.board a{color:inherit;text-decoration:none}.board a:hover .team{text-decoration:underline}.matchup .at{color:var(--muted);font-size:var(--fs-sm);margin-right:var(--s1)}
+.win{font-weight:700}.score{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem}
+.status .when{display:block}.status .next{display:block;font-size:.75rem;color:var(--faint)}
+tr.live .status .when{color:var(--live);font-weight:700}tr.final{color:var(--muted)}tr.final .pts{color:var(--muted);font-weight:400}tr.final .win,tr.final .pts.win{color:var(--pos);font-weight:700}tr.live .pts.lead{color:var(--ink)}.wpm{display:none}
+.tags{display:flex;flex-wrap:wrap;gap:0 var(--s3);margin-top:2px;font-size:.75rem;color:var(--muted);font-weight:400}.tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:700}.tag.close,.tag.hilev,.tag.top{color:var(--ink)}.tag.quiet{color:var(--faint)}
+.watch{display:inline-block;margin-top:2px;font-size:.78rem;color:var(--link);font-weight:600}.board a.watch{color:var(--link)}.board a.watch:hover{text-decoration:underline}
+.dv{display:inline-block;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-right:var(--s1);font-size:.7rem;font-weight:700;color:var(--muted);line-height:1.35;vertical-align:1px}
+.legend{display:flex;flex-wrap:wrap;gap:var(--s1) var(--s4);margin:0 0 var(--s3);font-size:var(--fs-sm);color:var(--muted)}.legend .live{color:var(--live);font-weight:700}.legend .won{color:var(--pos);font-weight:700}.legend .upset{color:var(--warn);font-weight:700}
+.int{font-variant-numeric:tabular-nums;font-weight:700}.bar{display:block;height:4px;border-radius:2px;background:var(--surface2);margin-top:3px;min-width:44px}.bar i{display:block;height:4px;border-radius:2px;background:var(--accent)}
+.nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:.78rem;color:var(--muted);font-weight:400}
+.empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
+dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2) var(--s4);margin:0}dl.terms dt{font-weight:600}dl.terms dd{margin:0;color:var(--muted)}dl.terms ul{margin:var(--s1) 0;padding-left:1.2em}
+@media (max-width:640px){main{padding:var(--s4) var(--s4) 48px}h1{font-size:1.8rem}.controls{width:100%}th,td{padding:var(--s2)}.board .lev,.board .levh,.board .wp,.board .wph{display:none}.wpm{display:block;font-size:.75rem;color:var(--muted)}.board .bar{display:none}.matchup{min-width:0}.board td.status{white-space:normal;max-width:92px}.board th,.board td{padding:var(--s2) 6px}.board thead th{font-size:.8rem}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
+"""
+
+JS = r"""
+(function(){
+const root=document.documentElement,KEY='SITE_KEY';
+// Theme: the viewer's choice wins; otherwise follow the device. Dark Reader is locked out in <head>.
+const savedTheme=(()=>{try{return localStorage.getItem(KEY+'-theme')}catch(e){return null}})();
+if(savedTheme==='dark'||savedTheme==='light')root.setAttribute('data-theme',savedTheme);
+function isDark(){const t=root.getAttribute('data-theme');return t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches)}
+function paintTheme(){const dark=isDark();document.querySelectorAll('.th').forEach(b=>b.classList.toggle('active',(b.dataset.theme==='dark')===dark));document.querySelectorAll('meta[name=theme-color]').forEach(m=>{m.removeAttribute('media');m.content=dark?'#15181d':'#f4f3ef'});}
+document.querySelectorAll('.th').forEach(b=>b.addEventListener('click',()=>{root.setAttribute('data-theme',b.dataset.theme);try{localStorage.setItem(KEY+'-theme',b.dataset.theme)}catch(e){}paintTheme();}));
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',paintTheme);
+paintTheme();
+// Times: every <time datetime> renders in the chosen zone. 'local' means the device's zone.
+const deviceTz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+let tzChoice=(()=>{try{return localStorage.getItem(KEY+'-tz')}catch(e){return null}})()||'local';
+function zone(){return tzChoice==='local'?deviceTz:tzChoice}
+function renderTimes(){
+  const z=zone();
+  document.querySelectorAll('time[datetime]').forEach(t=>{
+    const d=new Date(t.getAttribute('datetime'));if(isNaN(d))return;
+    const opts=t.dataset.fmt==='full'?{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short',timeZone:z}:{hour:'numeric',minute:'2-digit',timeZoneName:'short',timeZone:z};
+    t.textContent=new Intl.DateTimeFormat('en-US',opts).format(d);
+  });
+  document.querySelectorAll('.tz').forEach(b=>b.classList.toggle('active',b.dataset.tz===tzChoice));
+}
+document.querySelectorAll('.tz').forEach(b=>b.addEventListener('click',()=>{tzChoice=b.dataset.tz;try{localStorage.setItem(KEY+'-tz',tzChoice)}catch(e){}renderTimes();document.dispatchEvent(new Event('tzchange'));}));
+window.currentZone=zone;
+window.renderTimes=renderTimes;
+renderTimes();
+// Countdowns: any element with data-until.
+function tick(){const now=Date.now();document.querySelectorAll('[data-until]').forEach(el=>{const ms=new Date(el.dataset.until)-now;if(ms<=0){el.textContent='';return}const m=Math.floor(ms/60000),d=Math.floor(m/1440),h=Math.floor((m%1440)/60),mm=m%60;el.textContent='in '+(d?d+'d ':'')+(d||h?h+'h ':'')+(d?'':mm+'m');});}
+tick();setInterval(tick,60000);
+// Sortable tables: click a header to sort by that column; click again to reverse.
+function cellKey(td){const raw=td.dataset.sort!==undefined?td.dataset.sort:td.textContent.trim();const n=parseFloat(raw.replace(/[,%#$]/g,''));return isNaN(n)||!/^[-+#$]?[\d.,]+%?$/.test(raw.replace(/\s/g,''))?raw.toLowerCase():n;}
+document.querySelectorAll('table.sortable').forEach(t=>{
+  const ths=[...t.querySelectorAll('thead th')],body=t.tBodies[0];if(!body)return;
+  ths.forEach((th,i)=>{const go=()=>{const dir=th.getAttribute('aria-sort')==='ascending'?'descending':'ascending';ths.forEach(h=>h.setAttribute('aria-sort','none'));th.setAttribute('aria-sort',dir);
+    const rows=[...body.rows];rows.sort((a,b)=>{const x=cellKey(a.cells[i]),y=cellKey(b.cells[i]);const r=typeof x==='number'&&typeof y==='number'?x-y:typeof x==='number'?-1:typeof y==='number'?1:String(x).localeCompare(String(y));return dir==='ascending'?r:-r;});
+    rows.forEach(r=>body.appendChild(r));};
+    th.addEventListener('click',go);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});});
+});
+// Expand all / collapse all for the twisties.
+window.setAll=function(open){document.querySelectorAll('details.group').forEach(d=>{d.open=open});};
+})();
+"""
+
+
+def controls():
+    zones = "".join(f'<button type="button" class="tz" data-tz="{esc(z["id"])}">{esc(z["label"])}</button>' for z in SITE["timezones"])
+    zones += '<button type="button" class="tz" data-tz="local">Device</button>'
+    return (f'<div class="controls"><div class="ctl"><span class="seglabel" id="lbl-times">Times</span>'
+            f'<div class="seg" role="group" aria-labelledby="lbl-times">{zones}</div></div>'
+            f'<div class="ctl"><span class="seglabel" id="lbl-theme">Theme</span>'
+            f'<div class="seg" role="group" aria-labelledby="lbl-theme"><button type="button" class="th" data-theme="light">Light</button>'
+            f'<button type="button" class="th" data-theme="dark">Dark</button></div></div>'
+            f'<div class="ctl"><span class="seglabel">Sections</span><div class="toggles"><button type="button" onclick="setAll(true)">Expand all</button>'
+            f'<button type="button" onclick="setAll(false)">Collapse all</button></div></div></div>')
+
+
+def head():
+    gc = SITE.get("goatcounter")
+    tag = f'<script data-goatcounter="https://{esc(gc)}.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>\n' if gc else ""
+    icon = f'<link rel="icon" href="{esc(SITE["favicon"])}">\n' if SITE.get("favicon") else ""
+    css = CSS.replace("ACCENT_LIGHT", SITE.get("accent", {}).get("light", "#1f5fbf")).replace("ACCENT_DARK", SITE.get("accent", {}).get("dark", "#7fb0ff"))
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="darkreader-lock">
+<meta name="ste-allow" content="NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III">
+<meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15181d" media="(prefers-color-scheme: dark)">
+<title>{esc(SITE["title"])}</title>
+<meta name="description" content="{esc(SITE["description"])}">
+{icon}{tag}<style>{css}</style></head><body><main>
+<div class="top"><div><h1>{esc(SITE["title"])}</h1><p class="sub">{esc(SITE["intro"])}</p></div>{controls()}</div>
+"""
+
+
+def footer():
+    built = stamp(NOW.isoformat())
+    fetched = stamp(DATA["fetched_at"])
+    zone_name = SITE["timezones"][0]["label"]
+    credit = SITE.get("footer_credit", "")
+    return (f'<footer>Built {esc(built)} {esc(zone_name)}. Data fetched {esc(fetched)} {esc(zone_name)}. '
+            f'{esc(credit)}</footer></main><script>{JS.replace("SITE_KEY", SITE["slug"])}</script></body></html>')
+
+
+# ---------------------------------------------------------------------------
+# Section renderers. The rows are drawn by LIVE_JS from the embedded slate, so
+# the same code renders the first paint, other nights, and every live update.
+# ---------------------------------------------------------------------------
+
+def default_night(dates):
+    """Tonight in Eastern time when it has games; otherwise the next night with games, else the last one."""
+    today = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+    ahead = sorted(d for d in dates if d >= today)
+    return ahead[0] if ahead else (max(dates) if dates else today)
+
+
+def load_slate(day):
+    path = SLATES / f"{day}.json"
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def sections():
+    dates = sorted(DATA.get("dates", {}))
+    night = default_night(dates)
+    slate = load_slate(night)
+    boot = {"dates": dates, "counts": DATA.get("dates", {}), "night": night, "slate": slate,
+            "slates": sorted(p.stem for p in SLATES.glob("*.json"))}
+    picker = ('<div class="night" role="group" aria-label="Night">'
+              '<button type="button" id="prev" aria-label="Previous night">&#8249; Previous</button>'
+              '<span class="label" id="nightlabel"></span>'
+              '<button type="button" id="next" aria-label="Next night">Next &#8250;</button>'
+              '<button type="button" id="tonight">Tonight</button></div>')
+    newcomers = twisty("Newcomers with big games", '<p class="small">Freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
+                       'A big game is a game score of 15 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. '
+                       'Live lines are read at halftime and at the final.</p><div id="newcomers"></div>', count="")
+    board = twisty("Scoreboard", '<p class="small" id="boardnote">The number before each team is its preseason efficiency rank among Division III teams. Sorted by interest: live games first, then games not yet started, then finals. '
+                   'Click a header to sort by that column. Click Interest to return to this order.</p>'
+                   '<p class="legend"><span class="live">\U0001F534 Live</span><span class="won">Green: winner</span><span class="upset">\U0001F6A8 Upset</span>'
+                   '<span>\U0001F525 Close</span><span>\u26A1 High leverage</span><span>\u2B50 Top 25</span><span>\U0001F512 Decided</span><span>\U0001F4A4 No tournament stakes</span><span>\U0001F4FA Video</span><span><span class="dv">D1</span>Division I or II opponent, not an NPI game</span></p>'
+                   '<div class="tablewrap"><table class="board sortable" id="board"><thead><tr>'
+                   '<th class="lead" role=button tabindex=0 aria-sort=none>Interest</th>'
+                   '<th class="lead gameh" role=button tabindex=0 aria-sort=none><span>Game</span><span>Score</span></th>'
+                   '<th role=button tabindex=0 aria-sort=none>Status</th>'
+                   '<th class="wph" role=button tabindex=0 aria-sort=none>Win chance</th>'
+                   '<th class="levh" role=button tabindex=0 aria-sort=none>Leverage</th>'
+                   '</tr></thead><tbody id="rows"></tbody></table></div>', count="")
+    how = twisty("How the order and the checks work", HOW, open_=False)
+    data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
+    return f'{picker}\n{newcomers}\n{board}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
+
+
+HOW = """<dl class="terms">
+<dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Games between one of those teams and a Division I or II team appear too, exhibitions included. A D1 or D2 badge takes the place of the opponent's rank. They do not count for the NPI, so they have no win chance or leverage. Exhibitions against Division III teams, games against NAIA and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it.</dd>
+<dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</dd>
+<dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
+<dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
+<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks.</dd>
+<dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more, and a star marks a top 25 team. A Watch link opens the video stream when the schedule page lists one.</dd>
+<dt>Newcomers</dt><dd>The full box score is read twice a game, at halftime and at the final, and only when a team has newcomers on its roster.</dd>
+</dl>"""
+
+LIVE_JS = r"""
+(function(){
+const BOOT=JSON.parse(document.getElementById('boot').textContent);
+const KEY='SITE_KEY';
+const BUDGET_PER_MIN=40;           // feed reads per minute for the whole page
+const GAME_MS=2*3600000;           // tipoff to expected final
+const SD=11;                       // points, full-game spread of the final margin
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let night=BOOT.night,games=[],timer=null,userSorted=false;
+const tokens=[];                   // timestamps of recent feed reads, for the budget
+
+// ---------- model
+function phi(z){const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2);const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return z>0?1-p:p;}
+// Home team's chance to win. lead is home minus away; progress is the share of regulation played.
+function winProb(g,lead,progress){
+  const left=Math.max(0,1-progress);
+  if(left<=0)return lead>0?1:lead<0?0:0.5;
+  return phi((lead+g.pregame_margin*left)/(SD*Math.sqrt(left)));
+}
+function interest(g,st){
+  // A team outside Division III has no preseason rank; it counts as an average team.
+  const q=r=>r?1-(r-1)/409:0.5,q1=q(g.home_rank),q2=q(g.away_rank);
+  const Q=0.6*Math.max(q1,q2)+0.4*Math.min(q1,q2);
+  const L=1-Math.exp(-(Math.abs(g.home_lev)+Math.abs(g.away_lev))/12);
+  const T=Math.max(g.home_tourn,g.away_tourn),S=T/(T+0.01);
+  const P=st.progress||0,wp=st.wp;
+  const C=1-Math.abs(2*wp-1);
+  const homeDog=g.pregame_wp<0.5;
+  // A game against a Division I or II team has no pregame model, so it has no upset term.
+  const U=g.division?0:Math.max(0,homeDog?wp-g.pregame_wp:(1-wp)-(1-g.pregame_wp));
+  // Rank and leverage fade as the result becomes certain: at the final whistle of a blowout they count for little.
+  const settled=1-P*(1-Math.sqrt(C));
+  return Math.min(100,100*S*((0.30*Q+0.25*L)*settled+(0.20+0.15*P)*C+0.25*U));
+}
+// Minutes to wait before the next check: 60^((1 - I/100)^WAIT_CURVE), so 1 at interest 100 and 60 at interest 0,
+// stretched by the leader's margin, (0.5/p)^MARGIN_STRETCH with p the trailing team's chance.
+const WAIT_CURVE=2,MARGIN_STRETCH=0.35;
+function waitMs(g,st){
+  const base=Math.pow(60,Math.pow(1-st.interest/100,WAIT_CURVE));
+  const p=Math.max(1e-9,Math.min(st.wp,1-st.wp));
+  return base*Math.pow(0.5/p,MARGIN_STRETCH)*60000;
+}
+function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
+function nextCheck(g,st,now){
+  if(st.final||!g.feed)return null;
+  const tip=tipMs(g);
+  if(tip&&now<tip+5*60000&&!st.live)return tip+5*60000;
+  const end=(tip||now)+GAME_MS;
+  if(now>=end)return now+15*60000;                 // past the expected end: look for the final every 15 minutes
+  return Math.min(now+waitMs(g,st),end);
+}
+
+// ---------- feeds
+function teamTokens(n){return new Set(String(n||'').toLowerCase().match(/[a-z]+/g)||[]);}
+function overlap(a,b){const B=teamTokens(b);let n=0;teamTokens(a).forEach(t=>{if(B.has(t)&&!['college','university','of','the','state'].includes(t))n++;});return n;}
+function mdy(day){const [y,m,d]=day.split('-').map(Number);return m+'/'+d+'/'+y;}
+function progressOf(period,clockSec,regulation){
+  const len=regulation===2?1200:600,total=regulation*len;
+  if(period<=regulation)return((period-1)*len+(len-clockSec))/total;
+  return 1;                                        // overtime: the regulation clock has run out
+}
+function clockToSec(t){const m=/^(\d+):(\d+)/.exec(t||'');return m?(+m[1])*60+(+m[2]):0;}
+function periodName(period,regulation){
+  if(period>regulation)return 'OT'+(period-regulation>1?period-regulation:'');
+  return regulation===2?['','1st half','2nd half'][period]:'Q'+period;
+}
+function statusText(period,clockSec,regulation){
+  if(clockSec===0&&period===regulation/2)return 'Halftime';
+  if(clockSec===0&&period<regulation)return 'End '+periodName(period,regulation);
+  return Math.floor(clockSec/60)+':'+String(clockSec%60).padStart(2,'0')+' '+periodName(period,regulation);
+}
+function num(v){const n=parseFloat(v);return isNaN(n)?0:n;}
+function ma(v){const m=/(\d+)\s*-\s*(\d+)/.exec(v||'');return m?[+m[1],+m[2]]:[0,0];}
+function sidearmLines(full){
+  const out={};
+  [['H','HomeTeam'],['V','VisitingTeam']].forEach(([side,key])=>{
+    const t=(full.Stats||{})[key]||{},people={};(t.Players||[]).forEach(p=>{people[p.PersonId||('#'+p.UniformNumber)]=p;});
+    out[side]=(((t.PlayerGroups||{}).Players||{}).Values||[]).map(v=>{const p=people[v.PersonId]||people['#'+v.Uni]||{};const fg=ma(v.Fgam),ft=ma(v.Ftma);
+      return {first:p.FirstName||'',last:p.LastName||'',abbr:v.Name||'',min:num(v.Minutes),pts:num(v.Points),fgm:fg[0],fga:fg[1],ftm:ft[0],fta:ft[1],
+        oreb:num(v.OffensiveRebounds),dreb:num(v.DefensiveRebounds),reb:num(v.TotalRebounds),ast:num(v.Assists),to:num(v.Turnovers),stl:num(v.Steals),blk:num(v.Blocks),pf:num(v.PersonalFouls)};});
+  });
+  return out;
+}
+function prestoLines(x){
+  const out={};
+  x.querySelectorAll('team').forEach(t=>{out[t.getAttribute('vh')]=[...t.querySelectorAll('player')].filter(p=>p.getAttribute('code')!=='TM'&&p.querySelector('stats')).map(p=>{
+    const a=p.querySelector('stats'),g=k=>num(a.getAttribute(k)),name=p.getAttribute('name')||p.getAttribute('checkname')||'';
+    const [last,first]=name.includes(',')?name.split(',').map(s=>s.trim()):[name.split(' ').slice(-1)[0],name.split(' ').slice(0,-1).join(' ')];
+    return {first,last,abbr:name,min:g('min'),pts:g('tp'),fgm:g('fgm'),fga:g('fga'),ftm:g('ftm'),fta:g('fta'),oreb:g('oreb'),dreb:g('dreb'),reb:g('treb'),ast:g('ast'),to:g('to'),stl:g('stl'),blk:g('blk'),pf:g('pf')};
+  });});
+  return out;
+}
+// One read of a game's feed. Returns null when the feed shows a different game or has not started.
+async function readFeed(g,full){
+  const f=g.feed;tokens.push(Date.now());
+  const url=f.type==='sidearm'&&full?f.url+'?detail=full':f.url;
+  const r=await fetch(url,{cache:'no-store'});if(!r.ok)return null;
+  let s;
+  if(f.type==='sidearm'){
+    const j=await r.json(),G=j.Game;
+    if(!G||!G.HasStarted)return null;
+    // Stat crews sometimes leave the feed's date unset or stale (1/1/0001). Then the feed counts when one of its teams
+    // is one of ours and the game is not over, or when this page already read it live.
+    const ours=overlap(G.HomeTeam.Name,g.home)+overlap(G.HomeTeam.Name,g.away)+overlap(G.VisitingTeam.Name,g.home)+overlap(G.VisitingTeam.Name,g.away)>0;
+    if(G.Date!==mdy(g.date)&&!(ours&&(!G.IsComplete||g.st.live)))return null;
+    const regulation=num((G.Rules||{}).PeriodMinutes)>=20?2:4,period=num(G.Period),clock=num(G.ClockSeconds);
+    s={home:num(G.HomeTeam.Score),away:num(G.VisitingTeam.Score),feedHome:G.HomeTeam.Name,complete:!!G.IsComplete,period,regulation,
+       progress:G.IsComplete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:full?sidearmLines(j):null};
+  }else{
+    const x=new DOMParser().parseFromString(await r.text(),'application/xml');
+    const venue=x.querySelector('venue'),st=x.querySelector('status'),rules=x.querySelector('rules');
+    if(!venue||!st||venue.getAttribute('date')!==mdy(g.date)||!x.querySelector('play'))return null;
+    const regulation=+(rules&&rules.getAttribute('prds'))||4,period=num(st.getAttribute('period')),clock=clockToSec(st.getAttribute('clock'));
+    const sc={};x.querySelectorAll('team').forEach(t=>{const ls=t.querySelector('linescore');sc[t.getAttribute('vh')]=num(ls&&ls.getAttribute('score'));});
+    const complete=st.getAttribute('complete')==='Y';
+    s={home:sc.H||0,away:sc.V||0,feedHome:venue.getAttribute('homename'),complete,period,regulation,
+       progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:prestoLines(x)};
+  }
+  // The stat crew's home side can differ from the schedule's; flip when the feed's home name matches our away team.
+  if(overlap(s.feedHome,g.away)>overlap(s.feedHome,g.home)){[s.home,s.away]=[s.away,s.home];if(s.lines)s.lines={H:s.lines.V||[],V:s.lines.H||[]};}
+  return s;
+}
+
+// ---------- newcomers
+function gameScore(l){return l.pts+0.4*l.fgm-0.7*l.fga-0.4*(l.fta-l.ftm)+0.7*l.oreb+0.3*l.dreb+l.stl+0.7*l.ast+0.7*l.blk-0.4*l.pf-l.to;}
+function bigGame(l){return gameScore(l)>=15||l.pts>=20||l.reb>=12||l.ast>=8||l.blk>=5||l.stl>=5;}
+const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
+function matchNewcomer(l,roster){
+  if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
+  let m=/^\s*([A-Za-z])[a-z]*\.?\s+(.+)$/.exec(l.abbr),initial,last;
+  if(l.abbr.includes(',')){const k=/^\s*(.+?),\s*([A-Za-z])/.exec(l.abbr);if(!k)return null;last=k[1];initial=k[2];}
+  else if(m){initial=m[1];last=m[2];}else return null;
+  const hits=roster.filter(p=>norm(p.name.split(' ').slice(-1)[0])===norm(last)&&norm(p.name)[0]===initial.toLowerCase());
+  return hits.length===1?hits[0]:null;
+}
+function newcomerLines(g,s,when){
+  const out=[];
+  [['H',g.home,g.newcomers_home],['V',g.away,g.newcomers_away]].forEach(([side,team,roster])=>{
+    ((s.lines||{})[side]||[]).forEach(l=>{const who=matchNewcomer(l,roster||[]);if(who&&bigGame(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
+      line:{min:l.min,pts:l.pts,reb:l.reb,ast:l.ast,stl:l.stl,blk:l.blk,fgm:l.fgm,fga:l.fga}});});
+  });
+  return out;
+}
+
+// ---------- state
+function initState(g){
+  const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,halfRead:false,finalRead:!!g.newcomers_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x))};
+  if(g.final){st.final=true;st.score=g.final;const lead=g.final[0]-g.final[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
+  st.interest=interest(g,st);
+  return st;
+}
+function hasNewcomers(g){return (g.newcomers_home||[]).length+(g.newcomers_away||[]).length>0;}
+async function check(g){
+  const st=g.st;let s=null;
+  const wantHalf=hasNewcomers(g)&&!st.halfRead&&st.progress>=0.5&&!st.final;
+  try{s=await readFeed(g,wantHalf);}catch(e){s=null;}
+  const now=Date.now();
+  if(s){
+    st.live=!s.complete;st.score=[s.home,s.away];st.progress=s.progress;
+    const lead=s.home-s.away;
+    st.wp=s.complete?(lead>0?1:lead<0?0:0.5):winProb(g,lead,s.progress);
+    st.status=s.complete?'Final'+(s.period>s.regulation?' (OT)':''):s.status;
+    if(s.lines&&!s.complete&&s.progress>=0.5&&!st.halfRead){st.halfRead=true;addNewcomers(g,newcomerLines(g,s,'half'));}
+    if(s.complete){
+      st.final=true;st.live=false;
+      if(hasNewcomers(g)&&!st.finalRead){
+        let full=s;if(g.feed.type==='sidearm'&&!s.lines){try{full=await readFeed(g,true)||s;}catch(e){}}
+        st.finalRead=true;addNewcomers(g,newcomerLines(g,full,'final'));
+      }
+    }else if(!s.lines&&hasNewcomers(g)&&!st.halfRead&&s.progress>=0.5){
+      // Crossed halftime since the last check: read the full box now.
+      st.nextAt=now;
+    }
+  }
+  st.interest=interest(g,st);
+  st.checked=now;
+  if(!st.nextAt||st.nextAt<=now)st.nextAt=nextCheck(g,st,now);
+}
+function addNewcomers(g,list){
+  const keep=g.st.nc.filter(x=>!list.some(y=>y.name===x.name&&y.team===x.team));
+  g.st.nc=keep.concat(list);
+}
+
+// ---------- scheduler: the most interesting due games first, within the per-minute budget
+function isToday(){const t=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date());return night===t||night===prevDay(t);}
+function prevDay(d){const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()-1);return x.toISOString().slice(0,10);}
+async function tick(){
+  if(document.hidden||!isToday())return;
+  const now=Date.now();
+  while(tokens.length&&tokens[0]<now-60000)tokens.shift();
+  const due=games.filter(g=>g.feed&&g.st.nextAt&&g.st.nextAt<=now).sort((a,b)=>b.st.interest-a.st.interest);
+  const room=Math.max(0,BUDGET_PER_MIN-tokens.length);
+  const batch=due.slice(0,room);
+  if(!batch.length){renderNext();return;}
+  await Promise.all(batch.map(check));
+  render();
+}
+
+// ---------- render
+function rank(r){return r?'<span class="rk">#'+r+'</span>':'';}
+// A Division I or II opponent gets its division badge where a D3 team shows its preseason rank.
+function sideTag(g,side){return g.division&&g[side]!==g.d3?'<span class="dv">D'+g.division+'</span>':rank(g[side+'_rank']);}
+function fmtTime(iso){return '<time datetime="'+esc(iso)+'" data-fmt="short"></time>';}
+function ago(ms){const m=Math.max(0,Math.round((Date.now()-ms)/60000));return m<1?'just now':m<60?m+'m ago':Math.floor(m/60)+'h '+(m%60)+'m ago';}
+function inMin(ms){const m=Math.max(0,Math.round((ms-Date.now())/60000));return m<1?'now':m<60?'in '+m+'m':'in '+Math.floor(m/60)+'h '+(m%60)+'m';}
+function winCell(g,st){
+  if(st.final||g.division)return '-';
+  const home=st.wp>=0.5,p=home?st.wp:1-st.wp,team=home?g.home:g.away;
+  return esc(team)+' '+(p>0.995?'>99':Math.round(p*100))+'%';
+}
+function tags(g,st){
+  // Each tag: [class, symbol, words]. Red marks a live game, green a winner, amber an upset, gray a game with nothing left to decide.
+  const out=g.label?[['quiet','',g.label.toLowerCase()]]:[];
+  const dogWp=g.pregame_wp<0.5?st.wp-g.pregame_wp:(1-st.wp)-(1-g.pregame_wp);
+  if(g.division)out.push(['quiet','','Division '+(g.division===1?'I':'II')+' opponent, not an NPI game']);
+  if(!g.division&&(st.live||st.final)&&dogWp>0.2)out.push(['upset','\u{1F6A8}',st.final?'upset':'upset alert']);
+  if(st.live&&Math.min(st.wp,1-st.wp)>0.3)out.push(['close','\u{1F525}','close']);
+  if(st.live&&Math.min(st.wp,1-st.wp)<0.02)out.push(['quiet','\u{1F512}','decided']);
+  if(Math.abs(g.home_lev)+Math.abs(g.away_lev)>=15)out.push(['hilev','\u26A1','high leverage']);
+  if(Math.min(g.home_rank||999,g.away_rank||999)<=25)out.push(['top','\u2B50','top 25']);
+  if(!g.division&&Math.max(g.home_tourn,g.away_tourn)<0.005)out.push(['quiet','\u{1F4A4}','no tournament stakes']);
+  return out.map(t=>'<span class="tag '+t[0]+'">'+(t[1]?t[1]+'\u00a0':'')+esc(t[2])+'</span>').join('');
+}
+function groupOf(st){return st.live?0:st.final?2:1;}
+function row(g){
+  const st=g.st;
+  const awayWin=st.final&&st.score&&st.score[1]>st.score[0],homeWin=st.final&&st.score&&st.score[0]>st.score[1];
+  let status;
+  if(st.final)status='<span class="when">'+esc(st.status||'Final')+'</span>';
+  else if(st.live)status='<span class="when">\u{1F534}\u00a0'+esc(st.status)+'</span>';
+  else status='<span class="when">'+(g.tip?fmtTime(g.tip):'Time TBA')+'</span>';
+  if(st.checked)status+='<span class="next ago">checked '+ago(st.checked)+'</span>';
+  if(!st.final&&g.feed&&st.nextAt&&isToday())status+='<span class="next nx">next check '+inMin(st.nextAt)+'</span>';
+  if(!g.feed&&!st.final)status+='<span class="next">no live feed</span>';
+  if(g.video&&!st.final)status+='<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA}\u00a0Watch</a>';
+  const leader=st.score?(st.score[0]>st.score[1]?0:st.score[1]>st.score[0]?1:-1):-1;
+  const pts=i=>st.score?'<span class="pts'+(st.final&&leader===i?' win':leader===i?' lead':'')+'">'+st.score[i]+'</span>':'';
+  const game='<div class="matchup"><span class="ln"><span>'+sideTag(g,'away')+'<span class="team'+(awayWin?' win':'')+'">'+esc(g.away)+'</span></span>'+pts(1)+'</span>'+
+    '<span class="ln"><span><span class="at">'+(g.neutral?'vs':'at')+'</span>'+sideTag(g,'home')+'<span class="team'+(homeWin?' win':'')+'">'+esc(g.home)+'</span></span>'+pts(0)+'</span></div>';
+  const w=tags(g,st);
+  const link=g.link?'<a href="'+esc(g.link)+'" target="_blank" rel="noopener">'+game+'</a>':game;
+  const I=Math.round(st.interest);
+  return '<tr class="'+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
+    '<td class="lead" data-sort="'+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></td>'+
+    '<td class="lead game" data-sort="'+esc(g.away)+'">'+link+(w?'<span class="tags">'+w+'</span>':'')+'</td>'+
+    '<td class="status" data-sort="'+(groupOf(st)*1e13+(tipMs(g)||0))+'">'+status+(st.final?'':'<span class="wpm">'+winCell(g,st)+'</span>')+'</td>'+
+    '<td class="wp" data-sort="'+(st.final||g.division?'':Math.round(Math.max(st.wp,1-st.wp)*100))+'">'+winCell(g,st)+'</td>'+
+    '<td class="lev" data-sort="'+(g.division?'':(Math.abs(g.home_lev)+Math.abs(g.away_lev)).toFixed(1))+'">'+(g.division?'-':(Math.abs(g.home_lev)+Math.abs(g.away_lev)).toFixed(1))+'</td></tr>';
+}
+function render(){
+  const sorted=userSorted?null:games.slice().sort((a,b)=>groupOf(a.st)-groupOf(b.st)||b.st.interest-a.st.interest);
+  const body=$('#rows');
+  if(!games.length){body.innerHTML='<tr><td class="lead" colspan="5"><p class="empty">No NPI games on this night.</p></td></tr>';}
+  else if(sorted){body.innerHTML=sorted.map(row).join('');}
+  else{const order=[...body.rows].map(r=>r.dataset.id);const by={};games.forEach(g=>by[g.id]=g);body.innerHTML=order.map(id=>by[id]?row(by[id]):'').join('');}
+  document.querySelectorAll('details.group summary .count')[1].textContent=games.length;
+  renderNewcomers();
+  if(window.renderTimes)window.renderTimes();
+}
+function renderNext(){document.querySelectorAll('#rows tr').forEach(tr=>{const g=games.find(x=>x.id===tr.dataset.id);if(!g)return;const n=tr.querySelector('.nx'),a=tr.querySelector('.ago');if(n&&g.st.nextAt&&!g.st.final)n.textContent='next check '+inMin(g.st.nextAt);if(a&&g.st.checked)a.textContent='checked '+ago(g.st.checked);});}
+function renderNewcomers(){
+  const all=[];games.forEach(g=>g.st.nc.forEach(x=>all.push(Object.assign({game:g},x))));
+  all.sort((a,b)=>b.gmsc-a.gmsc);
+  document.querySelectorAll('details.group summary .count')[0].textContent=all.length;
+  if(!all.length){$('#newcomers').innerHTML='<p class="empty">No newcomer has a big game on this night yet.</p>';return;}
+  const rows=all.map(x=>{const l=x.line,g=x.game;
+    return '<tr><td class="lead">'+esc(x.name)+'<span class="reason">'+esc(x.reason)+'</span></td><td class="lead">'+esc(x.team)+'</td>'+
+      '<td>'+l.pts+'</td><td>'+l.reb+'</td><td>'+l.ast+'</td><td>'+(l.stl+l.blk)+'</td><td>'+l.fgm+'-'+l.fga+'</td>'+
+      '<td>'+x.gmsc.toFixed(1)+'</td><td class="lead">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='half'?'At halftime':'Final')+'</span></td></tr>';}).join('');
+  $('#newcomers').innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ---------- nights
+const fmtNight=d=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z'));
+function showNight(slate){
+  night=slate.date;
+  games=slate.games.map(g=>Object.assign(g,{st:initState(g)}));
+  const now=Date.now();
+  games.forEach(g=>{g.st.nextAt=isToday()?firstCheck(g,now):null;});
+  $('#nightlabel').textContent=fmtNight(night);
+  const i=BOOT.dates.indexOf(night);
+  $('#prev').disabled=i<=0;$('#next').disabled=i<0||i>=BOOT.dates.length-1;
+  userSorted=false;document.querySelectorAll('#board th').forEach(h=>h.setAttribute('aria-sort','none'));
+  render();
+}
+function firstCheck(g,now){
+  if(g.st.final||!g.feed)return null;
+  const tip=tipMs(g);
+  if(!tip)return now;                               // time TBA: look now, then by interest
+  if(now<tip+5*60000)return tip+5*60000;
+  return now;                                       // in progress or past: read it on the first tick
+}
+async function go(d){
+  if(BOOT.slate&&d===BOOT.slate.date){showNight(BOOT.slate);return;}
+  if(!BOOT.slates.includes(d)){
+    // A future night beyond the slate window has no slate yet: show its game count only.
+    night=d;games=[];$('#nightlabel').textContent=fmtNight(d);
+    const i=BOOT.dates.indexOf(d);$('#prev').disabled=i<=0;$('#next').disabled=i>=BOOT.dates.length-1;
+    $('#rows').innerHTML='<tr><td class="lead" colspan="5"><p class="empty">'+(BOOT.counts[d]||0)+' NPI games. Tipoff times and live feeds appear the day before.</p></td></tr>';
+    renderNewcomers();return;
+  }
+  try{const r=await fetch('slates/'+d+'.json',{cache:'no-store'});showNight(await r.json());}
+  catch(e){$('#rows').innerHTML='<tr><td class="lead" colspan="5"><p class="empty">This night did not load. Try again.</p></td></tr>';}
+}
+$('#prev').addEventListener('click',()=>{const i=BOOT.dates.indexOf(night);if(i>0)go(BOOT.dates[i-1]);});
+$('#next').addEventListener('click',()=>{const i=BOOT.dates.indexOf(night);if(i<BOOT.dates.length-1)go(BOOT.dates[i+1]);});
+$('#tonight').addEventListener('click',()=>go(BOOT.night));
+// A header click sorts by that column and stops the automatic order; Interest restores it.
+document.querySelectorAll('#board th').forEach((th,i)=>{const f=()=>{userSorted=i!==0;if(i===0)setTimeout(render,0);};th.addEventListener('click',f);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')f();});});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
+document.addEventListener('tzchange',render);
+go(BOOT.night);
+tick();timer=setInterval(tick,5000);
+})();
+""".replace("SITE_KEY", SITE["slug"])
+
+
+def copy_slates():
+    dest = OUT.parent / "slates"
+    dest.mkdir(parents=True, exist_ok=True)
+    for path in SLATES.glob("*.json"):
+        shutil.copy(path, dest / path.name)
+
+
+def main():
+    copy_slates()
+    page = head() + sections() + footer()
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(page)
+    print(f"wrote {OUT} ({len(page)} bytes)")
+
+
+if __name__ == "__main__":
+    main()
