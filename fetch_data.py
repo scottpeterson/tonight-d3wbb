@@ -563,7 +563,7 @@ def result_score(r, page_is_home):
     return (mine, theirs) if page_is_home else (theirs, mine)
 
 
-def build_slate(day, games, schools, pages, tourn, newcomers, previous):
+def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None):
     prev = {g["id"]: g for g in (previous or {}).get("games", [])}
     out = []
     for g in games:
@@ -580,11 +580,15 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous):
         home_link = (home_row or {}).get("links", {}).get("live_stats")
         away_link = (away_row or {}).get("links", {}).get("live_stats")
         feed = live_feed(home_link)
+        link = home_link
         if not feed and not g["neutral"]:
             feed = house_feed(schools.get(g["home"]))
+            if feed and not link:
+                # Link the host's stat page, the one the feed reads, rather than the away school's.
+                link = f'{re.match(r"(https?://[^/]+)", schools[g["home"]]["schedule"]).group(1)}/sidearmstats/wbball/summary'
         if not feed:
             feed = live_feed(away_link)
-        link = home_link or away_link
+        link = (links or {}).get(gid) or link or away_link
         video = (home_row or {}).get("links", {}).get("video") or (away_row or {}).get("links", {}).get("video")
         old = prev.get(gid, {})
         final = list(g["final"]) if g.get("final") else None
@@ -678,7 +682,8 @@ def collect(previous):
         if others:
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(others)
         path = SLATES / f"{d.isoformat()}.json"
-        slate = build_slate(d, by_day.get(d.isoformat(), []) + others, schools, pages, tourn, newcomers, read_json(path))
+        slate = build_slate(d, by_day.get(d.isoformat(), []) + others, schools, pages, tourn, newcomers, read_json(path),
+                            extra.get("links"))
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
     # Finals: one full-feed read per unfinished game from yesterday and today, read in parallel.

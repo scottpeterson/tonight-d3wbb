@@ -1,7 +1,10 @@
 {
-  "note": "Games the schedule pages miss. Each needs date, home, away, neutral, and label. A game against a Division I or II team also needs division (1 or 2) and d3 (the Division III team). tip (UTC, ISO 8601) sets tipoff when no page lists the game. Schools not in schools.csv need an entry under schools; a Sidearm host's entry gives the page its live feed. pregame_margin (home minus away, points) is optional.",
+  "note": "Games the schedule pages miss. Each needs date, home, away, neutral, and label. A game against a Division I or II team also needs division (1 or 2) and d3 (the Division III team). tip (UTC, ISO 8601) sets tipoff when no page lists the game. Schools not in schools.csv need an entry under schools; a Sidearm host's entry gives the page its live feed. pregame_margin (home minus away, points) is optional. links maps a game id (date-away-at-home, letters only) to a live stats link that replaces the one the schedule pages give.",
   "schools": {
     "Southern Miss": {"type": "Sidearm", "schedule": "https://southernmiss.com/sports/womens-basketball/schedule", "tz": "America/Chicago"}
+  },
+  "links": {
+    "2026-10-27-christophernewport-at-olddominion": "http://stats.statbroadcast.com/mobile/?id=691640"
   },
   "games": [
     {"date": "2026-10-27", "home": "Southern Miss", "away": "East Texas Baptist", "neutral": false, "label": "Exhibition",
