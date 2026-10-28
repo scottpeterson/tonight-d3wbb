@@ -96,6 +96,9 @@ def test_newcomer_matching_and_big_game():
     line = "{pts:18,fgm:8,fga:14,ftm:0,fta:0,oreb:3,dreb:3,reb:6,ast:1,to:1,stl:3,blk:2,pf:2}"
     assert run(f"Math.round(gameScore({line})*10)/10") == 17.7
     assert run(f"bigGame({line})") is True
+    corson = "{pts:18,fgm:5,fga:14,ftm:4,fta:4,oreb:2,dreb:2,reb:4,ast:0,to:2,stl:1,blk:1,pf:2}"
+    assert run(f"bigGame({corson})") is True
+    assert run(f"bigGame(Object.assign({corson},{{to:3}}))") is False
 
 
 def test_tags_mark_upsets_close_games_and_dead_games():

@@ -65,7 +65,7 @@ Table columns: interest, game (away at home, preseason ranks), score, status (cl
 
 A newcomer is a player on a 2026-27 roster who is a freshman, an incoming transfer (any division), absent from every 2025-26 roster's stats, or under 30 minutes in 2025-26.
 
-A big game is any of: game score 15 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.
+A big game is any of: game score 11 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.
 
 The section sits above the scoreboard, lists player, team, reason (freshman, transfer from X, no 2025-26 minutes, under 30 minutes), line, and game, and sorts by game score.
 

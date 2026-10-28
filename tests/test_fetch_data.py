@@ -131,6 +131,11 @@ def test_game_score_and_big_game():
     assert not f.big_game(dict(LINE, pts=14, fgm=6, fga=12, reb=11))
     assert f.big_game(dict(LINE, reb=12))
     assert f.big_game(dict(LINE, stl=5))
+    # Olivia Corson at Eastern Illinois, 2026-10-27: game score 11.1, just over the cutoff.
+    corson = dict(LINE, pts=18, fgm=5, fga=14, ftm=4, fta=4, oreb=2, dreb=2, reb=4, to=2, stl=1, blk=1, pf=2)
+    assert round(f.game_score(corson), 1) == 11.1
+    assert f.big_game(corson)
+    assert not f.big_game(dict(corson, to=3))
 
 
 def test_sidearm_lines_from_full_feed():
