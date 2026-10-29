@@ -1,0 +1,341 @@
+{
+ "data": [
+  {
+   "id": 23488,
+   "date_info": {
+    "tbd": false,
+    "all_day": false,
+    "datetime_utc": "2026-10-28T21:00:00Z",
+    "date": "2026-10-28T00:00:00",
+    "time": "5:00 PM"
+   },
+   "client_id": 360,
+   "school_id": 1188,
+   "status": "A",
+   "noplay_text": null,
+   "conference_game": false,
+   "doubleheader": false,
+   "game_promotion_name": "Scrimmage",
+   "sport": {
+    "id": 4,
+    "title": "Women's Basketball",
+    "shortname": "wbball",
+    "abbrev": "WBB",
+    "global_sport_id": 4,
+    "is_doubleheader_sport": false
+   },
+   "location": {
+    "location": "Oswego, N.Y.",
+    "han": "H",
+    "facility": "Max Ziel Gymnasium"
+   },
+   "media": {
+    "tv": "",
+    "tv_image": null,
+    "radio": "",
+    "livestats": "https://oswegolakers.com/sidearmstats/wbball/summary",
+    "livestats_feed": "https://oswegolakers.com/api/livestats?game_id=23488",
+    "video": null,
+    "audio": null,
+    "tickets": null,
+    "boxscore": null
+   },
+   "home_team": {
+    "school_global_id": 1188,
+    "game_id": 23488,
+    "name": "Oswego State",
+    "logo": "https://oswegolakers.com/images/logos/site/site.png?transparent=1",
+    "website": "http://oswegolakers.com/",
+    "conference": {
+     "id": 100,
+     "name": "SUNYAC"
+    }
+   },
+   "away_team": {
+    "school_global_id": 1010,
+    "game_id": null,
+    "name": "Utica",
+    "logo": "https://oswegolakers.com/services/logo_handler.ashx?image_path=%2fimages%2flogos%2fMoose_FulClrB_WhtBG+(2)+(1).png&transparent=1",
+    "website": "http://www.ucpioneers.com/",
+    "conference": {
+     "id": 137,
+     "name": "Empire 8"
+    }
+   },
+   "division": {
+    "id": 23,
+    "name": "DIII"
+   },
+   "sidearmstats_active": null
+  },
+  {
+   "id": 5744,
+   "date_info": {
+    "tbd": false,
+    "all_day": false,
+    "datetime_utc": "2026-10-28T21:30:00Z",
+    "date": "2026-10-28T00:00:00",
+    "time": "5:30 PM"
+   },
+   "client_id": 2140,
+   "school_id": 1171,
+   "status": "A",
+   "noplay_text": null,
+   "conference_game": false,
+   "doubleheader": false,
+   "game_promotion_name": "Exhibition",
+   "sport": {
+    "id": 4,
+    "title": "Women's Basketball",
+    "shortname": "wbball",
+    "abbrev": "WBB",
+    "global_sport_id": 4,
+    "is_doubleheader_sport": false
+   },
+   "location": {
+    "location": "Geneseo, N.Y.",
+    "han": "H",
+    "facility": "Schrader Gym"
+   },
+   "media": {
+    "tv": "",
+    "tv_image": null,
+    "radio": "",
+    "livestats": "https://geneseoknights.com/sidearmstats/wbball/summary",
+    "livestats_feed": "https://geneseoknights.com/api/livestats?game_id=5744",
+    "video": "https://www.empire8network.com/geneseo/",
+    "audio": null,
+    "tickets": null,
+    "boxscore": null
+   },
+   "home_team": {
+    "school_global_id": 1171,
+    "game_id": 5744,
+    "name": "SUNY Geneseo",
+    "logo": "https://knights.geneseo.edu/images/logos/site/site.png?transparent=1",
+    "website": "http://knights.geneseo.edu/",
+    "conference": {
+     "id": 100,
+     "name": "SUNYAC"
+    }
+   },
+   "away_team": {
+    "school_global_id": null,
+    "game_id": null,
+    "name": "Binghamton",
+    "logo": "https://geneseoknights.com/services/logo_handler.ashx?image_path=%2fimages%2f2024%2f10%2f2%2fdownload.png&transparent=1",
+    "website": "https://binghamtonbearcats.com/",
+    "conference": null
+   },
+   "division": {
+    "id": 23,
+    "name": "DIII"
+   },
+   "sidearmstats_active": null
+  },
+  {
+   "id": 9899,
+   "date_info": {
+    "tbd": false,
+    "all_day": false,
+    "datetime_utc": "2026-10-28T23:00:00Z",
+    "date": "2026-10-28T00:00:00",
+    "time": "7:00 p.m."
+   },
+   "client_id": 843,
+   "school_id": 205,
+   "status": "A",
+   "noplay_text": null,
+   "conference_game": false,
+   "doubleheader": false,
+   "game_promotion_name": "",
+   "sport": {
+    "id": 4,
+    "title": "Women's Basketball",
+    "shortname": "wbball",
+    "abbrev": "WBB",
+    "global_sport_id": 4,
+    "is_doubleheader_sport": false
+   },
+   "location": {
+    "location": "Kent, Ohio",
+    "han": "H",
+    "facility": "Memorial Athletic and Convocation Center"
+   },
+   "media": {
+    "tv": "",
+    "tv_image": null,
+    "radio": "",
+    "livestats": "https://kentstatesports.com/sidearmstats/wbball",
+    "livestats_feed": "https://kentstatesports.com/api/livestats?game_id=9899",
+    "video": null,
+    "audio": null,
+    "tickets": "http://admin.kentstatesports.com/services/KSUTix.com",
+    "boxscore": null
+   },
+   "home_team": {
+    "school_global_id": 205,
+    "game_id": 9899,
+    "name": "Kent State University",
+    "logo": "https://kentstatesports.com/images/logos/site/site.png?transparent=1",
+    "website": "http://www.kentstatesports.com/",
+    "conference": {
+     "id": 15,
+     "name": "Mid-American"
+    }
+   },
+   "away_team": {
+    "school_global_id": 551,
+    "game_id": 12481,
+    "name": "Slippery Rock (Exhibition)",
+    "logo": "https://kentstatesports.com/services/logo_handler.ashx?image_path=%2fimages%2flogos%2fs1.png&transparent=1",
+    "website": "http://www.rockathletics.com/",
+    "conference": {
+     "id": 46,
+     "name": "PSAC"
+    }
+   },
+   "division": {
+    "id": 67,
+    "name": "DI"
+   },
+   "sidearmstats_active": null
+  },
+  {
+   "id": 15749,
+   "date_info": {
+    "tbd": false,
+    "all_day": false,
+    "datetime_utc": "2026-10-28T23:00:00Z",
+    "date": "2026-10-28T00:00:00",
+    "time": "7PM"
+   },
+   "client_id": 1184,
+   "school_id": 143,
+   "status": "A",
+   "noplay_text": null,
+   "conference_game": false,
+   "doubleheader": false,
+   "game_promotion_name": "Exhibition | First Game of Maria Marchesano Era",
+   "sport": {
+    "id": 4,
+    "title": "Women's Basketball",
+    "shortname": "wbball",
+    "abbrev": "WBB",
+    "global_sport_id": 4,
+    "is_doubleheader_sport": false
+   },
+   "location": {
+    "location": "Indianapolis, Ind.",
+    "han": "H",
+    "facility": "Hinkle Fieldhouse"
+   },
+   "media": {
+    "tv": "",
+    "tv_image": null,
+    "radio": "Butler Sports App/MIXLR",
+    "livestats": "https://www.statbroadcast.com/events/statbroadcast.php?t=1&gid=butl",
+    "livestats_feed": null,
+    "video": null,
+    "audio": "https://butlerathletics.mixlr.com/",
+    "tickets": "https://am.ticketmaster.com/butler/buy?filterType=41",
+    "boxscore": null
+   },
+   "home_team": {
+    "school_global_id": 143,
+    "game_id": 15749,
+    "name": "Butler University",
+    "logo": "https://butlersports.com/images/logos/site/site.png?transparent=1",
+    "website": "http://butlersports.com",
+    "conference": {
+     "id": 1,
+     "name": "Big East"
+    }
+   },
+   "away_team": {
+    "school_global_id": 1034,
+    "game_id": 7683,
+    "name": "Franklin",
+    "logo": "https://butlersports.com/services/logo_handler.ashx?image_path=%2fimages%2flogos%2fFranklin_College_2024.png&transparent=1",
+    "website": "http://www.franklingrizzlies.com/",
+    "conference": {
+     "id": 140,
+     "name": "Heartland Collegiate Athletic Conference"
+    }
+   },
+   "division": {
+    "id": 67,
+    "name": "DI"
+   },
+   "sidearmstats_active": null
+  },
+  {
+   "id": 2673,
+   "date_info": {
+    "tbd": false,
+    "all_day": false,
+    "datetime_utc": "2026-10-28T22:00:00Z",
+    "date": "2026-10-28T00:00:00",
+    "time": "6:00 PM"
+   },
+   "client_id": 2354,
+   "school_id": 4366,
+   "status": "A",
+   "noplay_text": null,
+   "conference_game": false,
+   "doubleheader": false,
+   "game_promotion_name": "",
+   "sport": {
+    "id": 8,
+    "title": "Women's Soccer",
+    "shortname": "wsoc",
+    "abbrev": "WSOC",
+    "global_sport_id": 8,
+    "is_doubleheader_sport": false
+   },
+   "location": {
+    "location": "Pineville, NC",
+    "han": "H",
+    "facility": "OrthoCarolina Sportsplex"
+   },
+   "media": {
+    "tv": "",
+    "tv_image": "http://charlotte.jwuathletics.com/images/2025/9/8/youthsportsnightsmall.png",
+    "radio": "",
+    "livestats": "https://charlotte.jwuathletics.com/sidearmstats/wsoc/summary",
+    "livestats_feed": "https://charlotte.jwuathletics.com/api/livestats?game_id=2673",
+    "video": "https://www.youtube.com/@JWUAthleticsCLT/streams",
+    "audio": null,
+    "tickets": null,
+    "boxscore": null
+   },
+   "home_team": {
+    "school_global_id": 4366,
+    "game_id": 2673,
+    "name": "Johnson & Wales University Charlotte",
+    "logo": "https://charlotte.jwuathletics.com/images/logos/site/site.png?transparent=1",
+    "website": "http://charlotte.jwuathletics.com/",
+    "conference": {
+     "id": 59,
+     "name": "Capital Athletic Conference"
+    }
+   },
+   "away_team": {
+    "school_global_id": 2016,
+    "game_id": 2832,
+    "name": "Warren Wilson",
+    "logo": "https://charlotte.jwuathletics.com/services/logo_handler.ashx?image_path=%2fimages%2flogos%2fWarren_Wilson.png&transparent=1",
+    "website": "http://www.warrenwilsonowls.com/",
+    "conference": {
+     "id": 164,
+     "name": "USCAA"
+    }
+   },
+   "division": {
+    "id": 46,
+    "name": "DII"
+   },
+   "sidearmstats_active": null
+  }
+ ]
+}

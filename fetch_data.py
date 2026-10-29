@@ -48,7 +48,8 @@ OUT = DATA / "data.json"
 EXTRA = DATA / "extra_games.json"
 MEMBERS = DATA / "ncaa_members.csv"
 SITE = json.loads((BASE / "site.json").read_text())
-UA = {"User-Agent": f"Mozilla/5.0 ({SITE.get('domain') or SITE['slug']} page builder)",
+# The bare domain: ESPN answers 403 to this user agent when it names www.tonightind3wbb.com.
+UA = {"User-Agent": f"Mozilla/5.0 ({re.sub(r'^www\.', '', SITE.get('domain') or SITE['slug'])} page builder)",
       "Accept": "text/html,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"}
 TAG = re.compile(r"<[^>]+>")
 FETCH_ERRORS = (urllib.error.URLError, TimeoutError, ValueError, KeyError, IndexError, ET.ParseError)
@@ -201,7 +202,35 @@ def sidearm_rows(url, tz):
                            "sidearm-schedule-neutral-game" in cls, text(opp_m.group(1)) if opp_m else "", links_in(b, url),
                            text(result_m.group(1)) if result_m else "", " ".join(text(m.group(1)) for m in (note_m, promo_m) if m),
                            opponent_link(opp_m.group(1)) if opp_m else ""))
-    return out or sidearm_table_rows(page, url, tz)
+    return out or sidearm_table_rows(page, url, tz) or sidearm_card_rows(page, url, tz)
+
+
+CARD_LINKS = {"live stats": "live_stats", "stats": "live_stats", "watch": "video", "box score": "boxscore"}
+
+
+def sidearm_card_rows(page, url, tz):
+    """Rows of Sidearm's newer layout (many Division I sites): one game card per game, a "vs" or "at" stamp,
+    "Oct 28 (Wed) 7:00 PM", the opponent linked as "<name> Website", and Live stats, Stats, and Watch links."""
+    soup = BeautifulSoup(page, "html.parser")
+    out = []
+    for card in soup.select('[data-test-id="s-game-card-standard__root"]'):
+        words = " ".join(card.get_text(" ", strip=True).split())
+        when = re.search(r"\b([A-Z][a-z]{2})\.? (\d{1,2}) \([A-Za-z]{3}\)\s*(TBA|TBD|\d{1,2}(?::\d{2})?\s*[AP]\.?M\.?(?:\s*[ECMP][SD]?T)?)?", words)
+        day = parse_month_day(f"{when.group(1)} {when.group(2)}") if when else None
+        team = card.select_one('a[aria-label$="Website"]')
+        if not day or not team:
+            continue
+        stamp = card.select_one(".s-stamp__text")
+        links = {}
+        for a in card.select("a[href]"):
+            key = CARD_LINKS.get(a.get_text(" ", strip=True).lower())
+            if key and key not in links:
+                links[key] = absolute(a["href"], url)
+        result = re.search(r"\b[WLT],?\s*\d{1,3}\s*-\s*\d{1,3}", words)
+        out.append(row(day, parse_time(when.group(3) or "", tz), (stamp.get_text(strip=True) if stamp else "") == "vs", False,
+                       team.get("title") or team.get_text(" ", strip=True), links, result.group(0) if result else "",
+                       "exhibition" if re.search(r"\bexhib", words, re.I) else "", team["href"].strip()))
+    return out
 
 
 def opponent_link(fragment):
@@ -295,8 +324,9 @@ def schedule_rows(school):
 
 def find_row(rows, day, opponent, exhibition=False):
     """The page's row for the game on `day` against `opponent`. A team rarely plays twice a day,
-    so the date decides; opponent-name overlap breaks a tie. Exhibition rows count only for extra games."""
-    same_day = [r for r in rows if r["day"] == day and r["exhibition"] == exhibition]
+    so the date decides; opponent-name overlap breaks a tie. Exhibition rows count only for extra games.
+    With exhibition=None either kind counts: a Division I host and its D3 guest often label the same game differently."""
+    same_day = [r for r in rows if r["day"] == day and (exhibition is None or r["exhibition"] == exhibition)]
     if len(same_day) <= 1:
         return same_day[0] if same_day else None
     want = name_tokens(opponent)
@@ -373,8 +403,10 @@ def other_games(day, schools, pages, members, ranks, covered):
                           "label": "Exhibition" if r["exhibition"] else None, "division": division, "d3": team,
                           "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0})
             if member["site"] and opp not in schools:
-                # A Sidearm host's own feed is the fallback when the D3 page has no live stats link.
-                hosts[opp] = {"team": opp, "type": "Sidearm", "schedule": f"https://{member['site']}/", "tz": school["tz"], "extra": True}
+                # The host's own schedule page fills a tipoff or live stats link the D3 page leaves out, and its
+                # Sidearm feed is a fallback. Its times print without a zone; the D3 team's zone is the best guess.
+                hosts[opp] = {"team": opp, "type": "Sidearm", "schedule": f"https://{member['site']}/sports/womens-basketball/schedule",
+                              "tz": school["tz"], "extra": True}
     return games, hosts
 
 
@@ -408,12 +440,212 @@ def live_feed(url):
     return feed
 
 
+def sidearm_over(g):
+    """True when a Sidearm feed's game is over. Some crews never set IsComplete (Butler, 2026-10-28), so the clock
+    at 0:00 in the last period of regulation or later, with no tie, also counts."""
+    regulation = 2 if num((g.get("Rules") or {}).get("PeriodMinutes")) >= 20 else 4
+    return bool(g.get("IsComplete")) or (num(g.get("Period")) >= regulation and g.get("ClockSeconds") == 0
+                                         and num(g["HomeTeam"].get("Score")) != num(g["VisitingTeam"].get("Score")))
+
+
 def house_feed(school):
-    """A Sidearm school's own women's basketball feed, used when a home game has no live stats link yet."""
+    """A Sidearm school's own women's basketball feed, used when a home game has no live stats link yet. The feed
+    answers 404 until the school's first game starts, so a 404 before tipoff says nothing about the game."""
     if not school or school["type"] != "Sidearm":
         return None
     host = re.match(r"(https?://[^/]+)", school["schedule"]).group(1)
-    return live_feed(f"{host}/sidearmstats/wbball")
+    feed = live_feed(f"{host}/sidearmstats/wbball")
+    return feed if feed and feed["type"] == "sidearm" else None
+
+
+# ---------------------------------------------------------------- Sidearm hub and ESPN
+
+HUB = "https://aggregation-service.sidearmsports.com/services/games.ashx"
+ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball"
+
+
+def hub_games(day):
+    """Women's basketball games on `day` from the feed behind sidearmstats.com/hub: every game a Sidearm school
+    lists, with tipoff in UTC, both teams' sites, and the live stats link. It answers only for about yesterday
+    through tomorrow. A TBA game carries midnight UTC on its date, so the window opens then and the date field
+    picks the day. `listing_home` says which side posted the listing; its live stats link belongs to that side."""
+    start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+    query = urllib.parse.urlencode({"start_date": start.isoformat().replace("+00:00", "Z"),
+                                    "end_date": (start + timedelta(hours=36)).isoformat().replace("+00:00", "Z")})
+    out = []
+    for g in get(f"{HUB}?{query}", as_json=True).get("data") or []:
+        info, home, away = g.get("date_info") or {}, g.get("home_team"), g.get("away_team")
+        if (g.get("sport") or {}).get("shortname") != "wbball" or (info.get("date") or "")[:10] != day.isoformat() \
+                or not isinstance(home, dict) or not isinstance(away, dict) or g.get("status") == "C":
+            continue
+        timed = not info.get("tbd") and not info.get("all_day") and info.get("datetime_utc")
+        names = f"{home.get('name') or ''} {away.get('name') or ''}"
+        han = (g.get("location") or {}).get("han")
+        out.append({"home": home.get("name") or "", "away": away.get("name") or "", "division": (g.get("division") or {}).get("name"),
+                    "home_site": site_of(home.get("website")), "away_site": site_of(away.get("website")),
+                    "home_id": home.get("school_global_id"), "away_id": away.get("school_global_id"),
+                    "neutral": han == "N", "listing_home": han != "A",
+                    "exhibition": bool(re.search(r"exhib|scrimmage", g.get("game_promotion_name") or "", re.I)
+                                       or re.search(r"\(ex|exhib|scrimmage", names, re.I)),
+                    "tip": info["datetime_utc"] if timed else None, "livestats": (g.get("media") or {}).get("livestats")})
+    return out
+
+
+def espn_games(day):
+    """Regular-season Division I games on `day` from ESPN's scoreboard. A team outside Division I has no conference
+    and isActive false. ESPN lists no exhibitions."""
+    out = []
+    for e in get(f"{ESPN}/scoreboard?dates={day:%Y%m%d}&groups=50&limit=500", as_json=True).get("events") or []:
+        c = e["competitions"][0]
+        tip = datetime.fromisoformat(e["date"].replace("Z", "+00:00"))
+        if tip.astimezone(EASTERN).date() != day:
+            continue
+        sides = {x["homeAway"]: {"name": x["team"].get("location") or "", "d1": bool(x["team"].get("isActive"))} for x in c["competitors"]}
+        if "home" in sides and "away" in sides:
+            out.append({"id": e["id"], "home": sides["home"], "away": sides["away"], "neutral": bool(c.get("neutralSite")),
+                        "tip": None if (c.get("timeValid") is False) else tip.isoformat().replace("+00:00", "Z")})
+    return out
+
+
+def espn_feed(event_id):
+    """The game's light ESPN feed (about 14 KB) and its summary with player box scores (about 500 KB). Both allow
+    reads from any site."""
+    return {"type": "espn", "url": f"{ESPN}/scoreboard/{event_id}", "full": f"{ESPN}/summary?event={event_id}"}
+
+
+def name_keys(name):
+    """Spellings of a team name for matching ESPN's: 'Fitchburg St.' -> {'fitchburgst', 'fitchburgstate'}."""
+    base = re.sub(r"[^a-z()]", "", name.lower().replace("&", "and"))
+    return {base, re.sub(r"st$", "state", base) if re.search(r"\bSt\.?$", name) else base, re.sub(r"[()]", "", base)}
+
+
+def team_sites(schools):
+    """{site: team} for D3 schools whose schedule page sits on their own site (not a conference site several share)."""
+    by_site = {}
+    for team, s in schools.items():
+        if not s.get("extra") and s.get("schedule"):
+            by_site.setdefault(site_of(s["schedule"]), []).append(team)
+    return {site: teams[0] for site, teams in by_site.items() if len(teams) == 1}
+
+
+def d3_keys(schools):
+    """{name key: team} for D3 schools, keeping only keys that fit one school."""
+    keys = {}
+    for team, s in schools.items():
+        if not s.get("extra"):
+            for k in name_keys(team):
+                keys.setdefault(k, set()).add(team)
+    return {k: next(iter(v)) for k, v in keys.items() if len(v) == 1}
+
+
+def hub_teams(h, sites, keys, others=frozenset(), by_name=True):
+    """(home, away) as D3 team names, None for a team outside Division III. The hub's team sites do not always
+    match ours (SUNY Geneseo: knights.geneseo.edu, schedule on geneseoknights.com), so the listing team's live
+    stats link and then the name are fallbacks. A site in `others` (Division I and II members) rules out a name match,
+    because names repeat across divisions (Pacific). With by_name False, only sites count."""
+    def which(name, *hosts):
+        found = next((sites[s] for s in hosts if s in sites), None)
+        if found or others & set(hosts) or not by_name:
+            return found
+        return next((keys[k] for k in name_keys(hub_name(name)) if k in keys), None)
+    stats = site_of(h["livestats"])
+    return (which(h["home"], h["home_site"], *([stats] if h.get("listing_home", True) else [])),
+            which(h["away"], h["away_site"], *([] if h.get("listing_home", True) else [stats])))
+
+
+def hub_name(raw):
+    """A hub team name for matching: exhibition marks and "University" or "College" go, a state qualifier stays,
+    so "Bethel University (Ind.)" stays apart from Bethel in Minnesota."""
+    name = re.sub(r"\((?:exhibition|exh?\.?)\)", "", raw or "", flags=re.I)
+    return " ".join(re.sub(r"\b(?:University|College)\b", "", name).split())
+
+
+def upper_sites(members):
+    return frozenset(s for s, m in members["site"].items() if m["division"] in (1, 2))
+
+
+def find_hub(g, hub, schools, others=frozenset()):
+    """The hub's listing of game g: one D3 team matches and the other team's names share a word, so a namesake
+    listing (Thomas University for Thomas in Maine) does not count. NAIA listings are skipped."""
+    sites, keys = team_sites(schools), d3_keys(schools)
+    for h in hub:
+        if h["division"] not in ("DI", "DII", "DIII"):
+            continue
+        home, away = hub_teams(h, sites, keys, others)
+        for mine, theirs, other_mine, other_theirs in ((home, g["home"], g["away"], h["away"]), (away, g["away"], g["home"], h["home"])):
+            if mine and mine == theirs and name_tokens(other_mine) & name_tokens(hub_name(other_theirs)):
+                return h
+    return None
+
+
+def find_espn(g, espn, keys):
+    """ESPN's listing of game g: the D3 team's name matches ESPN's non-D1 team, and the other names share a word."""
+    for e in espn:
+        for mine, theirs, other_mine, other_theirs in ((g["home"], e["home"], g["away"], e["away"]), (g["away"], e["away"], g["home"], e["home"])):
+            if not theirs["d1"] and any(keys.get(k) == mine for k in name_keys(theirs["name"])) \
+                    and name_tokens(other_mine) & name_tokens(other_theirs["name"]):
+                return e
+    return None
+
+
+def espn_confirmed(g, day, schools, pages):
+    host = g["away"] if g["home"] == g["d3"] else g["home"]
+    site = site_of(schools[g["d3"]].get("schedule"))
+    return any(r["day"] == day and site_of(r.get("opponent_url")) == site for r in pages.get(host, []))
+
+
+def listed_games(day, hub, espn, schools, members, ranks, taken, blocked):
+    """Games against Division I and II teams that no D3 schedule page gave. From the hub, with the D3 team found by
+    its site only: D3 pages often leave out an exhibition at a Division I school (Spalding at Bellarmine). From
+    ESPN only for a team in `blocked`, whose page could not be read, marked "espn" for collect() to check against
+    the host's page. `taken` holds the D3 teams that already have a game that day. Returns the games and host
+    entries for opponents outside schools.csv, as other_games() does."""
+    sites, keys, games, hosts = team_sites(schools), d3_keys(schools), [], {}
+    # A team plays once a day. A school's listing can carry the wrong opponent record (Indiana's "Marian" with
+    # Marian of Wisconsin's site, while Marian of Indiana lists the game too), so a team the hub puts against two
+    # different schools that day adds nothing. NAIA listings count here.
+    faced = {}
+    for h in hub:
+        if h.get("home_id") and h.get("away_id"):
+            faced.setdefault(h["home_id"], set()).add(h["away_id"])
+            faced.setdefault(h["away_id"], set()).add(h["home_id"])
+
+    def add(team, opp, team_home, neutral, label, division, tip, site, **mark):
+        home, away = (team, opp) if team_home else (opp, team)
+        games.append({"date": day.isoformat(), "home": home, "away": away, "neutral": neutral, "label": label,
+                      "division": division, "d3": team, "home_rank": ranks.get(home), "away_rank": ranks.get(away),
+                      "pregame_wp": 0.5, "pregame_margin": 0.0, "tip": tip, **mark})
+        taken.add(team)
+        if site and opp not in schools:
+            hosts[opp] = {"team": opp, "type": "Sidearm", "schedule": f"https://{site}/sports/womens-basketball/schedule",
+                          "tz": schools[team]["tz"], "extra": True}
+
+    for h in hub:
+        # The listing school's division; an NAIA school's listing of a game is about NAIA teams.
+        if h["division"] not in ("DI", "DII", "DIII"):
+            continue
+        home_team, away_team = hub_teams(h, sites, keys, by_name=False)
+        team = home_team or away_team
+        if bool(home_team) == bool(away_team) or team in taken \
+                or any(len(faced.get(h.get(k), ())) > 1 for k in ("home_id", "away_id")):
+            continue
+        raw = h["away"] if home_team else h["home"]
+        member = members["site"].get(h["away_site"] if home_team else h["home_site"])
+        if not member and hub_name(raw) == hub_name(re.sub(r"\([^)]*\)", "", raw)):
+            # By name only when no state qualifier says it is another school ("Holy Cross College (Ind.)").
+            hits = members["name"].get(name_key(raw), [])
+            member = hits[0] if len(hits) == 1 else None
+        if member and member["division"] in (1, 2):
+            add(team, opponent_name(raw), bool(home_team), h["neutral"], "Exhibition" if h.get("exhibition") else None,
+                member["division"], h["tip"], member["site"])
+    for e in espn:
+        for mine, other, team_home in ((e["home"], e["away"], True), (e["away"], e["home"], False)):
+            team = next((keys[k] for k in name_keys(mine["name"]) if k in keys), None)
+            if team and team in blocked and team not in taken and not mine["d1"] and other["d1"]:
+                hits = members["name"].get(name_key(other["name"]), [])
+                if len(hits) == 1:
+                    add(team, other["name"], team_home, e["neutral"], None, 1, e["tip"], hits[0]["site"], source="espn")
+    return games, hosts
 
 
 # ---------------------------------------------------------------- finals and newcomers
@@ -482,6 +714,31 @@ def presto_lines(root):
     return out
 
 
+def espn_lines(summary):
+    """{'H'|'V': [...]} from an ESPN summary. Each team's statistics list names its columns (MIN, PTS, FG as
+    "made-attempted", and so on); the header says which team is home."""
+    side = {c["team"]["id"]: "H" if c["homeAway"] == "home" else "V" for c in summary["header"]["competitions"][0]["competitors"]}
+    out = {}
+    for team in (summary.get("boxscore") or {}).get("players") or []:
+        block = (team.get("statistics") or [{}])[0]
+        names = block.get("names") or block.get("labels") or []
+        lines = []
+        for a in block.get("athletes") or []:
+            v = dict(zip(names, a.get("stats") or []))
+            if not v:
+                continue  # did not play
+            full = a["athlete"].get("displayName") or ""
+            first, _, last = full.partition(" ")
+            fgm, fga = made_attempted(v.get("FG"))
+            ftm, fta = made_attempted(v.get("FT"))
+            lines.append({"first": first, "last": last, "abbr": a["athlete"].get("shortName") or full, "min": num(v.get("MIN")),
+                          "pts": num(v.get("PTS")), "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta, "oreb": num(v.get("OREB")),
+                          "dreb": num(v.get("DREB")), "reb": num(v.get("REB")), "ast": num(v.get("AST")), "to": num(v.get("TO")),
+                          "stl": num(v.get("STL")), "blk": num(v.get("BLK")), "pf": num(v.get("PF"))})
+        out[side.get(team["team"]["id"], "V")] = lines
+    return out
+
+
 def norm(name):
     return re.sub(r"[^a-z]", "", (name or "").lower())
 
@@ -513,10 +770,19 @@ def read_final(game):
     if not feed:
         return None
     day = date.fromisoformat(game["date"])
-    if feed["type"] == "sidearm":
+    if feed["type"] == "espn":
+        summary = get(feed["full"], as_json=True)
+        comp = summary["header"]["competitions"][0]
+        if not comp["status"]["type"].get("completed"):
+            return None
+        sides = {c["homeAway"]: c for c in comp["competitors"]}
+        home_score, away_score = num(sides["home"].get("score")), num(sides["away"].get("score"))
+        feed_home = sides["home"]["team"].get("location") or ""
+        lines = espn_lines(summary) if game["newcomers_home"] or game["newcomers_away"] else {}
+    elif feed["type"] == "sidearm":
         full = get(feed["url"] + "?detail=full", as_json=True)
         g = full["Game"]
-        if not g.get("IsComplete") or not feed_date_matches(g.get("Date"), day):
+        if not sidearm_over(g) or not feed_date_matches(g.get("Date"), day):
             return None
         home_score, away_score = num(g["HomeTeam"]["Score"]), num(g["VisitingTeam"]["Score"])
         feed_home = g["HomeTeam"]["Name"]
@@ -563,31 +829,49 @@ def result_score(r, page_is_home):
     return (mine, theirs) if page_is_home else (theirs, mine)
 
 
-def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None):
+def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None, hub=(), espn=(), others=frozenset()):
     prev = {g["id"]: g for g in (previous or {}).get("games", [])}
+    keys = d3_keys(schools)
     out = []
     for g in games:
         gid = f'{g["date"]}-{norm(g["away"])}-at-{norm(g["home"])}'
-        exhibition = g.get("label") == "Exhibition"
+        # A Division I host and its D3 guest often disagree on whether a game is an exhibition.
+        exhibition = None if g.get("division") else g.get("label") == "Exhibition"
         home_row = find_row(pages.get(g["home"], []), day, g["away"], exhibition)
         away_row = find_row(pages.get(g["away"], []), day, g["home"], exhibition)
-        timed = [r for r in (home_row, away_row) if r and r["time"]]
-        tip, tbd = tip_time(timed[0] if timed else None, day)
-        if not tip and g.get("tip"):
-            tip, tbd = g["tip"], False
-        # Feed order: the home page's live stats link, the home school's own Sidearm feed, then the away page's link.
-        # An away school's link can point at its own stat page, which shows the host's game only some of the time.
+        listed, espn_game = find_hub(g, hub, schools, others), find_espn(g, espn, keys) if g.get("division") else None
+        # Tipoff order: a D3 page, a tip set by hand in extra_games.json, the hub and ESPN (both UTC), then a
+        # Division I or II host's page, whose zone is a guess.
+        own = [r for t, r in ((g["home"], home_row), (g["away"], away_row)) if r and r["time"] and not schools.get(t, {}).get("extra")]
+        hosts = [r for t, r in ((g["home"], home_row), (g["away"], away_row)) if r and r["time"] and schools.get(t, {}).get("extra")]
+        tip, tbd = tip_time(own[0] if own else None, day)
+        for later in (g.get("tip"), (listed or {}).get("tip"), (espn_game or {}).get("tip")):
+            if not tip and later:
+                tip, tbd = later, False
+        if not tip and hosts:
+            tip, tbd = tip_time(hosts[0], day)
+        # Feed order: the home page's live stats link, the hub's link when the home school posted the listing, the
+        # home school's own Sidearm feed, the away side's links, then ESPN. An away school's link can point at its
+        # own stat page, which shows the host's game only some of the time.
         home_link = (home_row or {}).get("links", {}).get("live_stats")
         away_link = (away_row or {}).get("links", {}).get("live_stats")
-        feed = live_feed(home_link)
-        link = home_link
+        hub_link = (listed or {}).get("livestats")
+        hub_home = (listed or {}).get("listing_home", True)
+        feed, link = live_feed(home_link), home_link
+        if not feed and hub_link and hub_home:
+            feed, link = live_feed(hub_link), link or hub_link
         if not feed and not g["neutral"]:
             feed = house_feed(schools.get(g["home"]))
             if feed and not link:
                 # Link the host's stat page, the one the feed reads, rather than the away school's.
                 link = f'{re.match(r"(https?://[^/]+)", schools[g["home"]]["schedule"]).group(1)}/sidearmstats/wbball/summary'
+        if not feed and hub_link and not hub_home:
+            feed, away_link = live_feed(hub_link), away_link or hub_link
         if not feed:
             feed = live_feed(away_link)
+        if not feed and espn_game:
+            feed = espn_feed(espn_game["id"])
+            link = link or f'https://www.espn.com/womens-college-basketball/game/_/gameId/{espn_game["id"]}'
         link = (links or {}).get(gid) or link or away_link
         video = (home_row or {}).get("links", {}).get("video") or (away_row or {}).get("links", {}).get("video")
         old = prev.get(gid, {})
@@ -675,15 +959,39 @@ def collect(previous):
     for g in extra.get("games", []):
         g["home_rank"], g["away_rank"] = g.get("home_rank") or ranks.get(g["home"]), g.get("away_rank") or ranks.get(g["away"])
     covered = {(g["date"], t) for g in extra.get("games", []) for t in (g["home"], g["away"])}
+    # A D3 page that could not be read (Presto sites behind AWS WAF answer 405) hides that team's games against
+    # Division I and II teams; ESPN lists the regular-season ones.
+    blocked = {t for t in schools if not schools[t].get("extra") and not pages.get(t)}
+
+    def listing(source, reader, d):
+        try:
+            return reader(d)
+        except (*FETCH_ERRORS, TypeError, AttributeError, KeyError, IndexError) as exc:
+            # A changed JSON shape costs this listing, not the run.
+            out["errors"].append(f"{source} {d.isoformat()}: {exc!r}")
+            return []
+
     for d in window:
         others, hosts = other_games(d, schools, pages, members, ranks, covered)
-        for name, school in hosts.items():
-            schools.setdefault(name, school)
+        hub, espn = listing("Sidearm hub", hub_games, d), listing("ESPN", espn_games, d)
+        taken = {t for g in by_day.get(d.isoformat(), []) + others for t in (g["home"], g["away"])}
+        listed, listed_hosts = listed_games(d, hub, espn, schools, members, ranks, taken, blocked)
+        others += listed
+        hosts.update(listed_hosts)
+        new_hosts = {name: school for name, school in hosts.items() if name not in schools}
+        schools.update(new_hosts)
+        # Host pages fill tipoffs and live stats links. A host page that fails costs nothing, so its error is not kept.
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            for team, rows, _err in pool.map(load, sorted(n for n in new_hosts if n not in pages)):
+                pages[team] = rows
+        # ESPN names a non-D1 team by its location only, so an ESPN game stays only when the host's page links the
+        # D3 team's site that day.
+        others = [g for g in others if g.pop("source", None) != "espn" or espn_confirmed(g, d, schools, pages)]
         if others:
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(others)
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, by_day.get(d.isoformat(), []) + others, schools, pages, tourn, newcomers, read_json(path),
-                            extra.get("links"))
+                            extra.get("links"), hub, espn, upper_sites(members))
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
     # Finals: one full-feed read per unfinished game from yesterday and today, read in parallel.

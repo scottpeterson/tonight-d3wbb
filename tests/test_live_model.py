@@ -3,13 +3,15 @@ import json
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from build_site import LIVE_JS
 
 FUNCS = ["phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
-         "statusText", "gameScore", "bigGame", "matchNewcomer", "tags", "rank", "sideTag", "winCell"]
+         "statusText", "gameScore", "bigGame", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
+         "num", "ma", "espnState", "espnLines"]
 CONSTS = ["GAME_MS", "SD", "esc", "WAIT_CURVE", "norm"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -123,3 +125,28 @@ def test_division_one_game_shows_a_badge_and_no_model_cells():
     assert run(f"winCell({g},{{wp:0.3}})") == "-"
     # No upset term: a D3 team leading a D1 team does not raise interest past an even game.
     assert run(f"interest({g},{{progress:0.5,wp:0.2}})") < run(f"interest({g},{{progress:0.5,wp:0.5}})")
+
+
+def test_espn_light_feed_and_summary():
+    fix = Path(__file__).parent / "fixtures"
+    event, summary = (fix / "espn_event.json").read_text(), (fix / "espn_summary.json").read_text()
+    s = run(f"espnState({event})")
+    assert (s["home"], s["away"], s["feedHome"], s["complete"], s["progress"], s["lines"]) == (56, 71, "Marquette", True, 1, None)
+    s = run(f"espnState({summary})")
+    strong = next(l for l in s["lines"]["V"] if l["last"] == "Strong")
+    assert (strong["first"], strong["pts"], strong["fgm"], strong["fga"], strong["min"]) == ("Sarah", 22, 9, 20, 27)
+    pre = json.loads(event)
+    pre["status"]["type"]["state"] = "pre"
+    pre["competitions"][0]["status"]["type"]["state"] = "pre"
+    assert run(f"espnState({json.dumps(pre)})") is None
+
+
+def test_espn_summary_clock_and_dead_games():
+    summary = json.loads((Path(__file__).parent / "fixtures" / "espn_summary.json").read_text())
+    st = summary["header"]["competitions"][0]["status"]
+    st.pop("clock", None)
+    st.update(period=3, displayClock="4:12", type=dict(st["type"], state="in", completed=False, name="STATUS_IN_PROGRESS"))
+    s = run(f"espnState({json.dumps(summary)})")
+    assert (s["status"], s["progress"]) == ("4:12 Q3", pytest.approx(0.645))
+    st["type"].update(state="post", name="STATUS_POSTPONED")
+    assert run(f"espnState({json.dumps(summary)})") is None

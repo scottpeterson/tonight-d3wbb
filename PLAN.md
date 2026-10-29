@@ -74,6 +74,7 @@ The section sits above the scoreboard, lists player, team, reason (freshman, tra
 - Sidearm light feed `sidearmstats.com/<client>/wbball/game.json`: about 4 KB, score, period, clock, `IsComplete`. Holds the client's latest game, so the date must match.
 - Sidearm full feed `?detail=full`: adds `Stats.<side>.PlayerGroups.Players.Values` (Name as "E. WILLIAMSON", Minutes, Fgam "made-attempted", Points, rebounds, and so on) and `Stats.<side>.Players` (FirstName, LastName, PersonId).
 - Presto `data.prestolivestats.com/xml/<site>/events/<event>.xml`: StatCrew XML with `<player>` stats.
+- ESPN `scoreboard/<id>` (light, about 14 KB) and `summary?event=<id>` (player box scores, about 500 KB): the feed for a Division I regular-season game with no Sidearm or Presto feed. Added 2026-10-28.
 - StatBroadcast: no readable feed. Those rows show a link only.
 
 ## Build order

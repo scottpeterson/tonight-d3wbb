@@ -367,13 +367,39 @@ function prestoLines(x){
   });});
   return out;
 }
+// ESPN's light feed (one scoreboard event) and its summary (header plus player box scores) share these fields.
+// The event id names one game, so no date check is needed.
+function espnState(j){
+  const c=(j.header||j).competitions[0],st=c.status||j.status||{},type=st.type||{};
+  if(type.state==='pre'||/POSTPONED|CANCELED/.test(type.name||'')||(type.state==='post'&&!type.completed))return null;
+  // The summary carries only displayClock; the light feed carries clock in seconds.
+  const side=h=>c.competitors.find(x=>x.homeAway===h)||{},regulation=4,period=num(st.period),
+    clock=typeof st.clock==='number'?Math.round(st.clock):clockToSec(st.displayClock||'0:00');
+  const complete=!!type.completed;
+  return {home:num(side('home').score),away:num(side('away').score),feedHome:(side('home').team||{}).location,complete,period,regulation,
+    progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:j.boxscore?espnLines(j):null};
+}
+function espnLines(j){
+  const side={},out={};
+  j.header.competitions[0].competitors.forEach(c=>{side[c.team.id]=c.homeAway==='home'?'H':'V';});
+  ((j.boxscore||{}).players||[]).forEach(t=>{
+    const b=(t.statistics||[])[0]||{},names=b.names||b.labels||[];
+    out[side[t.team.id]||'V']=(b.athletes||[]).filter(a=>(a.stats||[]).length).map(a=>{
+      const v={};names.forEach((n,i)=>{v[n]=a.stats[i];});const fg=ma(v.FG),ft=ma(v.FT),full=a.athlete.displayName||'',sp=full.indexOf(' ');
+      return {first:sp>0?full.slice(0,sp):full,last:sp>0?full.slice(sp+1):'',abbr:a.athlete.shortName||full,min:num(v.MIN),pts:num(v.PTS),fgm:fg[0],fga:fg[1],ftm:ft[0],fta:ft[1],
+        oreb:num(v.OREB),dreb:num(v.DREB),reb:num(v.REB),ast:num(v.AST),to:num(v.TO),stl:num(v.STL),blk:num(v.BLK),pf:num(v.PF)};});
+  });
+  return out;
+}
 // One read of a game's feed. Returns null when the feed shows a different game or has not started.
 async function readFeed(g,full){
   const f=g.feed;tokens.push(Date.now());
-  const url=f.type==='sidearm'&&full?f.url+'?detail=full':f.url;
+  const url=f.type==='espn'?(full?f.full:f.url):f.type==='sidearm'&&full?f.url+'?detail=full':f.url;
   const r=await fetch(url,{cache:'no-store'});if(!r.ok)return null;
   let s;
-  if(f.type==='sidearm'){
+  if(f.type==='espn'){
+    s=espnState(await r.json());if(!s)return null;
+  }else if(f.type==='sidearm'){
     const j=await r.json(),G=j.Game;
     if(!G||!G.HasStarted)return null;
     // Stat crews sometimes leave the feed's date unset or stale (1/1/0001). Then the feed counts when one of its teams
@@ -381,8 +407,10 @@ async function readFeed(g,full){
     const ours=overlap(G.HomeTeam.Name,g.home)+overlap(G.HomeTeam.Name,g.away)+overlap(G.VisitingTeam.Name,g.home)+overlap(G.VisitingTeam.Name,g.away)>0;
     if(G.Date!==mdy(g.date)&&!(ours&&(!G.IsComplete||g.st.live)))return null;
     const regulation=num((G.Rules||{}).PeriodMinutes)>=20?2:4,period=num(G.Period),clock=num(G.ClockSeconds);
-    s={home:num(G.HomeTeam.Score),away:num(G.VisitingTeam.Score),feedHome:G.HomeTeam.Name,complete:!!G.IsComplete,period,regulation,
-       progress:G.IsComplete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:full?sidearmLines(j):null};
+    // Some crews never set IsComplete (Butler, 2026-10-28). The clock at 0:00 in the last period with no tie is a final.
+    const complete=!!G.IsComplete||(period>=regulation&&G.ClockSeconds===0&&num(G.HomeTeam.Score)!==num(G.VisitingTeam.Score));
+    s={home:num(G.HomeTeam.Score),away:num(G.VisitingTeam.Score),feedHome:G.HomeTeam.Name,complete,period,regulation,
+       progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:full?sidearmLines(j):null};
   }else{
     const x=new DOMParser().parseFromString(await r.text(),'application/xml');
     const venue=x.querySelector('venue'),st=x.querySelector('status'),rules=x.querySelector('rules');
@@ -441,7 +469,7 @@ async function check(g){
     if(s.complete){
       st.final=true;st.live=false;
       if(hasNewcomers(g)&&!st.finalRead){
-        let full=s;if(g.feed.type==='sidearm'&&!s.lines){try{full=await readFeed(g,true)||s;}catch(e){}}
+        let full=s;if(g.feed.type!=='presto'&&!s.lines){try{full=await readFeed(g,true)||s;}catch(e){}}
         st.finalRead=true;addNewcomers(g,newcomerLines(g,full,'final'));
       }
     }else if(!s.lines&&hasNewcomers(g)&&!st.halfRead&&s.progress>=0.5){
