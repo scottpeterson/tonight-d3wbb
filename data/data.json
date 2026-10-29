@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-10-28T17:08:33+00:00",
+ "fetched_at": "2026-10-29T00:50:19+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -23,7 +23,6 @@
   "La Roche schedule: HTTP Error 405: Not Allowed",
   "Lasell schedule: HTTP Error 405: Not Allowed",
   "Lesley schedule: HTTP Error 405: Not Allowed",
-  "MCLA schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "La Verne at California State University at Fullerton feed: HTTP Error 404: Not Found"
  ],
