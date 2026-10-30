@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-10-29T17:24:04+00:00",
+ "fetched_at": "2026-10-30T16:59:44+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -21,10 +21,10 @@
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "Juniata schedule: HTTP Error 405: Not Allowed",
   "La Roche schedule: HTTP Error 405: Not Allowed",
+  "Lasell schedule: HTTP Error 405: Not Allowed",
+  "Lesley schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Adrian at Western Michigan feed: HTTP Error 404: Not Found",
-  "La Verne at California State University at Fullerton feed: HTTP Error 404: Not Found",
-  "Southern Virginia at Radford feed: HTTP Error 404: Not Found"
+  "Benedictine at Milwaukee feed: HTTP Error 500: Internal Server Error"
  ],
  "stale": {},
  "dates": {
@@ -134,7 +134,7 @@
   "2027-02-21": 8,
   "2027-02-27": 4,
   "2026-10-27": 1,
-  "2026-10-29": 4,
-  "2026-10-30": 6
+  "2026-10-30": 6,
+  "2026-10-31": 2
  }
 }
