@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-10-30T16:59:44+00:00",
+ "fetched_at": "2026-10-30T21:26:56+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -22,7 +22,6 @@
   "Juniata schedule: HTTP Error 405: Not Allowed",
   "La Roche schedule: HTTP Error 405: Not Allowed",
   "Lasell schedule: HTTP Error 405: Not Allowed",
-  "Lesley schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Benedictine at Milwaukee feed: HTTP Error 500: Internal Server Error"
  ],
