@@ -269,7 +269,7 @@ HOW = """<dl class="terms">
 <dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
-<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks.</dd>
+<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more, and a star marks a top 25 team. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Newcomers</dt><dd>The full box score is read twice a game, at halftime and at the final, and only when a team has newcomers on its roster.</dd>
 </dl>"""
@@ -318,13 +318,17 @@ function waitMs(g,st){
   return base*Math.pow(0.5/p,MARGIN_STRETCH)*60000;
 }
 function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
+// A feed that has not shown tonight's game this long after tipoff is not covering it: the crew posts elsewhere
+// or not at all. Checks stop there.
+const GIVE_UP_MS=45*60000;
 function nextCheck(g,st,now){
-  if(st.final||!g.feed)return null;
+  if(st.final||st.noStats||!g.feed)return null;
   const tip=tipMs(g);
   if(tip&&now<tip+5*60000&&!st.live)return tip+5*60000;
   const end=(tip||now)+GAME_MS;
   if(now>=end)return now+15*60000;                 // past the expected end: look for the final every 15 minutes
-  return Math.min(now+waitMs(g,st),end);
+  const next=Math.min(now+waitMs(g,st),end);
+  return tip&&!st.seen&&now<tip+GIVE_UP_MS?Math.min(next,tip+GIVE_UP_MS):next;
 }
 
 // ---------- feeds
@@ -460,8 +464,9 @@ async function check(g){
   const wantHalf=hasNewcomers(g)&&!st.halfRead&&st.progress>=0.5&&!st.final;
   try{s=await readFeed(g,wantHalf);}catch(e){s=null;}
   const now=Date.now();
+  if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
   if(s){
-    st.live=!s.complete;st.score=[s.home,s.away];st.progress=s.progress;
+    st.seen=true;st.live=!s.complete;st.score=[s.home,s.away];st.progress=s.progress;
     const lead=s.home-s.away;
     st.wp=s.complete?(lead>0?1:lead<0?0:0.5):winProb(g,lead,s.progress);
     st.status=s.complete?'Final'+(s.period>s.regulation?' (OT)':''):s.status;
@@ -536,7 +541,7 @@ function row(g){
   else status='<span class="when">'+(g.tip?fmtTime(g.tip):'Time TBA')+'</span>';
   if(st.checked)status+='<span class="next ago">checked '+ago(st.checked)+'</span>';
   if(!st.final&&g.feed&&st.nextAt&&isToday())status+='<span class="next nx">next check '+inMin(st.nextAt)+'</span>';
-  if(!g.feed&&!st.final)status+='<span class="next">no live feed</span>';
+  if((!g.feed||st.noStats)&&!st.final)status+='<span class="next">no live stats</span>';
   if(g.video&&!st.final)status+='<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA}\u00a0Watch</a>';
   const leader=st.score?(st.score[0]>st.score[1]?0:st.score[1]>st.score[0]?1:-1):-1;
   const pts=i=>st.score?'<span class="pts'+(st.final&&leader===i?' win':leader===i?' lead':'')+'">'+st.score[i]+'</span>':'';

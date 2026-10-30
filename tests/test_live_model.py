@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "bigGame", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines"]
-CONSTS = ["GAME_MS", "SD", "esc", "WAIT_CURVE", "norm"]
+CONSTS = ["GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -150,3 +150,12 @@ def test_espn_summary_clock_and_dead_games():
     assert (s["status"], s["progress"]) == ("4:12 Q3", pytest.approx(0.645))
     st["type"].update(state="post", name="STATUS_POSTPONED")
     assert run(f"espnState({json.dumps(summary)})") is None
+
+
+def test_checks_stop_when_a_feed_never_shows_the_game():
+    g = json.dumps(dict(GAME, home_rank=350, away_rank=360, home_lev=0, away_lev=0))
+    tip = "Date.parse('2026-11-14T19:00:00Z')"
+    # Before the feed shows the game, the wait ends by 45 minutes after tipoff.
+    assert run(f"(nextCheck({g},{{interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") == 45
+    assert run(f"(nextCheck({g},{{seen:true,live:true,interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") > 45
+    assert run(f"nextCheck({g},{{noStats:true,interest:0,wp:0.5}},{tip}+3600000)") is None
