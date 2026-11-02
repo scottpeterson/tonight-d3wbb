@@ -159,3 +159,19 @@ def test_checks_stop_when_a_feed_never_shows_the_game():
     assert run(f"(nextCheck({g},{{interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") == 45
     assert run(f"(nextCheck({g},{{seen:true,live:true,interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") > 45
     assert run(f"nextCheck({g},{{noStats:true,interest:0,wp:0.5}},{tip}+3600000)") is None
+
+
+def _default_night(dates, today, boot_night="2026-11-01"):
+    js = (f"const BOOT={json.dumps({'dates': dates, 'night': boot_night})};function todayET(){{return '{today}'}}\n"
+          + source("defaultNight") + "\nconsole.log(JSON.stringify(defaultNight()));")
+    out = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+def test_default_night_comes_from_the_device_clock_not_the_build():
+    dates = ["2026-10-30", "2026-11-01", "2026-11-06", "2026-11-07"]
+    assert _default_night(dates, "2026-11-01") == "2026-11-01"      # tonight has games
+    assert _default_night(dates, "2026-11-02") == "2026-11-06"      # a page built Sunday, opened Monday
+    assert _default_night(dates, "2027-03-01") == "2026-11-07"      # after the season: the last night
+    assert _default_night([], "2026-11-02") == "2026-11-01"         # no dates at all: whatever the build chose

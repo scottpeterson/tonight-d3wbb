@@ -223,7 +223,11 @@ def footer():
 # ---------------------------------------------------------------------------
 
 def default_night(dates):
-    """Tonight in Eastern time when it has games; otherwise the next night with games, else the last one."""
+    """Tonight in Eastern time when it has games; otherwise the next night with games, else the last one.
+
+    This only picks which slate the page embeds. The browser makes the same choice from the device clock on
+    every load, so a page built yesterday still opens on tonight.
+    """
     today = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
     ahead = sorted(d for d in dates if d >= today)
     return ahead[0] if ahead else (max(dates) if dates else today)
@@ -492,7 +496,8 @@ function addNewcomers(g,list){
 }
 
 // ---------- scheduler: the most interesting due games first, within the per-minute budget
-function isToday(){const t=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date());return night===t||night===prevDay(t);}
+function todayET(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date());}
+function isToday(){const t=todayET();return night===t||night===prevDay(t);}
 function prevDay(d){const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()-1);return x.toISOString().slice(0,10);}
 async function tick(){
   if(document.hidden||!isToday())return;
@@ -614,12 +619,14 @@ async function go(d){
 }
 $('#prev').addEventListener('click',()=>{const i=BOOT.dates.indexOf(night);if(i>0)go(BOOT.dates[i-1]);});
 $('#next').addEventListener('click',()=>{const i=BOOT.dates.indexOf(night);if(i<BOOT.dates.length-1)go(BOOT.dates[i+1]);});
-$('#tonight').addEventListener('click',()=>go(BOOT.night));
+// The page is built a few times a day, so BOOT.night can be stale by morning: pick tonight from the device clock.
+function defaultNight(){const t=todayET(),ahead=BOOT.dates.filter(d=>d>=t);return ahead[0]||(BOOT.dates.length?BOOT.dates[BOOT.dates.length-1]:BOOT.night);}
+$('#tonight').addEventListener('click',()=>go(defaultNight()));
 // A header click sorts by that column and stops the automatic order; Interest restores it.
 document.querySelectorAll('#board th').forEach((th,i)=>{const f=()=>{userSorted=i!==0;if(i===0)setTimeout(render,0);};th.addEventListener('click',f);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')f();});});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
 document.addEventListener('tzchange',render);
-go(BOOT.night);
+go(defaultNight());
 tick();timer=setInterval(tick,5000);
 })();
 """.replace("SITE_KEY", SITE["slug"])
