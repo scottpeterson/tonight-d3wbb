@@ -74,10 +74,10 @@ def opinion_box(title, note, paragraphs):
 
 
 CSS = r"""
-:root{color-scheme:light;--bg:#f4f3ef;--surface:#ffffff;--surface2:#ecebe5;--line:#d8d5cb;--ink:#1e2229;--muted:#616873;--faint:#8c939d;--link:#1f4e79;--pos:#2e8b57;--neg:#c0504d;--live:#d6323c;--warn:#9a5b00;--accent:ACCENT_LIGHT;--on-accent:#fff;--chip:#e9e7df;--gray:#ebeae5;--logo-edge:drop-shadow(0 0 .5px rgba(0,0,0,.5));
+:root{color-scheme:light;--bg:#f4f3ef;--surface:#ffffff;--surface2:#ecebe5;--line:#d8d5cb;--ink:#1e2229;--muted:#616873;--faint:#8c939d;--link:#1f4e79;--pos:#2e8b57;--neg:#c0504d;--live:#d6323c;--warn:#9a5b00;--accent:ACCENT_LIGHT;--on-accent:#fff;--chip:#e9e7df;--gray:#ebeae5;--logo-edge:drop-shadow(0 0 .5px rgba(0,0,0,.5));--lift:0 1px 2px rgba(30,34,41,.1),0 3px 8px rgba(30,34,41,.08);
 --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:40px;--pill:36px;--fs-sm:.85rem;--fs-md:.95rem;--fs-base:1rem}
-:root[data-theme="dark"]{color-scheme:dark;--bg:#15181d;--surface:#1d2128;--surface2:#252a32;--line:#363c46;--ink:#e7e9ec;--muted:#a7adb7;--faint:#7d848f;--link:#8ab8e6;--pos:#5fc08a;--neg:#e2807c;--live:#ff6b6b;--warn:#e8b04b;--accent:ACCENT_DARK;--on-accent:#15181d;--chip:#2e343d;--gray:#252a32;--logo-edge:drop-shadow(0 0 .6px rgba(255,255,255,.85)) drop-shadow(0 0 .6px rgba(255,255,255,.55))}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#15181d;--surface:#1d2128;--surface2:#252a32;--line:#363c46;--ink:#e7e9ec;--muted:#a7adb7;--faint:#7d848f;--link:#8ab8e6;--pos:#5fc08a;--neg:#e2807c;--live:#ff6b6b;--warn:#e8b04b;--accent:ACCENT_DARK;--on-accent:#15181d;--chip:#2e343d;--gray:#252a32;--logo-edge:drop-shadow(0 0 .6px rgba(255,255,255,.85)) drop-shadow(0 0 .6px rgba(255,255,255,.55))}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#15181d;--surface:#1d2128;--surface2:#252a32;--line:#363c46;--ink:#e7e9ec;--muted:#a7adb7;--faint:#7d848f;--link:#8ab8e6;--pos:#5fc08a;--neg:#e2807c;--live:#ff6b6b;--warn:#e8b04b;--accent:ACCENT_DARK;--on-accent:#15181d;--chip:#2e343d;--gray:#252a32;--logo-edge:drop-shadow(0 0 .6px rgba(255,255,255,.85)) drop-shadow(0 0 .6px rgba(255,255,255,.55));--lift:0 1px 2px rgba(0,0,0,.45),0 4px 10px rgba(0,0,0,.35)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#15181d;--surface:#1d2128;--surface2:#252a32;--line:#363c46;--ink:#e7e9ec;--muted:#a7adb7;--faint:#7d848f;--link:#8ab8e6;--pos:#5fc08a;--neg:#e2807c;--live:#ff6b6b;--warn:#e8b04b;--accent:ACCENT_DARK;--on-accent:#15181d;--chip:#2e343d;--gray:#252a32;--logo-edge:drop-shadow(0 0 .6px rgba(255,255,255,.85)) drop-shadow(0 0 .6px rgba(255,255,255,.55));--lift:0 1px 2px rgba(0,0,0,.45),0 4px 10px rgba(0,0,0,.35)}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
 a{color:var(--link)}img{max-width:100%}button{font:inherit;cursor:pointer}
@@ -121,9 +121,9 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .toolbar .mine{margin-left:auto}.toolbar .mine[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
 .sortbar{margin:var(--s3) 0 0;align-items:flex-start}.sortbar .caption{width:100%}.sortbar .caption{display:flex;justify-content:space-between;gap:var(--s3)}.sortbar .checked{font-size:.75rem;color:var(--muted)}
 .sortbar .seg button{padding:5px 11px;font-size:var(--fs-sm)}
-.board{columns:520px 3;column-gap:0;column-rule:1px solid var(--line);background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.gc{display:grid;grid-template-columns:44px minmax(0,1fr) 150px 24px;grid-template-areas:"ix teams side star" ". meta meta meta";gap:0 var(--s2);align-items:center;padding:6px var(--s3) 6px var(--s2);box-shadow:0 -1px 0 var(--line);break-inside:avoid;font-size:.875rem;line-height:1.25}
-.ix{grid-area:ix;padding-left:var(--s1)}.int{display:block;font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem;line-height:1.2}.bar{display:block;height:4px;border-radius:2px;background:var(--surface2);margin-top:3px}.bar i{display:block;height:4px;border-radius:2px;background:var(--accent)}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));grid-auto-rows:1fr;gap:var(--s3);padding-bottom:var(--s1)}
+.gc{display:grid;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto auto 1fr;grid-template-areas:"ix teams" ". side" ". meta";gap:0 var(--s1);align-items:start;padding:var(--s2) var(--s2) var(--s1) var(--s2);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--lift);font-size:.875rem;line-height:1.25}
+.ix{grid-area:ix;padding-top:2px}.int{display:block;font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem;line-height:1.2}.bar{display:block;height:4px;border-radius:2px;background:var(--surface2);margin-top:3px}.bar i{display:block;height:4px;border-radius:2px;background:var(--accent)}
 .teams{grid-area:teams;display:flex;flex-direction:column;gap:2px;color:inherit;text-decoration:none}a.teams:hover .team{text-decoration:underline}
 .ln{display:flex;align-items:center;gap:var(--s1);min-height:22px}.at{flex:0 0 16px;color:var(--muted);font-size:.72rem}
 .lg{flex:0 0 20px;width:20px;height:20px;object-fit:contain;filter:var(--logo-edge)}.lg.none{display:flex;align-items:center;justify-content:center;background:var(--chip);border-radius:5px;color:var(--muted);font-size:.72rem;font-weight:700;filter:none}
@@ -131,15 +131,15 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .dv{flex:none;border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:.68rem;font-weight:700;color:var(--muted);line-height:1.35}
 .pts{margin-left:auto;padding-left:var(--s2);font-variant-numeric:tabular-nums;font-weight:700;font-size:1.1rem}
 .gc.final .team{font-weight:400;color:var(--muted)}.gc.final .pts{font-weight:400;color:var(--muted)}.gc.final .team.win{font-weight:700;color:var(--ink)}.gc.final .pts.win{font-weight:700;color:var(--pos)}
-.side{grid-area:side;display:flex;flex-direction:column;gap:1px;font-size:.75rem;color:var(--muted)}.state{font-size:.8rem;font-weight:600;color:var(--ink)}.gc.live .state{color:var(--live);font-weight:700}.gc.final .state{color:var(--muted)}
-.star{grid-area:star;border:0;background:transparent;color:var(--faint);width:24px;height:24px;padding:0;font-size:.95rem;line-height:1}.star[aria-pressed="true"]{color:var(--warn)}
-.meta{grid-area:meta;display:flex;flex-wrap:wrap;gap:0 var(--s3);font-size:.75rem;color:var(--muted);padding-top:2px}.meta:empty{display:none}
+.side{grid-area:side;display:flex;align-items:center;gap:var(--s2);min-width:0;min-height:24px;font-size:.75rem;color:var(--muted)}.side>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.side .state,.side .lv{flex:none}.side .wc{display:flex;gap:.3em;min-width:0}.wc .who{min-width:0;overflow:hidden;text-overflow:ellipsis}.wc .pct{flex:none}.state{font-size:.8rem;font-weight:600;color:var(--ink)}.gc.live .state{color:var(--live);font-weight:700}.gc.final .state{color:var(--muted)}
+.star{flex:none;margin-left:auto;border:0;background:transparent;color:var(--muted);width:26px;height:24px;padding:0;font-size:1.05rem;line-height:1}.star[aria-pressed="true"]{color:var(--warn)}
+.meta{grid-area:meta;display:flex;flex-wrap:wrap;gap:0 var(--s3);font-size:.75rem;color:var(--muted);padding-bottom:var(--s1)}.meta:empty{display:none}
 .tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:700}.tag.close{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
 #how{scroll-margin-top:64px}dl.terms{max-width:900px}
 .nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:.78rem;color:var(--muted);font-weight:400}
 .empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
 dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2) var(--s4);margin:0}dl.terms dt{font-weight:600}dl.terms dd{margin:0;color:var(--muted)}dl.terms ul{margin:var(--s1) 0;padding-left:1.2em}
-@media (max-width:640px){.gc{grid-template-columns:34px minmax(0,1fr) 24px;grid-template-areas:"ix teams star" ". side side" ". meta meta";padding:6px var(--s1) 6px var(--s2)}.side{flex-direction:row;flex-wrap:wrap;gap:0 var(--s3);padding-top:2px}.ix{padding-left:0}main{padding:var(--s2) var(--s4) 48px}h1{font-size:1.15rem}.controls{width:100%}th,td{padding:var(--s2)}.toolbar{gap:var(--s1)}.toolbar .mine span{display:none}.toolbar input{flex:1 1 56px;padding:0 var(--s2)}.toolbar .step{width:30px}.toolbar .label{min-width:0}.toolbar button{padding:0 var(--s2)}.toolbar .step{padding:0}.toolbar .mine{margin-left:0;flex:none;width:34px;padding:0}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
+@media (max-width:640px){.board{grid-auto-rows:auto;gap:var(--s2)}main{padding:var(--s2) var(--s4) 48px}h1{font-size:1.15rem}.controls{width:100%}th,td{padding:var(--s2)}.toolbar{gap:var(--s1)}.toolbar .mine span{display:none}.toolbar input{flex:1 1 56px;padding:0 var(--s2)}.toolbar .step{width:30px}.toolbar .label{min-width:0}.toolbar button{padding:0 var(--s2)}.toolbar .step{padding:0}.toolbar .mine{margin-left:0;flex:none;width:34px;padding:0}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
 """
 
 JS = r"""
@@ -271,7 +271,7 @@ def sections():
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
             '<button type="button" class="sorter" data-sort="closest">Closest</button><button type="button" class="sorter" data-sort="leverage">Leverage</button></div></div>')
     groups = "".join(twisty(title, '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
-                     for key, title in (("live", "Live"), ("pre", "Not started"), ("final", "Final")))
+                     for key, title in (("mine", "My games"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("How it works", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
@@ -280,13 +280,13 @@ def sections():
 
 HOW = f"""<dl class="terms">
 <dt>This page</dt><dd>{esc(SITE["intro"])}</dd>
-<dt>Reading a row</dt><dd>The left column shows the interest score and its bar. A number before a team is its preseason efficiency rank among Division III teams, and a filled badge marks the top 25. The right side shows the status, the favorite's win chance, and the leverage. Star a game to keep it in My games, which this browser remembers.</dd>
+<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its preseason efficiency rank among Division III teams, and a filled badge marks the top 25. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Click a star to move a game into My games at the top of the page. This browser remembers your stars.</dd>
 <dt>Order</dt><dd>Games group as live, not started, and final. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
 <dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Games between one of those teams and a Division I or II team appear too, exhibitions included. A D1 or D2 badge takes the place of the opponent's rank. They do not count for the NPI, so they have no win chance or leverage. Exhibitions against Division III teams, games against NAIA and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it.</dd>
 <dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
-<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a row to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
+<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Newcomers</dt><dd>The full box score is read twice a game, at halftime and at the final, and only when a team has newcomers on its roster.</dd>
 </dl>"""
@@ -567,16 +567,15 @@ function card(g){
   else state=g.tip?fmtTime(g.tip):'Time TBA';
   const teams=line(g,'away',1)+line(g,'home',0);
   const wc=winCell(g,st),lev=leverage(g),side=['<span class="state">'+state+'</span>'],meta=[];
-  if(wc!=='-')side.push('<span>'+wc+'</span>');
-  if(!g.division&&lev>0)side.push('<span>'+(lev>=15?'⚡ ':'')+'Leverage '+lev.toFixed(1)+'</span>');
+  if(wc!=='-'){const m=/^(.*) (\S+%)$/.exec(wc);side.push('<span class="wc" title="'+wc+'"><span class="who">'+m[1]+'</span><span class="pct">'+m[2]+'</span></span>');};
+  if(!g.division&&lev>0)side.push('<span class="lv" title="Leverage">'+(lev>=15?'⚡ ':'')+'Lev '+lev.toFixed(1)+'</span>');
   const w=tags(g,st);if(w)meta.push(w);
   if((!g.feed||st.noStats)&&!st.final)meta.push('<span class="tag quiet">no live stats</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
   return '<article class="gc '+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+
     (g.link?'<a class="teams" href="'+esc(g.link)+'" target="_blank" rel="noopener">'+teams+'</a>':'<div class="teams">'+teams+'</div>')+
-    '<div class="side">'+side.join('')+'</div>'+
-    '<button type="button" class="star" aria-pressed="'+starred+'" aria-label="Star this game">'+(starred?'★':'☆')+'</button>'+
+    '<div class="side">'+side.join('')+'<button type="button" class="star" aria-pressed="'+starred+'" aria-label="'+(starred?'Remove this game from My games':'Add this game to My games')+'" title="'+(starred?'Remove from My games':'Add to My games')+'">'+(starred?'\u2605':'\u2606')+'</button></div>'+
     '<div class="meta">'+meta.join('')+'</div></article>';
 }
 const SORTS={
@@ -591,7 +590,7 @@ function shown(g){
   const q=plain(findText);
   return !q||plain(g.home).includes(q)||plain(g.away).includes(q);
 }
-// Update one group's rows in place, so logos do not reload and the reader's focus stays put when a score changes.
+// Update one group's cards in place, so logos do not reload and the reader's focus stays put when a score changes.
 function paint(grid,list){
   const have=new Map([...grid.children].map(el=>[el.dataset.id,el]));
   list.forEach((g,i)=>{
@@ -603,14 +602,15 @@ function paint(grid,list){
   have.forEach(el=>el.remove());
 }
 function message(text){const m=$('#boardmsg');m.textContent=text||'';m.hidden=!text;}
-function clearBoard(text){[0,1,2].forEach(n=>{const d=$('#g-'+GROUPS[n]);d.hidden=true;d.querySelector('.board').replaceChildren();});message(text);}
-const GROUPS=['live','pre','final'];
+function clearBoard(text){GROUPS.forEach(name=>{const d=$('#g-'+name);d.hidden=true;d.querySelector('.board').replaceChildren();});message(text);}
+const GROUPS=['mine','live','pre','final'],STATES=['live','pre','final'];
 function render(){
   const list=games.filter(shown).sort((a,b)=>groupOf(a.st)-groupOf(b.st)||SORTS[sortKey](a,b)||b.st.interest-a.st.interest);
-  GROUPS.forEach((name,n)=>{
-    const d=$('#g-'+name),mine=list.filter(g=>groupOf(g.st)===n);
-    d.hidden=!mine.length;d.querySelector('.count').textContent=mine.length;
-    paint(d.querySelector('.board'),mine);
+  // A starred game moves out of its status group and into My games at the top.
+  GROUPS.forEach(name=>{
+    const d=$('#g-'+name),part=name==='mine'?list.filter(g=>stars.has(g.id)):list.filter(g=>!stars.has(g.id)&&groupOf(g.st)===STATES.indexOf(name));
+    d.hidden=!part.length;d.querySelector('.count').textContent=part.length;
+    paint(d.querySelector('.board'),part);
   });
   message(!games.length?'No NPI games on this night.':list.length?'':onlyMine&&!findText?'You have no starred games on this night.':'No game on this night matches.');
   document.querySelectorAll('.sorter').forEach(b=>b.classList.toggle('active',b.dataset.sort===sortKey));
@@ -685,7 +685,7 @@ document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
 document.querySelector('#nc summary').addEventListener('click',()=>{ncUser=true;});
-// One listener for every star, because rows come and go as scores change.
+// One listener for every star, because cards come and go as scores change.
 document.querySelector('main').addEventListener('click',e=>{
   const b=e.target.closest('.star');if(!b)return;
   const id=b.closest('.gc').dataset.id;
