@@ -262,7 +262,7 @@ def sections():
                '<button type="button" class="step" id="next" aria-label="Next night">&#8250;</button>'
                '<button type="button" id="tonight">Tonight</button>'
                '<input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off">'
-               '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only my starred games">\u2605<span> My games</span></button></div>')
+               '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
     newcomers = twisty("Newcomers with big games", '<p class="small">Freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'A big game is a game score of 11 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. '
                        'Live lines are read at halftime and at the final.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
@@ -271,7 +271,7 @@ def sections():
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
             '<button type="button" class="sorter" data-sort="closest">Closest</button><button type="button" class="sorter" data-sort="leverage">Leverage</button></div></div>')
     groups = "".join(twisty(title, '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
-                     for key, title in (("mine", "My games"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
+                     for key, title in (("mine", "My Watchlist"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("How it works", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
@@ -280,7 +280,7 @@ def sections():
 
 HOW = f"""<dl class="terms">
 <dt>This page</dt><dd>{esc(SITE["intro"])}</dd>
-<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its preseason efficiency rank among Division III teams, and a filled badge marks the top 25. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Click a star to move a game into My games at the top of the page. This browser remembers your stars.</dd>
+<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its preseason efficiency rank among Division III teams, and a filled badge marks the top 25. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
 <dt>Order</dt><dd>Games group as live, not started, and final. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
 <dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Games between one of those teams and a Division I or II team appear too, exhibitions included. A D1 or D2 badge takes the place of the opponent's rank. They do not count for the NPI, so they have no win chance or leverage. Exhibitions against Division III teams, games against NAIA and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it.</dd>
 <dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</dd>
@@ -575,7 +575,7 @@ function card(g){
   return '<article class="gc '+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+
     (g.link?'<a class="teams" href="'+esc(g.link)+'" target="_blank" rel="noopener">'+teams+'</a>':'<div class="teams">'+teams+'</div>')+
-    '<div class="side">'+side.join('')+'<button type="button" class="star" aria-pressed="'+starred+'" aria-label="'+(starred?'Remove this game from My games':'Add this game to My games')+'" title="'+(starred?'Remove from My games':'Add to My games')+'">'+(starred?'\u2605':'\u2606')+'</button></div>'+
+    '<div class="side">'+side.join('')+'<button type="button" class="star" aria-pressed="'+starred+'" aria-label="'+(starred?'Remove this game from My Watchlist':'Add this game to My Watchlist')+'" title="'+(starred?'Remove from My Watchlist':'Add to My Watchlist')+'">'+(starred?'\u2605':'\u2606')+'</button></div>'+
     '<div class="meta">'+meta.join('')+'</div></article>';
 }
 const SORTS={
@@ -606,9 +606,9 @@ function clearBoard(text){GROUPS.forEach(name=>{const d=$('#g-'+name);d.hidden=t
 const GROUPS=['mine','live','pre','final'],STATES=['live','pre','final'];
 function render(){
   const list=games.filter(shown).sort((a,b)=>groupOf(a.st)-groupOf(b.st)||SORTS[sortKey](a,b)||b.st.interest-a.st.interest);
-  // A starred game moves out of its status group and into My games at the top.
+  // A starred game appears in My Watchlist and stays in its status group. The My Watchlist button shows the watchlist alone.
   GROUPS.forEach(name=>{
-    const d=$('#g-'+name),part=name==='mine'?list.filter(g=>stars.has(g.id)):list.filter(g=>!stars.has(g.id)&&groupOf(g.st)===STATES.indexOf(name));
+    const d=$('#g-'+name),part=name==='mine'?list.filter(g=>stars.has(g.id)):onlyMine?[]:list.filter(g=>groupOf(g.st)===STATES.indexOf(name));
     d.hidden=!part.length;d.querySelector('.count').textContent=part.length;
     paint(d.querySelector('.board'),part);
   });
