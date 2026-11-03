@@ -9,7 +9,7 @@ import pytest
 
 from build_site import LIVE_JS
 
-FUNCS = ["phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
+FUNCS = ["logoSlug", "phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "bigGame", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines"]
 CONSTS = ["GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
@@ -106,7 +106,7 @@ def test_newcomer_matching_and_big_game():
 def test_tags_mark_upsets_close_games_and_dead_games():
     g = json.dumps(dict(GAME, pregame_wp=0.9))
     upset = run(f"tags({g},{{live:true,wp:0.45}})")
-    assert "upset alert" in upset and "close" in upset and "top 25" in upset and "high leverage" in upset
+    assert "upset alert" in upset and "close" in upset
     assert "decided" in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995}})")
     assert "no tournament stakes" in run(f"tags({json.dumps(DEAD)},{{wp:0.5}})")
     assert "upset" not in run(f"tags({json.dumps(GAME)},{{final:true,wp:1}})")
@@ -119,9 +119,10 @@ D1 = dict(GAME, home="Old Dominion", away="Christopher Newport", d3="Christopher
 def test_division_one_game_shows_a_badge_and_no_model_cells():
     g = json.dumps(D1)
     tags = run(f"tags({g},{{live:true,wp:0.2}})")
-    assert "Division I opponent, not an NPI game" in tags and "exhibition" in tags and "upset" not in tags
+    assert "exhibition" in tags and "upset" not in tags and "not an NPI game" not in tags
     assert run(f"sideTag({g},'home')") == '<span class="dv">D1</span>'
-    assert run(f"sideTag({g},'away')") == '<span class="rk">#9</span>'
+    assert run(f"sideTag({g},'away')") == '<span class="rk top">#9</span>'
+    assert run("rank(26)") == '<span class="rk">#26</span>'
     assert run(f"winCell({g},{{wp:0.3}})") == "-"
     # No upset term: a D3 team leading a D1 team does not raise interest past an even game.
     assert run(f"interest({g},{{progress:0.5,wp:0.2}})") < run(f"interest({g},{{progress:0.5,wp:0.5}})")
@@ -175,3 +176,9 @@ def test_default_night_comes_from_the_device_clock_not_the_build():
     assert _default_night(dates, "2026-11-02") == "2026-11-06"      # a page built Sunday, opened Monday
     assert _default_night(dates, "2027-03-01") == "2026-11-07"      # after the season: the last night
     assert _default_night([], "2026-11-02") == "2026-11-01"         # no dates at all: whatever the build chose
+
+
+def test_logo_slug_matches_the_file_names():
+    from tools.make_logos import slug
+    for name in ("Hope", "St. John's", "Frank. & Mar.", "Trinity (CT)", "UW-La Crosse", "Mass-Boston"):
+        assert run(f"logoSlug({json.dumps(name)})") == slug(name)

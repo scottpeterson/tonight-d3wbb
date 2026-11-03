@@ -14,6 +14,7 @@ Live scores for every Division III women's basketball game that counts for the N
 | `tools/make_ncaa_members.py` | Rebuilds `data/ncaa_members.csv` from the NCAA directory |
 | `data/extra_games.json` | Games the schedule pages miss, such as a D3 exhibition at a Division I school on a page the reader cannot parse. The file's `note` lists the fields |
 | `tools/make_schools.py` | Rebuilds `data/schools.csv` from `~/projects/d3-bball-npi` (`team_base_websites.csv`, `school_demographics.csv`) |
+| `tools/make_logos.py` | Writes `docs/logos/<slug>.webp` from `logo_thumbs.json` in `~/projects/d3-bball-npi`. GitHub Actions cannot read that repo, so the logos are committed. Rerun it when a school changes its logo or a team joins. A team with no file, such as a D1 or D2 opponent, shows its first letter |
 | `requirements.txt` | BeautifulSoup, for the Presto schedule templates |
 | `tests/` | Parser tests against saved pages and feeds in `tests/fixtures/`, and browser model tests that run `LIVE_JS` functions in Node |
 | `docs/` | The published page and slates. With a custom domain, `docs/CNAME` holds it |
