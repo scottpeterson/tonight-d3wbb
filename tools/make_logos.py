@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write docs/logos/<slug>.webp for every team in ~/projects/d3-bball-npi's logo_thumbs.json.
 
-Each file is a 64 by 64 WebP. The page loads a logo only when its card scrolls into view.
+Each file is a 64 by 64 WebP. The page loads a logo only when its row scrolls into view.
 GitHub Actions cannot read that repo, so the files are committed. Rerun this script by
 hand when a school changes its logo or a team joins.
 """
