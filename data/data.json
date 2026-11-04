@@ -1,10 +1,9 @@
 {
- "fetched_at": "2026-11-04T15:42:54+00:00",
+ "fetched_at": "2026-11-04T18:36:09+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
   "Austin schedule: HTTP Error 403: Forbidden",
-  "Averett schedule: HTTP Error 503: Service Unavailable",
   "Blackburn schedule: HTTP Error 405: Not Allowed",
   "Bluffton schedule: HTTP Error 405: Not Allowed",
   "Bridgewater St. schedule: HTTP Error 405: Not Allowed",
