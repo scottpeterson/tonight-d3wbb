@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-05T15:45:19+00:00",
+ "fetched_at": "2026-11-05T18:41:17+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -20,7 +20,6 @@
   "Goucher schedule: HTTP Error 405: Not Allowed",
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "Juniata schedule: HTTP Error 405: Not Allowed",
-  "La Roche schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Dallas at Stephen F. Austin feed: HTTP Error 404: Not Found",
   "LeTourneau at Houston Christian feed: HTTP Error 404: Not Found"
