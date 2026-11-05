@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-04T18:36:09+00:00",
+ "fetched_at": "2026-11-05T01:26:14+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -23,8 +23,9 @@
   "La Roche schedule: HTTP Error 405: Not Allowed",
   "Lasell schedule: HTTP Error 405: Not Allowed",
   "Lesley schedule: HTTP Error 405: Not Allowed",
-  "MCLA schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Dallas at Stephen F. Austin feed: HTTP Error 404: Not Found",
+  "LeTourneau at Houston Christian feed: HTTP Error 404: Not Found",
   "UC Santa Cruz at UC Santa Barbara feed: HTTP Error 404: Not Found",
   "Swarthmore at University of Pennsylvania feed: HTTP Error 404: Not Found"
  ],
