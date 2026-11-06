@@ -97,7 +97,7 @@ p{margin:0 0 var(--s3)}.sub{color:var(--muted);max-width:760px}.small{font-size:
 .seg button.active{background:var(--accent);color:#fff;font-weight:700}.seg button.active::before{content:"\2713\00a0"}
 :root[data-theme="dark"] .seg button.active{color:#15181d}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.active{color:#15181d}}
 .toggles{display:flex;gap:var(--s2)}.toggles button{height:var(--pill);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s4);font-size:var(--fs-md)}
-.group summary{list-style:none;cursor:pointer}.group summary::-webkit-details-marker{display:none}.group summary h2{display:inline-block;width:100%}
+.group summary{list-style:none;cursor:pointer;width:fit-content}.group summary::-webkit-details-marker{display:none}.group summary h2{display:inline-block}
 .group summary h2::before{content:"\25BE";display:inline-block;width:1.1em;color:var(--muted)}.group:not([open]) summary h2::before{content:"\25B8"}
 .count{font-weight:600;color:var(--faint);margin-left:var(--s1)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--s4)}
