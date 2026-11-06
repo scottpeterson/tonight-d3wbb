@@ -137,6 +137,15 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:700}.tag.close{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
 #how{scroll-margin-top:64px}dl.terms{max-width:900px}
 .nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:.78rem;color:var(--muted);font-weight:400}
+.nc td.m{display:none}
+@media (max-width:640px){.nc thead{display:none}.nc,.nc tbody{display:block}
+.nc tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"p g" "t g" "m m" "gm gm";column-gap:var(--s3);row-gap:2px;padding:var(--s2) var(--s3);border-top:1px solid var(--line)}
+.nc tr:first-child{border-top:0}.nc td,.nc td.gm{padding:0;border:0;white-space:normal;min-width:0;text-align:left}
+.nc td.n{display:none}.nc td.p{grid-area:p}.nc td.t{grid-area:t;color:var(--muted);font-size:var(--fs-sm)}
+.nc td.m{display:block;grid-area:m;font-variant-numeric:tabular-nums;padding-top:2px}
+.nc td.gs{grid-area:g;align-self:center;text-align:right;font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums}
+.nc td.gs::after{content:"game score";display:block;font-size:.68rem;font-weight:400;color:var(--muted);letter-spacing:.02em}
+.nc td.gm{grid-area:gm;font-size:.78rem;color:var(--muted)}.nc td.lead.gm .reason{display:inline}.nc td.gm .reason::before{content:" · "}}
 .empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
 dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2) var(--s4);margin:0}dl.terms dt{font-weight:600}dl.terms dd{margin:0;color:var(--muted)}dl.terms ul{margin:var(--s1) 0;padding-left:1.2em}
 @media (max-width:640px){.board{grid-auto-rows:auto;gap:var(--s2)}main{padding:var(--s2) var(--s4) 48px}h1{font-size:1.15rem}.controls{width:100%}th,td{padding:var(--s2)}.toolbar{gap:var(--s1)}.toolbar .mine span{display:none}.toolbar input{flex:1 1 56px;padding:0 var(--s2)}.toolbar .step{width:30px}.toolbar .label{min-width:0}.toolbar button{padding:0 var(--s2)}.toolbar .step{padding:0}.toolbar .mine{margin-left:0;flex:none;width:34px;padding:0}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
@@ -210,7 +219,7 @@ def head():
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="darkreader-lock">
-<meta name="ste-allow" content="NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III">
+<meta name="ste-allow" content="NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III,PTS,REB,AST,STL,BLK,FG,FGM,FGA,FTM,FTA,OREB,DREB,PF,TO">
 <meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15181d" media="(prefers-color-scheme: dark)">
 <title>{esc(SITE["title"])}</title>
@@ -266,9 +275,9 @@ def sections():
                '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
     newcomers = twisty("Top 10 newcomer games", '<p class="small">The 10 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
-                       'Lines are read at halftime and at the final, so the list changes as games go on.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
+                       'Lines update with every score check, so players in games still going count too.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 10 game scores", '<p class="small">The 10 best game scores on this night by any player, in every game with a live stats feed. '
-                      'Lines are read at halftime and at the final, so the list changes as games go on.</p><div id="topgames"></div>', count="", open_=False, id_="top")
+                      'Lines update with every score check, so players in games still going count too.</p><div id="topgames"></div>', count="", open_=False, id_="top")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
@@ -291,7 +300,7 @@ HOW = f"""<dl class="terms">
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
-<dt>Top 10 lists</dt><dd>The full box score is read twice a game, at halftime and at the final. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
+<dt>Top 10 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
 </dl>"""
 
 LIVE_JS = r"""
@@ -490,7 +499,7 @@ function newcomerLines(g,s,when){
 
 // ---------- state
 function initState(g){
-  const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,halfRead:false,finalRead:!!g.box_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x)),
+  const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,finalRead:!!g.box_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x)),
     top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x))};
   if(g.final){st.final=true;st.score=g.final;const lead=g.final[0]-g.final[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
   st.interest=interest(g,st);
@@ -500,8 +509,8 @@ function initState(g){
 function readBox(g,s,when){addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);}
 async function check(g){
   const st=g.st;let s=null;
-  const wantHalf=!st.halfRead&&st.progress>=0.5&&!st.final;
-  try{s=await readFeed(g,wantHalf);}catch(e){s=null;}
+  // Every check of an unfinished game reads the full box, so both top 10 lists move with the score.
+  try{s=await readFeed(g,!st.final);}catch(e){s=null;}
   const now=Date.now();
   if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
   if(s){
@@ -509,16 +518,13 @@ async function check(g){
     const lead=s.home-s.away;
     st.wp=s.complete?(lead>0?1:lead<0?0:0.5):winProb(g,lead,s.progress);
     st.status=s.complete?'Final'+(s.period>s.regulation?' (OT)':''):s.status;
-    if(s.lines&&!s.complete&&s.progress>=0.5&&!st.halfRead){st.halfRead=true;readBox(g,s,'half');}
+    if(s.lines&&!s.complete)readBox(g,s,'live');
     if(s.complete){
       st.final=true;st.live=false;
       if(!st.finalRead){
         let full=s;if(g.feed.type!=='presto'&&!s.lines){try{full=await readFeed(g,true)||s;}catch(e){}}
         st.finalRead=true;readBox(g,full,'final');
       }
-    }else if(!s.lines&&!st.halfRead&&s.progress>=0.5){
-      // Crossed halftime since the last check: read the full box now.
-      st.nextAt=now;
     }
   }
   st.interest=interest(g,st);
@@ -657,9 +663,11 @@ function renderLines(id,box,list,empty){
   secLast[id]=list.length;
   if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
   const rows=list.map(x=>{const l=x.line,g=x.game;
-    return '<tr><td class="lead">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead">'+esc(x.team)+'</td>'+
-      '<td>'+l.pts+'</td><td>'+l.reb+'</td><td>'+l.ast+'</td><td>'+(l.stl+l.blk)+'</td><td>'+l.fgm+'-'+l.fga+'</td>'+
-      '<td>'+x.gmsc.toFixed(1)+'</td><td class="lead">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='half'?'At halftime':'Final')+'</span></td></tr>';}).join('');
+    // td.m repeats the five stat cells as one line; the phone layout shows it in their place.
+    return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+'</td>'+
+      '<td class="n">'+l.pts+'</td><td class="n">'+l.reb+'</td><td class="n">'+l.ast+'</td><td class="n">'+(l.stl+l.blk)+'</td><td class="n">'+l.fgm+'-'+l.fga+'</td>'+
+      '<td class="m">'+l.pts+' PTS · '+l.reb+' REB · '+l.ast+' AST · '+(l.stl+l.blk)+' STL+BLK · '+l.fgm+'-'+l.fga+' FG</td>'+
+      '<td class="gs">'+x.gmsc.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
   $(box).innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderNewcomers(){
