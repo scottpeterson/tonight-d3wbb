@@ -273,10 +273,10 @@ def sections():
                '<button type="button" id="tonight">Tonight</button>'
                '<input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off">'
                '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
-    newcomers = twisty("Top 10 newcomer games", '<p class="small">The 10 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
+    newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
                        'Lines update with every score check, so players in games still going count too.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
-    topgames = twisty("Top 10 game scores", '<p class="small">The 10 best game scores on this night by any player, in every game with a live stats feed. '
+    topgames = twisty("Top 15 game scores", '<p class="small">The 15 best game scores on this night by any player, in every game with a live stats feed. '
                       'Lines update with every score check, so players in games still going count too.</p><div id="topgames"></div>', count="", open_=False, id_="top")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
@@ -300,7 +300,7 @@ HOW = f"""<dl class="terms">
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
-<dt>Top 10 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
+<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
 </dl>"""
 
 LIVE_JS = r"""
@@ -313,7 +313,6 @@ const SD=11;                       // points, full-game spread of the final marg
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let night=BOOT.night,games=[],timer=null,sortKey='interest',onlyMine=false,findText='';
-const secUser={nc:false,top:false},secLast={nc:0,top:0};
 const LOGOS=new Set(BOOT.logos||[]);
 const stars=new Set((()=>{try{return JSON.parse(localStorage.getItem(KEY+'-stars'))||[]}catch(e){return []}})());
 const tokens=[];                   // timestamps of recent feed reads, for the budget
@@ -466,7 +465,7 @@ async function readFeed(g,full){
 function gameScore(l){return l.pts+0.4*l.fgm-0.7*l.fga-0.4*(l.fta-l.ftm)+0.7*l.oreb+0.3*l.dreb+l.stl+0.7*l.ast+0.7*l.blk-0.4*l.pf-l.to;}
 // A newcomer who saw the floor; some crews leave minutes blank, so any counting stat also counts.
 function played(l){return (+l.min||0)>0||['pts','reb','ast','stl','blk','fga','fta','to','pf'].some(k=>(+l[k]||0)>0);}
-const TOP_N=10;
+const TOP_N=15;
 const boxLine=l=>({min:l.min,pts:l.pts,reb:l.reb,ast:l.ast,stl:l.stl,blk:l.blk,fgm:l.fgm,fga:l.fga});
 // Feeds name players "First Last", "LAST,FIRST", or "Last, First". Show "First Last" and soften all-caps words.
 function lineName(l){
@@ -505,11 +504,11 @@ function initState(g){
   st.interest=interest(g,st);
   return st;
 }
-// Every box read feeds both top 10 lists.
+// Every box read feeds both top 15 lists.
 function readBox(g,s,when){addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);}
 async function check(g){
   const st=g.st;let s=null;
-  // Every check of an unfinished game reads the full box, so both top 10 lists move with the score.
+  // Every check of an unfinished game reads the full box, so both top 15 lists move with the score.
   try{s=await readFeed(g,!st.final);}catch(e){s=null;}
   const now=Date.now();
   if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
@@ -658,9 +657,6 @@ function renderNext(){
 function renderLines(id,box,list,empty){
   list.sort((a,b)=>b.gmsc-a.gmsc);list.splice(TOP_N);
   const sec=$('#'+id);sec.querySelector('.count').textContent=list.length;
-  // A list stays one line until its first line is read, unless the reader has opened or closed it.
-  if(!secUser[id]&&(list.length>0)!==(secLast[id]>0))sec.open=list.length>0;
-  secLast[id]=list.length;
   if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
   const rows=list.map(x=>{const l=x.line,g=x.game;
     // td.m repeats the five stat cells as one line; the phone layout shows it in their place.
@@ -687,7 +683,6 @@ function showNight(slate){
   $('#nightlabel').textContent=fmtNight(night);
   const i=BOOT.dates.indexOf(night);
   $('#prev').disabled=i<=0;$('#next').disabled=i<0||i>=BOOT.dates.length-1;
-  secUser.nc=secUser.top=false;
   render();
 }
 function firstCheck(g,now){
@@ -717,7 +712,6 @@ $('#tonight').addEventListener('click',()=>go(defaultNight()));
 document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;render();}));
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
-['nc','top'].forEach(id=>document.querySelector('#'+id+' summary').addEventListener('click',()=>{secUser[id]=true;}));
 // One listener for every star, because cards come and go as scores change.
 document.querySelector('main').addEventListener('click',e=>{
   const b=e.target.closest('.star');if(!b)return;

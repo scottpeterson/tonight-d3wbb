@@ -61,11 +61,11 @@ So a lopsided game slides toward one last check for the final score, and a game 
 
 Table columns: interest, game (away at home, preseason ranks), score, status (clock and period, or tipoff time), win probability, leverage. Rows re-sort by interest after each check. Final games move below live games; upcoming games sort by interest too. Tapping a row opens the feed's own live stats page.
 
-## Top 10 newcomer games
+## Top 15 newcomer games
 
 A newcomer is a player on a 2026-27 roster who is a freshman, an incoming transfer (any division), absent from every 2025-26 roster's stats, or under 30 minutes in 2025-26.
 
-The section shows the 10 best newcomer game scores of the night, from every newcomer who played. It reads the full box score on every check of a live game, and a newer line replaces that player's older one. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.
+The section shows the 15 best newcomer game scores of the night, from every newcomer who played. It reads the full box score on every check of a live game, and a newer line replaces that player's older one. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.
 
 The section sits above the scoreboard, lists player, team, reason (freshman, transfer from X, no 2025-26 minutes, under 30 minutes), line, and game, and sorts by game score.
 

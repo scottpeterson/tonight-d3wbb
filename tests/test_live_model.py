@@ -103,12 +103,12 @@ def test_newcomer_matching_and_played():
     assert run("played({min:0,pts:0,reb:0,ast:0,stl:0,blk:0,fga:0,fta:0,to:0,pf:1})") is True
 
 
-def test_top_lines_keep_the_best_ten_of_a_game():
+def test_top_lines_keep_the_best_fifteen_of_a_game():
     line = "{min:30,pts:%d,fgm:0,fga:0,ftm:0,fta:0,oreb:0,dreb:0,reb:0,ast:0,to:0,stl:0,blk:0,pf:0,first:'',last:'',abbr:'DOE,JANE'}"
-    home = ",".join(line % p for p in range(1, 13))
+    home = ",".join(line % p for p in range(1, 18))
     s = "{lines:{H:[%s],V:[%s]}}" % (home, line % 0)
     top = run(f"topLines({{home:'NYU',away:'Brandeis'}},{s},'final')")
-    assert len(top) == 10 and top[0]["gmsc"] == 12 and top[-1]["gmsc"] == 3
+    assert len(top) == 15 and top[0]["gmsc"] == 17 and top[-1]["gmsc"] == 3
     assert top[0]["name"] == "Jane Doe" and top[0]["team"] == "NYU"
 
 

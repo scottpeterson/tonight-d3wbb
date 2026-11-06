@@ -21,8 +21,8 @@ Each run does three things:
    exhibitions included. Those games carry `division` and do not count for the NPI.
 3. For yesterday and today, reads the feed of each game without a final score.
    When the feed reports the game complete, stores the final score, the line of
-   every newcomer who played, and the game's 10 best lines by any player. The
-   page shows the night's top 10 game scores from each list.
+   every newcomer who played, and the game's 15 best lines by any player. The
+   page shows the night's top 15 game scores from each list.
 """
 import csv
 import html
@@ -657,7 +657,7 @@ def game_score(s):
             + s["stl"] + 0.7 * s["ast"] + 0.7 * s["blk"] - 0.4 * s["pf"] - s["to"])
 
 
-TOP_N = 10  # the page shows the 10 best game scores of the night; a game can supply all 10
+TOP_N = 15  # the page shows the 15 best game scores of the night; a game can supply all 15
 
 
 def line_name(line):
