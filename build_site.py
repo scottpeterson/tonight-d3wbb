@@ -267,6 +267,8 @@ def sections():
     newcomers = twisty("Top 10 newcomer games", '<p class="small">The 10 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
                        'Lines are read at halftime and at the final, so the list changes as games go on.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
+    topgames = twisty("Top 10 game scores", '<p class="small">The 10 best game scores on this night by any player, in every game with a live stats feed. '
+                      'Lines are read at halftime and at the final, so the list changes as games go on.</p><div id="topgames"></div>', count="", open_=False, id_="top")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
@@ -276,7 +278,7 @@ def sections():
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("How it works", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
-    return f'{toolbar}\n{newcomers}\n{board}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
+    return f'{toolbar}\n{newcomers}\n{topgames}\n{board}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
 
 
 HOW = f"""<dl class="terms">
@@ -289,7 +291,7 @@ HOW = f"""<dl class="terms">
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
-<dt>Newcomers</dt><dd>The full box score is read twice a game, at halftime and at the final, and only when a team has newcomers on its roster.</dd>
+<dt>Top 10 lists</dt><dd>The full box score is read twice a game, at halftime and at the final. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
 </dl>"""
 
 LIVE_JS = r"""
@@ -301,7 +303,8 @@ const GAME_MS=2*3600000;           // tipoff to expected final
 const SD=11;                       // points, full-game spread of the final margin
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let night=BOOT.night,games=[],timer=null,sortKey='interest',onlyMine=false,findText='',ncUser=false,ncLast=0;
+let night=BOOT.night,games=[],timer=null,sortKey='interest',onlyMine=false,findText='';
+const secUser={nc:false,top:false},secLast={nc:0,top:0};
 const LOGOS=new Set(BOOT.logos||[]);
 const stars=new Set((()=>{try{return JSON.parse(localStorage.getItem(KEY+'-stars'))||[]}catch(e){return []}})());
 const tokens=[];                   // timestamps of recent feed reads, for the budget
@@ -454,7 +457,19 @@ async function readFeed(g,full){
 function gameScore(l){return l.pts+0.4*l.fgm-0.7*l.fga-0.4*(l.fta-l.ftm)+0.7*l.oreb+0.3*l.dreb+l.stl+0.7*l.ast+0.7*l.blk-0.4*l.pf-l.to;}
 // A newcomer who saw the floor; some crews leave minutes blank, so any counting stat also counts.
 function played(l){return (+l.min||0)>0||['pts','reb','ast','stl','blk','fga','fta','to','pf'].some(k=>(+l[k]||0)>0);}
-const NC_TOP=10;
+const TOP_N=10;
+const boxLine=l=>({min:l.min,pts:l.pts,reb:l.reb,ast:l.ast,stl:l.stl,blk:l.blk,fgm:l.fgm,fga:l.fga});
+// Feeds name players "First Last", "LAST,FIRST", or "Last, First". Show "First Last" and soften all-caps words.
+function lineName(l){
+  const n=l.first&&l.last?l.first+' '+l.last:String(l.abbr||'').replace(/^\s*(.+?),\s*(.+)$/,'$2 $1');
+  return n.trim().split(/\s+/).map(w=>w.length>1&&w===w.toUpperCase()?w.charAt(0)+w.slice(1).toLowerCase():w).join(' ');
+}
+// The best TOP_N lines of one game, any player.
+function topLines(g,s,when){
+  const out=[];
+  [['H',g.home],['V',g.away]].forEach(([side,team])=>((s.lines||{})[side]||[]).forEach(l=>{if(played(l))out.push({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l)});}));
+  return out.sort((a,b)=>b.gmsc-a.gmsc).slice(0,TOP_N);
+}
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
 function matchNewcomer(l,roster){
   if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
@@ -468,22 +483,24 @@ function newcomerLines(g,s,when){
   const out=[];
   [['H',g.home,g.newcomers_home],['V',g.away,g.newcomers_away]].forEach(([side,team,roster])=>{
     ((s.lines||{})[side]||[]).forEach(l=>{const who=matchNewcomer(l,roster||[]);if(who&&played(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
-      line:{min:l.min,pts:l.pts,reb:l.reb,ast:l.ast,stl:l.stl,blk:l.blk,fgm:l.fgm,fga:l.fga}});});
+      line:boxLine(l)});});
   });
   return out;
 }
 
 // ---------- state
 function initState(g){
-  const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,halfRead:false,finalRead:!!g.newcomers_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x))};
+  const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,halfRead:false,finalRead:!!g.box_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x)),
+    top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x))};
   if(g.final){st.final=true;st.score=g.final;const lead=g.final[0]-g.final[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
   st.interest=interest(g,st);
   return st;
 }
-function hasNewcomers(g){return (g.newcomers_home||[]).length+(g.newcomers_away||[]).length>0;}
+// Every box read feeds both top 10 lists.
+function readBox(g,s,when){addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);}
 async function check(g){
   const st=g.st;let s=null;
-  const wantHalf=hasNewcomers(g)&&!st.halfRead&&st.progress>=0.5&&!st.final;
+  const wantHalf=!st.halfRead&&st.progress>=0.5&&!st.final;
   try{s=await readFeed(g,wantHalf);}catch(e){s=null;}
   const now=Date.now();
   if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
@@ -492,14 +509,14 @@ async function check(g){
     const lead=s.home-s.away;
     st.wp=s.complete?(lead>0?1:lead<0?0:0.5):winProb(g,lead,s.progress);
     st.status=s.complete?'Final'+(s.period>s.regulation?' (OT)':''):s.status;
-    if(s.lines&&!s.complete&&s.progress>=0.5&&!st.halfRead){st.halfRead=true;addNewcomers(g,newcomerLines(g,s,'half'));}
+    if(s.lines&&!s.complete&&s.progress>=0.5&&!st.halfRead){st.halfRead=true;readBox(g,s,'half');}
     if(s.complete){
       st.final=true;st.live=false;
-      if(hasNewcomers(g)&&!st.finalRead){
+      if(!st.finalRead){
         let full=s;if(g.feed.type!=='presto'&&!s.lines){try{full=await readFeed(g,true)||s;}catch(e){}}
-        st.finalRead=true;addNewcomers(g,newcomerLines(g,full,'final'));
+        st.finalRead=true;readBox(g,full,'final');
       }
-    }else if(!s.lines&&hasNewcomers(g)&&!st.halfRead&&s.progress>=0.5){
+    }else if(!s.lines&&!st.halfRead&&s.progress>=0.5){
       // Crossed halftime since the last check: read the full box now.
       st.nextAt=now;
     }
@@ -632,20 +649,24 @@ function renderNext(){
   games.forEach(g=>{if(g.st.checked>latest)latest=g.st.checked;});
   $('#checked').textContent=latest?'Latest check '+ago(latest):'';
 }
-function renderNewcomers(){
-  const all=[];games.forEach(g=>g.st.nc.forEach(x=>all.push(Object.assign({game:g},x))));
-  all.sort((a,b)=>b.gmsc-a.gmsc);
-  all.splice(NC_TOP);
-  const nc=$('#nc');nc.querySelector('.count').textContent=all.length;
-  // The section stays one line until a newcomer line is read, unless the reader has opened or closed it.
-  if(!ncUser&&(all.length>0)!==(ncLast>0))nc.open=all.length>0;
-  ncLast=all.length;
-  if(!all.length){$('#newcomers').innerHTML='<p class="empty">No newcomer line has been read on this night yet.</p>';return;}
-  const rows=all.map(x=>{const l=x.line,g=x.game;
-    return '<tr><td class="lead">'+esc(x.name)+'<span class="reason">'+esc(x.reason)+'</span></td><td class="lead">'+esc(x.team)+'</td>'+
+function renderLines(id,box,list,empty){
+  list.sort((a,b)=>b.gmsc-a.gmsc);list.splice(TOP_N);
+  const sec=$('#'+id);sec.querySelector('.count').textContent=list.length;
+  // A list stays one line until its first line is read, unless the reader has opened or closed it.
+  if(!secUser[id]&&(list.length>0)!==(secLast[id]>0))sec.open=list.length>0;
+  secLast[id]=list.length;
+  if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
+  const rows=list.map(x=>{const l=x.line,g=x.game;
+    return '<tr><td class="lead">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead">'+esc(x.team)+'</td>'+
       '<td>'+l.pts+'</td><td>'+l.reb+'</td><td>'+l.ast+'</td><td>'+(l.stl+l.blk)+'</td><td>'+l.fgm+'-'+l.fga+'</td>'+
       '<td>'+x.gmsc.toFixed(1)+'</td><td class="lead">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='half'?'At halftime':'Final')+'</span></td></tr>';}).join('');
-  $('#newcomers').innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  $(box).innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderNewcomers(){
+  const nc=[],top=[];
+  games.forEach(g=>{g.st.nc.forEach(x=>nc.push(Object.assign({game:g},x)));g.st.top.forEach(x=>top.push(Object.assign({game:g},x)));});
+  renderLines('nc','#newcomers',nc,'No newcomer line has been read on this night yet.');
+  renderLines('top','#topgames',top,'No box score has been read on this night yet.');
 }
 
 // ---------- nights
@@ -658,7 +679,7 @@ function showNight(slate){
   $('#nightlabel').textContent=fmtNight(night);
   const i=BOOT.dates.indexOf(night);
   $('#prev').disabled=i<=0;$('#next').disabled=i<0||i>=BOOT.dates.length-1;
-  ncUser=false;
+  secUser.nc=secUser.top=false;
   render();
 }
 function firstCheck(g,now){
@@ -688,7 +709,7 @@ $('#tonight').addEventListener('click',()=>go(defaultNight()));
 document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;render();}));
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
-document.querySelector('#nc summary').addEventListener('click',()=>{ncUser=true;});
+['nc','top'].forEach(id=>document.querySelector('#'+id+' summary').addEventListener('click',()=>{secUser[id]=true;}));
 // One listener for every star, because cards come and go as scores change.
 document.querySelector('main').addEventListener('click',e=>{
   const b=e.target.closest('.star');if(!b)return;

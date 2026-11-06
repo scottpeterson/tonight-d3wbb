@@ -186,6 +186,18 @@ def test_read_final_records_score_and_newcomer(monkeypatch):
     out = f.read_final(nyu_game())
     assert (out["home"], out["away"]) == (80, 58)
     assert [(n["name"], n["gmsc"], n["line"]["pts"]) for n in out["newcomers"]] == [("Brooke Batchelor", 17.7, 18)]
+    # The top list covers every player in the game, best first, at most 10.
+    top = out["top"]
+    assert 0 < len(top) <= f.TOP_N
+    assert [x["gmsc"] for x in top] == sorted((x["gmsc"] for x in top), reverse=True)
+    assert top[0]["gmsc"] >= 17.7 and {x["team"] for x in top} <= {"NYU", "Brandeis"}
+
+
+def test_read_final_records_the_top_list_with_no_newcomers(monkeypatch):
+    full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
+    monkeypatch.setattr(f, "get", lambda *a, **k: full)
+    out = f.read_final(nyu_game(newcomers_home=[]))
+    assert out["newcomers"] == [] and len(out["top"]) == f.TOP_N
 
 
 def test_read_final_flips_when_the_feed_lists_our_away_team_as_home(monkeypatch):
@@ -195,6 +207,13 @@ def test_read_final_flips_when_the_feed_lists_our_away_team_as_home(monkeypatch)
                                 newcomers_away=[{"name": "Brooke Batchelor", "reason": "Freshman"}]))
     assert (out["home"], out["away"]) == (58, 80)
     assert out["newcomers"][0]["team"] == "New York"
+
+
+@pytest.mark.parametrize("line,name", [({"first": "Jane", "last": "Doe", "abbr": "J. Doe"}, "Jane Doe"),
+                                       ({"first": "", "last": "", "abbr": "DOE,JANE"}, "Jane Doe"),
+                                       ({"first": "", "last": "", "abbr": "McDonald, Ann-Marie"}, "Ann-Marie McDonald")])
+def test_line_name(line, name):
+    assert f.line_name(line) == name
 
 
 def test_read_final_ignores_another_days_game(monkeypatch):

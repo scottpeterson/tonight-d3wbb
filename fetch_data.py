@@ -20,8 +20,9 @@ Each run does three things:
    that data/ncaa_members.csv lists in Division I or II becomes a game too,
    exhibitions included. Those games carry `division` and do not count for the NPI.
 3. For yesterday and today, reads the feed of each game without a final score.
-   When the feed reports the game complete, stores the final score and the
-   line of every newcomer who played (the page shows the top 10 game scores).
+   When the feed reports the game complete, stores the final score, the line of
+   every newcomer who played, and the game's 10 best lines by any player. The
+   page shows the night's top 10 game scores from each list.
 """
 import csv
 import html
@@ -656,6 +657,18 @@ def game_score(s):
             + s["stl"] + 0.7 * s["ast"] + 0.7 * s["blk"] - 0.4 * s["pf"] - s["to"])
 
 
+TOP_N = 10  # the page shows the 10 best game scores of the night; a game can supply all 10
+
+
+def line_name(line):
+    """'First Last' from a box line. Feeds give first and last, 'LAST,FIRST', or 'Last, First'; all-caps words soften."""
+    if line.get("first") and line.get("last"):
+        name = f'{line["first"]} {line["last"]}'
+    else:
+        name = re.sub(r"^\s*(.+?),\s*(.+)$", r"\2 \1", line.get("abbr") or "")
+    return " ".join(w[0] + w[1:].lower() if len(w) > 1 and w.isupper() else w for w in name.split())
+
+
 def played(s):
     """True when the box line shows the player on the floor. Some crews leave minutes blank."""
     return (s.get("min") or 0) > 0 or any((s.get(k) or 0) > 0 for k in ("pts", "reb", "ast", "stl", "blk", "fga", "fta", "to", "pf"))
@@ -779,7 +792,7 @@ def read_final(game):
         sides = {c["homeAway"]: c for c in comp["competitors"]}
         home_score, away_score = num(sides["home"].get("score")), num(sides["away"].get("score"))
         feed_home = sides["home"]["team"].get("location") or ""
-        lines = espn_lines(summary) if game["newcomers_home"] or game["newcomers_away"] else {}
+        lines = espn_lines(summary)
     elif feed["type"] == "sidearm":
         full = get(feed["url"] + "?detail=full", as_json=True)
         g = full["Game"]
@@ -787,7 +800,7 @@ def read_final(game):
             return None
         home_score, away_score = num(g["HomeTeam"]["Score"]), num(g["VisitingTeam"]["Score"])
         feed_home = g["HomeTeam"]["Name"]
-        lines = sidearm_lines(full) if game["newcomers_home"] or game["newcomers_away"] else {}
+        lines = sidearm_lines(full)
     else:
         root = ET.fromstring(get(feed["url"]))
         venue, status = root.find(".//venue"), root.find(".//status")
@@ -796,7 +809,7 @@ def read_final(game):
         scores = {t.get("vh"): num((t.find("linescore").attrib if t.find("linescore") is not None else {}).get("score")) for t in root.iter("team")}
         home_score, away_score = scores.get("H", 0), scores.get("V", 0)
         feed_home = venue.get("homename") or ""
-        lines = presto_lines(root) if game["newcomers_home"] or game["newcomers_away"] else {}
+        lines = presto_lines(root)
     # The feed's home side follows the stat crew; flip when the crew lists our away team as home.
     flip = len(name_tokens(feed_home) & name_tokens(game["away"])) > len(name_tokens(feed_home) & name_tokens(game["home"]))
     if flip:
@@ -809,7 +822,11 @@ def read_final(game):
             if who and played(line):
                 found.append({"team": team, "name": who["name"], "reason": who["reason"], "gmsc": round(game_score(line), 1),
                               "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}})
-    return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"])}
+    top = [{"team": team, "name": line_name(line), "reason": "", "gmsc": round(game_score(line), 1),
+            "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}}
+           for side, team in (("H", game["home"]), ("V", game["away"])) for line in lines.get(side, []) if played(line)]
+    return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"]),
+            "top": sorted(top, key=lambda x: -x["gmsc"])[:TOP_N]}
 
 
 # ---------------------------------------------------------------- slates
@@ -891,6 +908,7 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "feed": feed or old.get("feed"), "link": link or old.get("link"),
             "video": video or old.get("video"),
             "final": final, "newcomer_games": old.get("newcomer_games", []),
+            "top_lines": old.get("top_lines", []), "box_read": old.get("box_read", False),
             "newcomers_home": newcomers.get(g["home"], []), "newcomers_away": newcomers.get(g["away"], []),
         })
     return {"date": day.isoformat(), "built": now().isoformat(timespec="seconds"), "games": out}
@@ -1007,8 +1025,7 @@ def collect(previous):
         slate = read_json(path)
         if not slate:
             continue
-        due = [g for g in slate["games"] if g.get("feed") and not g.get("newcomers_read")
-               and not (g.get("final") and not (g["newcomers_home"] or g["newcomers_away"]))
+        due = [g for g in slate["games"] if g.get("feed") and not g.get("box_read")
                and not (g.get("tip") and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) > now() - timedelta(hours=2))]
         with ThreadPoolExecutor(max_workers=12) as pool:
             for g, result, err in pool.map(final, due):
@@ -1017,7 +1034,8 @@ def collect(previous):
                 elif result:
                     g["final"] = [result["home"], result["away"]]
                     g["newcomer_games"] = result["newcomers"]
-                    g["newcomers_read"] = True
+                    g["top_lines"] = result["top"]
+                    g["newcomers_read"] = g["box_read"] = True
         path.write_text(json.dumps(slate, separators=(",", ":")))
     return out
 
