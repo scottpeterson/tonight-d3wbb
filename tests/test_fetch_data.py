@@ -124,20 +124,16 @@ LINE = {"first": "", "last": "", "abbr": "", "min": 30, "pts": 0, "fgm": 0, "fga
         "dreb": 0, "reb": 0, "ast": 0, "to": 0, "stl": 0, "blk": 0, "pf": 0}
 
 
-def test_game_score_and_big_game():
+def test_game_score_and_played():
     line = dict(LINE, pts=18, fgm=8, fga=14, oreb=3, dreb=3, reb=6, ast=1, to=1, stl=3, blk=2, pf=2)
     assert round(f.game_score(line), 1) == 17.7
-    assert f.big_game(line)
-    assert not f.big_game(dict(LINE, pts=14, fgm=6, fga=12, reb=11))
-    assert f.big_game(dict(LINE, reb=12))
-    assert f.big_game(dict(LINE, stl=5))
-    # Olivia Corson at Eastern Illinois, 2026-10-27: game score 11.1. Each extra turnover costs 1.0,
-    # so 3 turnovers (10.1) still clears the cutoff of 10 and 4 (9.1) does not.
+    # Olivia Corson at Eastern Illinois, 2026-10-27: game score 11.1.
     corson = dict(LINE, pts=18, fgm=5, fga=14, ftm=4, fta=4, oreb=2, dreb=2, reb=4, to=2, stl=1, blk=1, pf=2)
     assert round(f.game_score(corson), 1) == 11.1
-    assert f.big_game(corson)
-    assert f.big_game(dict(corson, to=3))
-    assert not f.big_game(dict(corson, to=4))
+    assert f.played(corson)
+    assert not f.played(dict(LINE, min=0))
+    assert f.played(dict(LINE, min=0, pf=1))  # a crew that leaves minutes blank
+    assert f.played(dict(LINE, min=3))
 
 
 def test_sidearm_lines_from_full_feed():

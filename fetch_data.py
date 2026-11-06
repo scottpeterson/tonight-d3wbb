@@ -20,8 +20,8 @@ Each run does three things:
    that data/ncaa_members.csv lists in Division I or II becomes a game too,
    exhibitions included. Those games carry `division` and do not count for the NPI.
 3. For yesterday and today, reads the feed of each game without a final score.
-   When the feed reports the game complete, stores the final score and any
-   newcomer's big game.
+   When the feed reports the game complete, stores the final score and the
+   line of every newcomer who played (the page shows the top 10 game scores).
 """
 import csv
 import html
@@ -656,8 +656,9 @@ def game_score(s):
             + s["stl"] + 0.7 * s["ast"] + 0.7 * s["blk"] - 0.4 * s["pf"] - s["to"])
 
 
-def big_game(s):
-    return game_score(s) >= 10 or s["pts"] >= 20 or s["reb"] >= 12 or s["ast"] >= 8 or s["blk"] >= 5 or s["stl"] >= 5
+def played(s):
+    """True when the box line shows the player on the floor. Some crews leave minutes blank."""
+    return (s.get("min") or 0) > 0 or any((s.get(k) or 0) > 0 for k in ("pts", "reb", "ast", "stl", "blk", "fga", "fta", "to", "pf"))
 
 
 def made_attempted(v):
@@ -805,7 +806,7 @@ def read_final(game):
     for side, team, roster in (("H", game["home"], game["newcomers_home"]), ("V", game["away"], game["newcomers_away"])):
         for line in lines.get(side, []):
             who = match_newcomer(line, roster)
-            if who and big_game(line):
+            if who and played(line):
                 found.append({"team": team, "name": who["name"], "reason": who["reason"], "gmsc": round(game_score(line), 1),
                               "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}})
     return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"])}

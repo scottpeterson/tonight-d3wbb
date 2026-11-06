@@ -264,9 +264,9 @@ def sections():
                '<button type="button" id="tonight">Tonight</button>'
                '<input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off">'
                '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
-    newcomers = twisty("Newcomers with big games", '<p class="small">Freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
-                       'A big game is a game score of 10 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. '
-                       'Live lines are read at halftime and at the final.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
+    newcomers = twisty("Top 10 newcomer games", '<p class="small">The 10 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
+                       'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
+                       'Lines are read at halftime and at the final, so the list changes as games go on.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
@@ -452,7 +452,9 @@ async function readFeed(g,full){
 
 // ---------- newcomers
 function gameScore(l){return l.pts+0.4*l.fgm-0.7*l.fga-0.4*(l.fta-l.ftm)+0.7*l.oreb+0.3*l.dreb+l.stl+0.7*l.ast+0.7*l.blk-0.4*l.pf-l.to;}
-function bigGame(l){return gameScore(l)>=10||l.pts>=20||l.reb>=12||l.ast>=8||l.blk>=5||l.stl>=5;}
+// A newcomer who saw the floor; some crews leave minutes blank, so any counting stat also counts.
+function played(l){return (+l.min||0)>0||['pts','reb','ast','stl','blk','fga','fta','to','pf'].some(k=>(+l[k]||0)>0);}
+const NC_TOP=10;
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
 function matchNewcomer(l,roster){
   if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
@@ -465,7 +467,7 @@ function matchNewcomer(l,roster){
 function newcomerLines(g,s,when){
   const out=[];
   [['H',g.home,g.newcomers_home],['V',g.away,g.newcomers_away]].forEach(([side,team,roster])=>{
-    ((s.lines||{})[side]||[]).forEach(l=>{const who=matchNewcomer(l,roster||[]);if(who&&bigGame(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
+    ((s.lines||{})[side]||[]).forEach(l=>{const who=matchNewcomer(l,roster||[]);if(who&&played(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
       line:{min:l.min,pts:l.pts,reb:l.reb,ast:l.ast,stl:l.stl,blk:l.blk,fgm:l.fgm,fga:l.fga}});});
   });
   return out;
@@ -633,11 +635,12 @@ function renderNext(){
 function renderNewcomers(){
   const all=[];games.forEach(g=>g.st.nc.forEach(x=>all.push(Object.assign({game:g},x))));
   all.sort((a,b)=>b.gmsc-a.gmsc);
+  all.splice(NC_TOP);
   const nc=$('#nc');nc.querySelector('.count').textContent=all.length;
-  // The section stays one line until a newcomer has a big game, unless the reader has opened or closed it.
+  // The section stays one line until a newcomer line is read, unless the reader has opened or closed it.
   if(!ncUser&&(all.length>0)!==(ncLast>0))nc.open=all.length>0;
   ncLast=all.length;
-  if(!all.length){$('#newcomers').innerHTML='<p class="empty">No newcomer has a big game on this night yet.</p>';return;}
+  if(!all.length){$('#newcomers').innerHTML='<p class="empty">No newcomer line has been read on this night yet.</p>';return;}
   const rows=all.map(x=>{const l=x.line,g=x.game;
     return '<tr><td class="lead">'+esc(x.name)+'<span class="reason">'+esc(x.reason)+'</span></td><td class="lead">'+esc(x.team)+'</td>'+
       '<td>'+l.pts+'</td><td>'+l.reb+'</td><td>'+l.ast+'</td><td>'+(l.stl+l.blk)+'</td><td>'+l.fgm+'-'+l.fga+'</td>'+
