@@ -203,7 +203,8 @@ def controls():
 def head():
     gc = SITE.get("goatcounter")
     tag = f'<script data-goatcounter="https://{esc(gc)}.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>\n' if gc else ""
-    icon = f'<link rel="icon" href="{esc(SITE["favicon"])}">\n' if SITE.get("favicon") else ""
+    icon = (f'<link rel="icon" type="image/svg+xml" href="{esc(SITE["favicon"])}">\n'
+            '<link rel="apple-touch-icon" href="apple-touch-icon.png">\n') if SITE.get("favicon") else ""
     css = CSS.replace("ACCENT_LIGHT", SITE.get("accent", {}).get("light", "#1f5fbf")).replace("ACCENT_DARK", SITE.get("accent", {}).get("dark", "#7fb0ff"))
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

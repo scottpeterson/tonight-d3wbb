@@ -5,7 +5,7 @@
   "intro": "Every Division III women's basketball game that counts for the NCAA Power Index, sorted by how interesting it is right now. Close games, top teams, upsets, and games with tournament stakes rise to the top. D3 games against Division I and II teams appear too, marked D1 or D2.",
   "domain": "www.tonightind3wbb.com",
   "goatcounter": "tonightind3wbb",
-  "favicon": null,
+  "favicon": "favicon.svg",
   "output": "docs/index.html",
   "accent": {
     "light": "#1f5fbf",
