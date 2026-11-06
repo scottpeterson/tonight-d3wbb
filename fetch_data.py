@@ -657,7 +657,7 @@ def game_score(s):
 
 
 def big_game(s):
-    return game_score(s) >= 11 or s["pts"] >= 20 or s["reb"] >= 12 or s["ast"] >= 8 or s["blk"] >= 5 or s["stl"] >= 5
+    return game_score(s) >= 10 or s["pts"] >= 20 or s["reb"] >= 12 or s["ast"] >= 8 or s["blk"] >= 5 or s["stl"] >= 5
 
 
 def made_attempted(v):

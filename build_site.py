@@ -265,7 +265,7 @@ def sections():
                '<input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off">'
                '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
     newcomers = twisty("Newcomers with big games", '<p class="small">Freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
-                       'A big game is a game score of 11 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. '
+                       'A big game is a game score of 10 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. '
                        'Live lines are read at halftime and at the final.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
@@ -452,7 +452,7 @@ async function readFeed(g,full){
 
 // ---------- newcomers
 function gameScore(l){return l.pts+0.4*l.fgm-0.7*l.fga-0.4*(l.fta-l.ftm)+0.7*l.oreb+0.3*l.dreb+l.stl+0.7*l.ast+0.7*l.blk-0.4*l.pf-l.to;}
-function bigGame(l){return gameScore(l)>=11||l.pts>=20||l.reb>=12||l.ast>=8||l.blk>=5||l.stl>=5;}
+function bigGame(l){return gameScore(l)>=10||l.pts>=20||l.reb>=12||l.ast>=8||l.blk>=5||l.stl>=5;}
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
 function matchNewcomer(l,roster){
   if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}

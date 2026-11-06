@@ -100,7 +100,8 @@ def test_newcomer_matching_and_big_game():
     assert run(f"bigGame({line})") is True
     corson = "{pts:18,fgm:5,fga:14,ftm:4,fta:4,oreb:2,dreb:2,reb:4,ast:0,to:2,stl:1,blk:1,pf:2}"
     assert run(f"bigGame({corson})") is True
-    assert run(f"bigGame(Object.assign({corson},{{to:3}}))") is False
+    assert run(f"bigGame(Object.assign({corson},{{to:3}}))") is True   # 10.1
+    assert run(f"bigGame(Object.assign({corson},{{to:4}}))") is False  # 9.1
 
 
 def test_tags_mark_upsets_close_games_and_dead_games():

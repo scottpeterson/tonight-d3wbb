@@ -80,7 +80,7 @@ dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2
 </style></head><body><main>
 <div class="top"><h1>Tonight in D3 WBB</h1><a href="#how" class="how">How it works</a><details class="settings"><summary>Settings</summary></details><div class="settings-panel"><div class="controls"><div class="ctl"><span class="seglabel" id="lbl-times">Times</span><div class="seg" role="group" aria-labelledby="lbl-times"><button type="button" class="tz" data-tz="America/New_York">Eastern</button><button type="button" class="tz" data-tz="local">Device</button></div></div><div class="ctl"><span class="seglabel" id="lbl-theme">Theme</span><div class="seg" role="group" aria-labelledby="lbl-theme"><button type="button" class="th" data-theme="light">Light</button><button type="button" class="th" data-theme="dark">Dark</button></div></div><div class="ctl"><span class="seglabel">Sections</span><div class="toggles"><button type="button" onclick="setAll(true)">Expand all</button><button type="button" onclick="setAll(false)">Collapse all</button></div></div></div></div></div>
 <div class="toolbar" role="group" aria-label="Night and filters"><button type="button" class="step" id="prev" aria-label="Previous night">&#8249;</button><span class="label" id="nightlabel"></span><button type="button" class="step" id="next" aria-label="Next night">&#8250;</button><button type="button" id="tonight">Tonight</button><input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off"><button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">★<span> My Watchlist</span></button></div>
-<details class="group" id="nc"><summary><h2>Newcomers with big games <span class="count"></span></h2></summary><p class="small">Freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. A big game is a game score of 11 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. Live lines are read at halftime and at the final.</p><div id="newcomers"></div></details>
+<details class="group" id="nc"><summary><h2>Newcomers with big games <span class="count"></span></h2></summary><p class="small">Freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. A big game is a game score of 10 or more, 20 points, 12 rebounds, 8 assists, or 5 blocks or steals. Live lines are read at halftime and at the final.</p><div id="newcomers"></div></details>
 <div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span><div class="seg" role="group" aria-labelledby="lbl-sort"><button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button><button type="button" class="sorter" data-sort="closest">Closest</button><button type="button" class="sorter" data-sort="leverage">Leverage</button></div></div><p class="empty" id="boardmsg" hidden></p><details class="group" id="g-mine" open hidden><summary><h2>My Watchlist <span class="count"></span></h2></summary><div class="board"></div></details><details class="group" id="g-live" open hidden><summary><h2>Live <span class="count"></span></h2></summary><div class="board"></div></details><details class="group" id="g-pre" open hidden><summary><h2>Not started <span class="count"></span></h2></summary><div class="board"></div></details><details class="group" id="g-final" open hidden><summary><h2>Final <span class="count"></span></h2></summary><div class="board"></div></details>
 <details class="group" id="how"><summary><h2>How it works</h2></summary><dl class="terms">
 <dt>This page</dt><dd>Every Division III women&#x27;s basketball game that counts for the NCAA Power Index, sorted by how interesting it is right now. Close games, top teams, upsets, and games with tournament stakes rise to the top. D3 games against Division I and II teams appear too, marked D1 or D2.</dd>
@@ -254,7 +254,7 @@ async function readFeed(g,full){
 
 // ---------- newcomers
 function gameScore(l){return l.pts+0.4*l.fgm-0.7*l.fga-0.4*(l.fta-l.ftm)+0.7*l.oreb+0.3*l.dreb+l.stl+0.7*l.ast+0.7*l.blk-0.4*l.pf-l.to;}
-function bigGame(l){return gameScore(l)>=11||l.pts>=20||l.reb>=12||l.ast>=8||l.blk>=5||l.stl>=5;}
+function bigGame(l){return gameScore(l)>=10||l.pts>=20||l.reb>=12||l.ast>=8||l.blk>=5||l.stl>=5;}
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
 function matchNewcomer(l,roster){
   if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
@@ -502,7 +502,7 @@ document.addEventListener('tzchange',render);
 go(defaultNight());
 tick();timer=setInterval(tick,5000);
 })();
-</script><footer>Built 2026-11-06 2:49 PM Eastern. Data fetched 2026-11-06 12:55 PM Eastern. This page is not affiliated with any organization it describes.</footer></main><script>
+</script><footer>Built 2026-11-06 5:29 PM Eastern. Data fetched 2026-11-06 12:55 PM Eastern. This page is not affiliated with any organization it describes.</footer></main><script>
 (function(){
 const root=document.documentElement,KEY='tonight-d3wbb';
 // Theme: the viewer's choice wins; otherwise follow the device. Dark Reader is locked out in <head>.
