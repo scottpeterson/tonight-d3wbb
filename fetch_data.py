@@ -770,7 +770,7 @@ def game_score(s):
             + s["stl"] + 0.7 * s["ast"] + 0.7 * s["blk"] - 0.4 * s["pf"] - s["to"])
 
 
-TOP_N = 15  # the page shows the 15 best game scores of the night; a game can supply all 15
+TOP_N = 15  # the page shows the 15 best game scores of the night; one team can supply all 15
 
 
 def line_name(line):
@@ -1048,7 +1048,7 @@ def tip_time(r, day):
 
 
 def box_result(game, home_score, away_score, sides, lines):
-    """The stored final: score, newcomer lines, and the 15 best lines, oriented to the schedule's home and away."""
+    """The stored final: score, newcomer lines, and each team's 15 best lines, oriented to the schedule's home and away."""
     # The feed's home side follows the stat crew, and so do its labels; flip when the evidence says so.
     if should_flip(game, sides, lines):
         home_score, away_score = away_score, home_score
@@ -1060,11 +1060,15 @@ def box_result(game, home_score, away_score, sides, lines):
             if who and played(line):
                 found.append({"team": team, "name": who["name"], "reason": who["reason"], "gmsc": round(game_score(line), 1),
                               "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}})
-    top = [{"team": team, "name": line_name(line), "reason": "", "gmsc": round(game_score(line), 1),
-            "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}}
-           for side, team in (("H", game["home"]), ("V", game["away"])) for line in lines.get(side, []) if played(line)]
+    # The page can filter the list by team rank, so each team keeps its own 15 best: one team can fill the list alone.
+    top = []
+    for side, team in (("H", game["home"]), ("V", game["away"])):
+        mine = [{"team": team, "name": line_name(line), "reason": "", "gmsc": round(game_score(line), 1),
+                 "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}}
+                for line in lines.get(side, []) if played(line)]
+        top += sorted(mine, key=lambda x: -x["gmsc"])[:TOP_N]
     return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"]),
-            "top": sorted(top, key=lambda x: -x["gmsc"])[:TOP_N]}
+            "top": sorted(top, key=lambda x: -x["gmsc"])}
 
 
 def read_presto_page(game, url):

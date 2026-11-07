@@ -186,9 +186,9 @@ def test_read_final_records_score_and_newcomer(monkeypatch):
     out = f.read_final(nyu_game())
     assert (out["home"], out["away"]) == (80, 58)
     assert [(n["name"], n["gmsc"], n["line"]["pts"]) for n in out["newcomers"]] == [("Brooke Batchelor", 17.7, 18)]
-    # The top list covers every player in the game, best first, at most 10.
+    # The top list covers every player in the game, best first, at most 15 per team.
     top = out["top"]
-    assert 0 < len(top) <= f.TOP_N
+    assert 0 < len(top) and all(sum(x["team"] == t for x in top) <= f.TOP_N for t in ("NYU", "Brandeis"))
     assert [x["gmsc"] for x in top] == sorted((x["gmsc"] for x in top), reverse=True)
     assert top[0]["gmsc"] >= 17.7 and {x["team"] for x in top} <= {"NYU", "Brandeis"}
 
@@ -197,7 +197,7 @@ def test_read_final_records_the_top_list_with_no_newcomers(monkeypatch):
     full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
     monkeypatch.setattr(f, "get", lambda *a, **k: full)
     out = f.read_final(nyu_game(newcomers_home=[]))
-    assert out["newcomers"] == [] and len(out["top"]) == f.TOP_N
+    assert out["newcomers"] == [] and len(out["top"]) > f.TOP_N
 
 
 def test_read_final_flips_when_the_feed_lists_our_away_team_as_home(monkeypatch):
@@ -540,7 +540,7 @@ def test_read_box_page_orients_and_finds_newcomers(monkeypatch):
     result = f.read_box_page(BOX_GAME, "https://fredoniabluedevils.com/sports/womens-basketball/stats/2025-26/thiel-college/boxscore/9019")
     assert (result["home"], result["away"]) == (71, 44)
     assert [(n["team"], n["name"], n["line"]["pts"]) for n in result["newcomers"]] == [("Thiel", "Issy Green", 14)]
-    assert len(result["top"]) == f.TOP_N and result["top"][0]["gmsc"] >= result["top"][-1]["gmsc"]
+    assert {x["team"] for x in result["top"]} == {"Fredonia St.", "Thiel"} and result["top"][0]["gmsc"] >= result["top"][-1]["gmsc"]
     # The page's date has to be the game's.
     assert f.read_box_page({**BOX_GAME, "date": "2025-11-08"}, "https://x/boxscore/1") is None
 

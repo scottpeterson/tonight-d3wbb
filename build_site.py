@@ -273,11 +273,17 @@ def sections():
                '<button type="button" id="tonight">Tonight</button>'
                '<input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off">'
                '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
+    def rank_bar(list_id):
+        # Both lists share one rank cut; the two button rows stay in step.
+        buttons = "".join(f'<button type="button" class="cut" data-cut="{n}">{label}</button>'
+                          for n, label in ((0, "All teams"), (200, "Top 200"), (100, "Top 100")))
+        return (f'<div class="sortbar ctl"><span class="seglabel caption" id="lbl-cut-{list_id}">Teams</span>'
+                f'<div class="seg" role="group" aria-labelledby="lbl-cut-{list_id}">{buttons}</div></div>')
     newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
-                       'Lines update with every score check, so players in games still going count too.</p><div id="newcomers"></div>', count="", open_=False, id_="nc")
+                       'Lines update with every score check, so players in games still going count too.</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 15 game scores", '<p class="small">The 15 best game scores on this night by any player, in every game with a live stats feed. '
-                      'Lines update with every score check, so players in games still going count too.</p><div id="topgames"></div>', count="", open_=False, id_="top")
+                      'Lines update with every score check, so players in games still going count too.</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
@@ -300,7 +306,7 @@ HOW = f"""<dl class="terms">
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
-<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
+<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that preseason efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
 </dl>"""
 
 LIVE_JS = r"""
@@ -313,6 +319,8 @@ const SD=11;                       // points, full-game spread of the final marg
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let night=BOOT.night,games=[],timer=null,sortKey='interest',onlyMine=false,findText='';
+// The team rank cut for both top 15 lists: 0 shows every team. This browser remembers it.
+let rankCut=(()=>{try{const v=+localStorage.getItem(KEY+'-cut');return [0,100,200].includes(v)?v:0}catch(e){return 0}})();
 const LOGOS=new Set(BOOT.logos||[]);
 const stars=new Set((()=>{try{return JSON.parse(localStorage.getItem(KEY+'-stars'))||[]}catch(e){return []}})());
 const tokens=[];                   // timestamps of recent feed reads, for the budget
@@ -519,12 +527,17 @@ function lineName(l){
   const n=l.first&&l.last?l.first+' '+l.last:String(l.abbr||'').replace(/^\s*(.+?),\s*(.+)$/,'$2 $1');
   return n.trim().split(/\s+/).map(w=>w.length>1&&w===w.toUpperCase()?w.charAt(0)+w.slice(1).toLowerCase():w).join(' ');
 }
-// The best TOP_N lines of one game, any player.
+// The best TOP_N lines of each team in one game. The rank filter can hide one team, so each team keeps its own.
 function topLines(g,s,when){
   const out=[];
-  [['H',g.home],['V',g.away]].forEach(([side,team])=>((s.lines||{})[side]||[]).forEach(l=>{if(played(l))out.push({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l)});}));
-  return out.sort((a,b)=>b.gmsc-a.gmsc).slice(0,TOP_N);
+  [['H',g.home],['V',g.away]].forEach(([side,team])=>{
+    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l)}));
+    out.push(...mine.sort((a,b)=>b.gmsc-a.gmsc).slice(0,TOP_N));
+  });
+  return out.sort((a,b)=>b.gmsc-a.gmsc);
 }
+// A line's team rank, for the rank filter. A team with no rank (Division I or II) is outside every cut.
+function lineRank(x){return (x.team===x.game.home?x.game.home_rank:x.team===x.game.away?x.game.away_rank:null)||Infinity;}
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
 function matchNewcomer(l,roster){
   if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
@@ -726,6 +739,7 @@ function renderNext(){
   $('#checked').textContent=latest?'Latest check '+ago(latest):'';
 }
 function renderLines(id,box,list,empty){
+  if(rankCut){list=list.filter(x=>lineRank(x)<=rankCut);if(list.length===0)empty='No player from a top '+rankCut+' team has a line on this night yet.';}
   list.sort((a,b)=>b.gmsc-a.gmsc);list.splice(TOP_N);
   const sec=$('#'+id);sec.querySelector('.count').textContent=list.length;
   if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
@@ -738,6 +752,7 @@ function renderLines(id,box,list,empty){
   $(box).innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderNewcomers(){
+  document.querySelectorAll('.cut').forEach(b=>b.classList.toggle('active',+b.dataset.cut===rankCut));
   const nc=[],top=[];
   games.forEach(g=>{g.st.nc.forEach(x=>nc.push(Object.assign({game:g},x)));g.st.top.forEach(x=>top.push(Object.assign({game:g},x)));});
   renderLines('nc','#newcomers',nc,'No newcomer line has been read on this night yet.');
@@ -782,6 +797,7 @@ function defaultNight(){const t=todayET(),ahead=BOOT.dates.filter(d=>d>=t);retur
 $('#tonight').addEventListener('click',()=>go(defaultNight()));
 document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;render();}));
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
+document.querySelectorAll('.cut').forEach(b=>b.addEventListener('click',()=>{rankCut=+b.dataset.cut;try{localStorage.setItem(KEY+'-cut',rankCut)}catch(err){}renderNewcomers();}));
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
 // One listener for every star, because cards come and go as scores change.
 document.querySelector('main').addEventListener('click',e=>{

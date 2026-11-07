@@ -10,7 +10,7 @@ import pytest
 from build_site import LIVE_JS
 
 FUNCS = ["logoSlug", "phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
-         "statusText", "gameScore", "played", "lineName", "topLines", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
+         "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
 
@@ -103,13 +103,24 @@ def test_newcomer_matching_and_played():
     assert run("played({min:0,pts:0,reb:0,ast:0,stl:0,blk:0,fga:0,fta:0,to:0,pf:1})") is True
 
 
-def test_top_lines_keep_the_best_fifteen_of_a_game():
+def test_top_lines_keep_the_best_fifteen_of_each_team():
     line = "{min:30,pts:%d,fgm:0,fga:0,ftm:0,fta:0,oreb:0,dreb:0,reb:0,ast:0,to:0,stl:0,blk:0,pf:0,first:'',last:'',abbr:'DOE,JANE'}"
-    home = ",".join(line % p for p in range(1, 18))
-    s = "{lines:{H:[%s],V:[%s]}}" % (home, line % 0)
+    home = ",".join(line % p for p in range(21, 38))
+    away = ",".join(line % p for p in range(1, 4))
+    s = "{lines:{H:[%s],V:[%s]}}" % (home, away)
     top = run(f"topLines({{home:'NYU',away:'Brandeis'}},{s},'final')")
-    assert len(top) == 15 and top[0]["gmsc"] == 17 and top[-1]["gmsc"] == 3
+    # NYU's 15 best fill an unfiltered list, and Brandeis keeps its 3 for a filter that hides NYU.
+    assert len(top) == 18 and top[0]["gmsc"] == 37 and top[14]["gmsc"] == 23
+    assert [x["gmsc"] for x in top if x["team"] == "Brandeis"] == [3, 2, 1]
     assert top[0]["name"] == "Jane Doe" and top[0]["team"] == "NYU"
+
+
+def test_line_rank_reads_the_players_team():
+    g = "{home:'NYU',away:'Brandeis',home_rank:12,away_rank:250}"
+    assert run(f"lineRank({{team:'NYU',game:{g}}})") == 12
+    assert run(f"lineRank({{team:'Brandeis',game:{g}}})") == 250
+    # A Division I opponent has no rank, so every cut leaves it out.
+    assert run("lineRank({team:'Army',game:{home:'Army',away:'NYU',home_rank:null,away_rank:12}})===Infinity") is True
 
 
 def test_tags_mark_upsets_close_games_and_dead_games():
