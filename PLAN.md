@@ -23,7 +23,7 @@ Cron (UTC): `7 11,17,21 * * *` builds the slate (6 a.m., noon, 4 p.m. Eastern st
 
 Inputs for each game:
 
-- **Quality Q**: from preseason rank, `q = 1 - (rank - 1) / 409`. `Q = 0.6 * max(q1, q2) + 0.4 * min(q1, q2)`, so one elite team lifts a game more than two average teams do.
+- **Quality Q**: from preseason rank, `q = (1 - (rank - 1) / 409)^3` (a team with no rank counts 0.125, the midpoint). The cube makes the top steep and the middle flat: 13th against 39th is a gap of 0.17, 213th against 239th a gap of 0.04 (2026-11-07: on the linear scale, Concordia (MN) at Wartburg, 22 at 13 with leverage 23, ranked below RIT at Rochester, 39 at 54, for being a little less close). `Q = 0.6 * max(q1, q2) + 0.4 * min(q1, q2)`, so one elite team lifts a game more than two average teams do.
 - **Leverage L**: `1 - exp(-(|lev1| + |lev2|) / 12)`. Leverage is each team's change in tournament chance between winning and losing, in percentage points. Across the 5,016 games the total has median 3 (L 0.22), 90th percentile 19.5 (L 0.80), top 99.5 (L 1.00).
 - **Stakes S**: `T / (T + 0.01)`, where T is the larger of the two teams' tournament chances from `seasonSimulations.json`. T of 0 gives 0, 1% gives 0.5, 5% gives 0.83, 25% gives 0.96. 131 of 411 teams sit at 0%.
 - **Closeness C**: `1 - |2 * WP - 1|`, where WP is the live win probability of the home team. Before tipoff, C uses the pregame WP.

@@ -255,6 +255,21 @@ STORE = ("(()=>{const m={};globalThis.KEY='t';globalThis.localStorage={getItem:k
          "setItem:(k,v)=>{m[k]=String(v)}};return 0})()")
 
 
+def test_two_top_25_teams_with_high_leverage_outrank_a_closer_mid_table_game():
+    # 2026-11-07: Concordia (MN) at Wartburg (22 at 13, leverage 23.21 and 4.43, home win chance 0.68) ranked below
+    # RIT at Rochester (39 at 54, leverage 10.31 and 12.93, 0.55) while quality was linear in rank.
+    wartburg = dict(GAME, home="Wartburg", away="Concordia (MN)", home_rank=13, away_rank=22, pregame_wp=0.68,
+                    home_lev=4.43, away_lev=23.21, home_tourn=0.97, away_tourn=0.515)
+    rochester = dict(GAME, home="Rochester", away="RIT", home_rank=54, away_rank=39, pregame_wp=0.55,
+                     home_lev=12.93, away_lev=10.31, home_tourn=0.9, away_tourn=0.9)
+    pregame = lambda g: run(f"interest({json.dumps(g)},{{progress:0,wp:{g['pregame_wp']}}})")
+    assert pregame(wartburg) > pregame(rochester)
+    # The top of the ranking is steep and the middle is flat.
+    q = lambda h, a: run(f"quality({json.dumps(dict(GAME, home_rank=h, away_rank=a))})")
+    assert q(13, 39) - q(39, 39) > 4 * (q(213, 239) - q(239, 239))
+    assert q(None, None) == pytest.approx(0.125) and q(1, 1) == 1
+
+
 def test_a_final_read_from_the_feed_survives_a_reload():
     # The feed moves on to the host's next game, and the slate has no final yet: the browser's own read holds the card.
     g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06", tip="2026-11-06T23:00:00Z"))
