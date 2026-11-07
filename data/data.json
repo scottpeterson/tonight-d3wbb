@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-07T01:02:27+00:00",
+ "fetched_at": "2026-11-07T01:12:48+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -24,6 +24,15 @@
   "Lasell schedule: HTTP Error 405: Not Allowed",
   "Lesley schedule: HTTP Error 405: Not Allowed",
   "MCLA schedule: HTTP Error 405: Not Allowed",
+  "Mitchell schedule: HTTP Error 405: Not Allowed",
+  "Moravian schedule: HTTP Error 405: Not Allowed",
+  "Mt. Holyoke schedule: HTTP Error 405: Not Allowed",
+  "Muskingum schedule: HTTP Error 405: Not Allowed",
+  "Ohio Northern schedule: HTTP Error 405: Not Allowed",
+  "Olivet schedule: HTTP Error 405: Not Allowed",
+  "Penn St. Altoona schedule: HTTP Error 405: Not Allowed",
+  "Penn St. Behrend schedule: HTTP Error 405: Not Allowed",
+  "Pitt-Bradford schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Bluffton at Olivet feed: not well-formed (invalid token): line 1, column 0",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found",
