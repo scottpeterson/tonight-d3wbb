@@ -19,10 +19,14 @@ Each run does three things:
    tipoff and the live stats feed, and writes the slate. A row against a school
    that data/ncaa_members.csv lists in Division I or II becomes a game too,
    exhibitions included. Those games carry `division` and do not count for the NPI.
-3. For yesterday and today, reads the feed of each game without a final score.
-   When the feed reports the game complete, stores the final score, the line of
-   every newcomer who played, and the game's 15 best lines by any player. The
-   page shows the night's top 15 game scores from each list.
+3. For the last three days, reads each game that has no box score yet. The live
+   feed comes first. Once a game is 2.5 hours past tipoff and its feed has no
+   complete box score (crews reuse a feed for their next game), the fetcher reads
+   the Box Score link on either team's schedule page instead: Sidearm HTML or
+   Presto StatCrew XML. It stores the final score, the line of every newcomer
+   who played, and the game's 15 best lines by any player. A score a schedule
+   page posts outranks the feed's. The page shows the night's top 15 game scores
+   from each list.
 """
 import csv
 import html
@@ -66,7 +70,8 @@ ZONES = {"ET": "America/New_York", "EST": "America/New_York", "EDT": "America/Ne
 MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 SEASON_START_YEAR = 2026
 SLATE_DAYS_AHEAD = 1  # today and tomorrow
-FINALS_DAYS_BACK = 1  # yesterday and today
+FINALS_DAYS_BACK = 3  # schools post a box score link hours or a day late
+BOX_PAGE_AFTER = timedelta(hours=2, minutes=30)  # a game this long past tipoff is over; its box score page is the record
 
 
 def now():
@@ -755,6 +760,53 @@ def presto_lines(root):
     return out
 
 
+BOX_COLUMNS = {"MIN": "min", "PTS": "pts", "REB": "reb", "A": "ast", "AST": "ast", "TO": "to", "STL": "stl", "BLK": "blk", "PF": "pf"}
+
+
+def sidearm_box(page):
+    """A Sidearm box score page: {'date': 'M/D/YYYY', 'sides': {...}, 'score': {...}, 'lines': {...}}, keyed 'V' and
+    'H' like a feed, or None when the page lacks two player tables. The page lists the visiting team first."""
+    soup = BeautifulSoup(page, "html.parser")
+    tables = [t for t in soup.select("table.overall-stats") if t.select_one("thead") and "Player" in t.select_one("thead").get_text()]
+    board = soup.select_one("table.sidearm-table")
+    teams = [tr for tr in (board.select("tr")[1:] if board else []) if tr.find_all("td")]
+    if len(tables) != 2 or len(teams) != 2:
+        return None
+    board_heads = [c.get_text(" ", strip=True) for c in board.select("tr")[0].find_all(["th", "td"])]
+    total = next((i for i, h in enumerate(board_heads) if h.startswith("Total")), None)
+    if total is None:
+        return None
+    sides, score, lines = {}, {}, {}
+    for side, tr, table in zip(("V", "H"), teams, tables):
+        cells = tr.find_all(["th", "td"])
+        label = re.sub(r"^\s*Winner\s+", "", cells[0].get_text(" ", strip=True))
+        code, _, name = label.partition(" ")
+        sides[side] = {"name": name or code, "id": code}
+        score[side] = num(cells[total].get_text(strip=True)) if total < len(cells) else 0
+        heads = [c.get_text(" ", strip=True) for c in table.select("thead tr")[-1].find_all(["th", "td"])]
+        out = []
+        for row in table.select("tbody tr"):
+            v = dict(zip(heads, row.find_all(["th", "td"])))
+            who = v.get("Player")
+            if who is None:
+                continue
+            for jersey in who.select(".mobile-jersey-number"):
+                jersey.decompose()
+            abbr = re.sub(r"\s*,\s*", ", ", who.get_text(" ", strip=True))
+            if not abbr or abbr.upper() == "TEAM":
+                continue
+            last, _, first = abbr.partition(", ")
+            stat = {key: num(v[col].get_text(strip=True)) for col, key in BOX_COLUMNS.items() if col in v}
+            fgm, fga = made_attempted(v["FG"].get_text(strip=True) if "FG" in v else "")
+            ftm, fta = made_attempted(v["FT"].get_text(strip=True) if "FT" in v else "")
+            oreb, dreb = made_attempted(v["ORB-DRB"].get_text(strip=True) if "ORB-DRB" in v else "")
+            out.append({"first": first.strip(), "last": last.strip(), "abbr": abbr, "fgm": fgm, "fga": fga, "ftm": ftm,
+                        "fta": fta, "oreb": oreb, "dreb": dreb, **{k: 0 for k in BOX_COLUMNS.values()}, **stat})
+        lines[side] = out
+    when = re.search(r"\bon (\d{1,2}/\d{1,2}/\d{4})", soup.title.get_text() if soup.title else "")
+    return {"date": when.group(1) if when else None, "sides": sides, "score": score, "lines": lines}
+
+
 def espn_lines(summary):
     """{'H'|'V': [...]} from an ESPN summary. Each team's statistics list names its columns (MIN, PTS, FG as
     "made-attempted", and so on); the header says which team is home."""
@@ -841,8 +893,22 @@ def read_final(game):
             if t.get("vh") in feed_sides:
                 feed_sides[t.get("vh")] = {"name": t.get("name") or feed_sides[t.get("vh")]["name"], "id": t.get("id")}
         lines = presto_lines(root)
-    # The feed's home side follows the stat crew; flip when the crew lists our away team as home.
-    if should_flip(game, feed_sides, lines):
+    return box_result(game, home_score, away_score, feed_sides, lines)
+
+
+# ---------------------------------------------------------------- slates
+
+def tip_time(r, day):
+    if not r or not r["time"]:
+        return None, True
+    hour, minute, zone = r["time"]
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=ZoneInfo(zone)).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), False
+
+
+def box_result(game, home_score, away_score, sides, lines):
+    """The stored final: score, newcomer lines, and the 15 best lines, oriented to the schedule's home and away."""
+    # The feed's home side follows the stat crew, and so do its labels; flip when the evidence says so.
+    if should_flip(game, sides, lines):
         home_score, away_score = away_score, home_score
         lines = {"H": lines.get("V", []), "V": lines.get("H", [])}
     found = []
@@ -859,21 +925,43 @@ def read_final(game):
             "top": sorted(top, key=lambda x: -x["gmsc"])[:TOP_N]}
 
 
-# ---------------------------------------------------------------- slates
+def is_over(game, today):
+    """True once a game is BOX_PAGE_AFTER past tipoff, or, with no tipoff, once its day has passed."""
+    if game.get("tip"):
+        return datetime.fromisoformat(game["tip"].replace("Z", "+00:00")) < now() - BOX_PAGE_AFTER
+    return date.fromisoformat(game["date"]) < today
 
-def tip_time(r, day):
-    if not r or not r["time"]:
-        return None, True
-    hour, minute, zone = r["time"]
-    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=ZoneInfo(zone)).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), False
+
+def box_link(game, pages):
+    """The Box Score link and posted result from either team's schedule page: (link, (home, away) or None)."""
+    day = date.fromisoformat(game["date"])
+    exhibition = None if game.get("division") else game.get("label") == "Exhibition"
+    home_row = find_row(pages.get(game["home"], []), day, game["away"], exhibition)
+    away_row = find_row(pages.get(game["away"], []), day, game["home"], exhibition)
+    link = next((r["links"]["boxscore"] for r in (home_row, away_row) if r and r["links"].get("boxscore")), None)
+    return link or game.get("boxscore"), result_score(home_row, True) or result_score(away_row, False)
+
+
+def read_box_page(game, url):
+    """The final from a box score page a schedule links: Presto's StatCrew XML or a Sidearm HTML page."""
+    day = date.fromisoformat(game["date"])
+    if url.lower().split("?")[0].endswith(".xml"):
+        return read_final({**game, "feed": {"type": "presto", "url": url}})
+    box = sidearm_box(get(url))
+    if not box or (box["date"] and not feed_date_matches(box["date"], day)):
+        return None
+    return box_result(game, box["score"]["H"], box["score"]["V"], box["sides"], box["lines"])
+
 
 
 def result_score(r, page_is_home):
-    """'W 70-62' on a schedule page -> (home, away)."""
+    """'W 70-62' or 'L, 106-26' on a schedule page -> (home, away). Pages put the winner's score first, or
+    sometimes their own, so the W or L decides which score is the page team's."""
     m = re.search(r"\b([WLT])\b\s*,?\s*(\d{1,3})\s*-\s*(\d{1,3})", (r or {}).get("result") or "")
     if not m:
         return None
-    mine, theirs = int(m.group(2)), int(m.group(3))
+    a, b = int(m.group(2)), int(m.group(3))
+    mine, theirs = (max(a, b), min(a, b)) if m.group(1) == "W" else (min(a, b), max(a, b)) if m.group(1) == "L" else (a, b)
     return (mine, theirs) if page_is_home else (theirs, mine)
 
 
@@ -938,6 +1026,7 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "feed": feed or old.get("feed"), "link": link or old.get("link"),
             "video": video or old.get("video"),
             "final": final, "newcomer_games": old.get("newcomer_games", []),
+            "boxscore": next((r["links"]["boxscore"] for r in (home_row, away_row) if r and r["links"].get("boxscore")), None) or old.get("boxscore"),
             "top_lines": old.get("top_lines", []), "box_read": old.get("box_read", False),
             "newcomers_home": newcomers.get(g["home"], []), "newcomers_away": newcomers.get(g["away"], []),
         })
@@ -1043,25 +1132,40 @@ def collect(previous):
                             extra.get("links"), hub, espn, upper_sites(members))
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
-    # Finals: one full-feed read per unfinished game from yesterday and today, read in parallel.
+    # Finals: one read per game without a box score from the last FINALS_DAYS_BACK days, in parallel. The live feed
+    # comes first; a crew can reuse it for its next game, so once the game is over, the box score page a schedule
+    # links is read instead. A score a schedule page posts outranks a feed's.
     def final(g):
-        try:
-            return g, read_final(g), None
-        except FETCH_ERRORS as exc:
-            return g, None, f'{g["away"]} at {g["home"]} feed: {exc}'
+        errors, result = [], None
+        if g.get("feed"):
+            try:
+                result = read_final(g)
+            except FETCH_ERRORS as exc:
+                errors.append(f'{g["away"]} at {g["home"]} feed: {exc}')
+        link, posted = box_link(g, pages)
+        if not result and link and is_over(g, today):
+            try:
+                result = read_box_page(g, link)
+            except FETCH_ERRORS as exc:
+                errors.append(f'{g["away"]} at {g["home"]} box score: {exc}')
+        if result and posted:
+            result["home"], result["away"] = posted
+        return g, result, posted, link, errors
 
     for d in (today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)):
         path = SLATES / f"{d.isoformat()}.json"
         slate = read_json(path)
         if not slate:
             continue
-        due = [g for g in slate["games"] if g.get("feed") and not g.get("box_read")
+        due = [g for g in slate["games"] if not g.get("box_read")
                and not (g.get("tip") and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) > now() - timedelta(hours=2))]
         with ThreadPoolExecutor(max_workers=12) as pool:
-            for g, result, err in pool.map(final, due):
-                if err:
-                    out["errors"].append(err)
-                elif result:
+            for g, result, posted, link, errors in pool.map(final, due):
+                out["errors"].extend(errors)
+                g["boxscore"] = link or g.get("boxscore")
+                if posted and not result:
+                    g["final"] = list(posted)
+                if result:
                     g["final"] = [result["home"], result["away"]]
                     g["newcomer_games"] = result["newcomers"]
                     g["top_lines"] = result["top"]

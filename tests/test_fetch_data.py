@@ -1,7 +1,7 @@
 """Parsers in fetch_data.py, run against saved pages and feeds in tests/fixtures/."""
 import json
 import xml.etree.ElementTree as ET
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -511,3 +511,61 @@ def test_should_flip_counts_roster_players_first():
     # Names and codes say keep (3 each side); two Calvin newcomers on the visiting side say flip.
     assert f.should_flip(game, sides, {"H": [], "V": lines})
     assert not f.should_flip(game, sides, {"H": lines, "V": []})
+
+
+# Fredonia 71, Thiel 44 (2025-11-07): a Sidearm box score page, the permanent record once a feed moves on.
+BOX_GAME = {"date": "2025-11-07", "home": "Fredonia St.", "away": "Thiel", "neutral": False, "tip": "2025-11-08T00:00:00Z",
+            "newcomers_home": [], "newcomers_away": [{"name": "Issy Green", "reason": "FR"}]}
+
+
+def box_page():
+    return (Path(__file__).parent / "fixtures" / "sidearm_boxscore.html").read_text()
+
+
+def test_sidearm_box_page():
+    box = f.sidearm_box(box_page())
+    assert box["date"] == "11/7/2025"
+    assert box["sides"] == {"V": {"name": "Thiel", "id": "THI"}, "H": {"name": "Fredonia", "id": "Fred"}}
+    assert box["score"] == {"V": 44, "H": 71}
+    green = box["lines"]["V"][0]
+    assert (green["first"], green["last"], green["min"], green["pts"], green["fgm"], green["fga"], green["ftm"], green["fta"],
+            green["oreb"], green["dreb"], green["reb"], green["ast"], green["to"], green["stl"], green["pf"]) == (
+            "Issy", "Green", 33, 14, 4, 9, 5, 10, 0, 4, 4, 3, 5, 5, 1)
+    assert all(line["last"] != "TEAM" for side in "VH" for line in box["lines"][side])
+    assert sum(line["pts"] for line in box["lines"]["H"]) == 71
+
+
+def test_read_box_page_orients_and_finds_newcomers(monkeypatch):
+    monkeypatch.setattr(f, "get", lambda *a, **k: box_page())
+    result = f.read_box_page(BOX_GAME, "https://fredoniabluedevils.com/sports/womens-basketball/stats/2025-26/thiel-college/boxscore/9019")
+    assert (result["home"], result["away"]) == (71, 44)
+    assert [(n["team"], n["name"], n["line"]["pts"]) for n in result["newcomers"]] == [("Thiel", "Issy Green", 14)]
+    assert len(result["top"]) == f.TOP_N and result["top"][0]["gmsc"] >= result["top"][-1]["gmsc"]
+    # The page's date has to be the game's.
+    assert f.read_box_page({**BOX_GAME, "date": "2025-11-08"}, "https://x/boxscore/1") is None
+
+
+def test_box_link_and_posted_result_from_either_page():
+    day = date(2025, 11, 7)
+    away_row = {"day": day, "exhibition": False, "opponent": "Fredonia", "result": "L, 44-71",
+                "links": {"boxscore": "https://thiel.example/boxscore/1"}}
+    link, posted = f.box_link(BOX_GAME, {"Thiel": [away_row]})
+    assert link == "https://thiel.example/boxscore/1" and posted == (71, 44)
+    assert f.box_link({**BOX_GAME, "boxscore": "https://saved/1"}, {}) == ("https://saved/1", None)
+
+
+def test_is_over(monkeypatch):
+    monkeypatch.setattr(f, "now", lambda: datetime(2025, 11, 8, 2, 0, tzinfo=timezone.utc))
+    assert not f.is_over(BOX_GAME, date(2025, 11, 7))
+    monkeypatch.setattr(f, "now", lambda: datetime(2025, 11, 8, 2, 31, tzinfo=timezone.utc))
+    assert f.is_over(BOX_GAME, date(2025, 11, 7))
+    assert f.is_over({"date": "2025-11-06"}, date(2025, 11, 7)) and not f.is_over({"date": "2025-11-07"}, date(2025, 11, 7))
+
+
+def test_result_score_reads_the_page_teams_side_from_w_or_l():
+    # Centenary's page at ULM, 2026-11-05: winner's score first.
+    assert f.result_score({"result": "L , 106-26"}, False) == (106, 26)
+    assert f.result_score({"result": "L 62-70"}, True) == (62, 70)
+    assert f.result_score({"result": "W, 71-44"}, True) == (71, 44)
+    assert f.result_score({"result": "W 44-71"}, False) == (44, 71)
+    assert f.result_score({"result": ""}, True) is None
