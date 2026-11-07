@@ -114,12 +114,12 @@ th.lead,td.lead{text-align:left}td.lead{font-weight:600}
 .opinion h2{margin:0 0 var(--s2);border:0;padding:0;font-size:1.15rem}.opinion .note{margin:0 0 var(--s3);font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
 .opinion blockquote{margin:0;padding:0;font-style:italic}.opinion blockquote p::before{content:"\201C"}.opinion blockquote p::after{content:"\201D"}
 footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--line);font-size:var(--fs-sm);color:var(--muted)}
-.toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:var(--s2);margin:var(--s2) 0 0;padding:var(--s2) 0;background:var(--bg);border-bottom:1px solid var(--line)}
+.toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:var(--s2);margin:var(--s2) 0 var(--s3);padding:var(--s2) 0;background:var(--bg);border-bottom:1px solid var(--line)}
 .toolbar button{height:var(--pill);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font-size:var(--fs-sm);white-space:nowrap}
 .toolbar button:disabled{color:var(--faint);cursor:default}.toolbar .step{padding:0;width:var(--pill)}.toolbar .label{font-weight:700;white-space:nowrap;text-align:center;min-width:5.6em}
 .toolbar input{flex:0 1 220px;min-width:0;width:100%;height:var(--pill);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font:inherit}.toolbar input::placeholder{color:var(--muted)}
 .toolbar .mine{margin-left:auto}.toolbar .mine[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
-.sortbar{margin:var(--s3) 0 0;align-items:flex-start}.sortbar .caption{width:100%}.sortbar .caption{display:flex;justify-content:space-between;gap:var(--s3)}.sortbar .checked{font-size:.75rem;color:var(--muted)}
+.sortbar{margin:var(--s3) 0;align-items:flex-start}.sortbar .caption{width:100%}.sortbar .caption{display:flex;justify-content:space-between;gap:var(--s3)}.sortbar .checked{font-size:.75rem;color:var(--muted)}
 .sortbar .seg button{padding:5px 11px;font-size:var(--fs-sm)}
 .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));grid-auto-rows:1fr;gap:var(--s3);padding-bottom:var(--s1)}
 .gc{display:grid;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto auto 1fr;grid-template-areas:"ix teams" ". side" ". meta";gap:0 var(--s1);align-items:start;padding:var(--s2) var(--s2) var(--s1) var(--s2);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--lift);font-size:.875rem;line-height:1.25}
