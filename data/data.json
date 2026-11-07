@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-07T14:17:50+00:00",
+ "fetched_at": "2026-11-07T14:21:59+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -39,14 +39,7 @@
   "Salem St. schedule: HTTP Error 405: Not Allowed",
   "Schreiner schedule: HTTP Error 405: Not Allowed",
   "Simpson schedule: HTTP Error 405: Not Allowed",
-  "St. Joseph (CT) schedule: HTTP Error 405: Not Allowed",
-  "Suffolk schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Wentworth schedule: HTTP Error 405: Not Allowed",
-  "Westfield St. schedule: HTTP Error 405: Not Allowed",
-  "Willamette schedule: HTTP Error 405: Not Allowed",
-  "Wittenberg schedule: HTTP Error 405: Not Allowed",
-  "Worcester St. schedule: HTTP Error 405: Not Allowed",
   "Bluffton at Olivet feed: not well-formed (invalid token): line 1, column 0",
   "New England College at Wentworth box score: HTTP Error 403: Forbidden",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found",
@@ -56,8 +49,8 @@
  "stale": {},
  "dates": {
   "2026-11-06": 79,
-  "2026-11-07": 82,
-  "2026-11-08": 31,
+  "2026-11-07": 96,
+  "2026-11-08": 34,
   "2026-11-09": 17,
   "2026-11-10": 28,
   "2026-11-11": 68,
