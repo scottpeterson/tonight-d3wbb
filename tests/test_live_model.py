@@ -9,7 +9,7 @@ import pytest
 
 from build_site import LIVE_JS
 
-FUNCS = ["logoSlug", "phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
+FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
          "remembered", "remember", "initState"]
@@ -267,3 +267,30 @@ def test_the_slate_final_wins_and_old_finals_drop_out():
     assert run(f"[{STORE},remember('2026-11-06-union-at-catholic',[93,52],'Final'),initState({g}).score][2]") == [90, 50]
     old = "remember('2020-01-01-a-at-b',[1,0],'Final'),remember('2099-01-01-c-at-d',[2,0],'Final'),Object.keys(remembered())"
     assert run(f"[{STORE},{old}][3]") == ["2099-01-01-c-at-d"]
+
+
+def final_score(game, score, status="Final"):
+    return run(f"interest({json.dumps(game)},{{final:true,score:{json.dumps(score)},status:{json.dumps(status)},wp:1,progress:1}})")
+
+
+WJ = dict(GAME, home="Washington & Jefferson", away="Transylvania", home_rank=44, away_rank=50, pregame_wp=0.629,
+          pregame_margin=3.6, home_lev=13.74, away_lev=12.05, home_tourn=0.712, away_tourn=0.78)
+
+
+def test_a_close_final_between_good_teams_scores_without_an_upset():
+    # Washington & Jefferson 62, Transylvania 58 on 2026-11-06 scored 0 under the live formula.
+    assert 45 < final_score(WJ, [62, 58]) < 65
+    assert final_score(WJ, [62, 58]) > final_score(WJ, [80, 50]) > 0
+
+
+def test_an_upset_final_beats_the_same_game_won_by_the_favorite():
+    assert final_score(WJ, [58, 62]) > final_score(WJ, [62, 58])
+    # A big underdog that loses close beats the spread too, at a discount from winning.
+    big = dict(WJ, pregame_margin=20)
+    assert final_score(big, [70, 68]) > final_score(big, [90, 70]) and final_score(big, [68, 70]) > final_score(big, [70, 68])
+
+
+def test_overtime_counts_as_the_closest_finish_and_dead_teams_rank_lower():
+    assert final_score(WJ, [70, 62], "Final (OT)") > final_score(WJ, [70, 62])
+    dead = dict(WJ, home_tourn=0, away_tourn=0)
+    assert 0 < final_score(dead, [62, 58]) < final_score(WJ, [62, 58])

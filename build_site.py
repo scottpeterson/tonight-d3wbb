@@ -301,7 +301,7 @@ HOW = f"""<dl class="terms">
 <dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its preseason efficiency rank among Division III teams, and a filled badge marks the top 25. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
 <dt>Order</dt><dd>Games group as live, not started, and final. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
 <dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Games between one of those teams and a Division I or II team appear too, exhibitions included. A D1 or D2 badge takes the place of the opponent's rank. They do not count for the NPI, so they have no win chance or leverage. Exhibitions against Division III teams, games against NAIA and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it.</dd>
-<dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</dd>
+<dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The preseason efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>Tournament chances lower a finished game's score by at most half.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
@@ -333,11 +333,26 @@ function winProb(g,lead,progress){
   if(left<=0)return lead>0?1:lead<0?0:0.5;
   return phi((lead+g.pregame_margin*left)/(SD*Math.sqrt(left)));
 }
+// Team quality: a team outside Division III has no preseason rank; it counts as an average team. The better team counts more.
+function quality(g){const q=r=>r?1-(r-1)/409:0.5,q1=q(g.home_rank),q2=q(g.away_rank);return 0.6*Math.max(q1,q2)+0.4*Math.min(q1,q2);}
+function stakes(g){return 1-Math.exp(-(Math.abs(g.home_lev)+Math.abs(g.away_lev))/12);}
+// How far the underdog beat the pregame spread, 0 to 1. A win counts in full and a closer-than-expected loss counts 60%.
+function dogSurprise(g,score){
+  if(g.division||!g.pregame_margin)return 0;
+  const homeDog=g.pregame_margin<0,dogMargin=homeDog?score[0]-score[1]:score[1]-score[0];
+  const z=Math.max(0,(dogMargin+Math.abs(g.pregame_margin))/SD);
+  return (1-Math.exp(-z))*(dogMargin>0?1:0.6);
+}
+// A finished game: team quality, the upset or near upset, how close it ended, and leverage. Tournament chances
+// scale it down only halfway, so a good game between two long shots still ranks above a blowout.
+function finalInterest(g,st){
+  const T=Math.max(g.home_tourn,g.away_tourn),S=T/(T+0.01);
+  const ot=/OT/.test(st.status||''),C=ot?1:Math.exp(-Math.abs(st.score[0]-st.score[1])/7);
+  return Math.min(100,100*(0.5+0.5*S)*(0.30*quality(g)+0.30*dogSurprise(g,st.score)+0.25*C+0.15*stakes(g)));
+}
 function interest(g,st){
-  // A team outside Division III has no preseason rank; it counts as an average team.
-  const q=r=>r?1-(r-1)/409:0.5,q1=q(g.home_rank),q2=q(g.away_rank);
-  const Q=0.6*Math.max(q1,q2)+0.4*Math.min(q1,q2);
-  const L=1-Math.exp(-(Math.abs(g.home_lev)+Math.abs(g.away_lev))/12);
+  if(st.final&&st.score)return finalInterest(g,st);
+  const Q=quality(g),L=stakes(g);
   const T=Math.max(g.home_tourn,g.away_tourn),S=T/(T+0.01);
   const P=st.progress||0,wp=st.wp;
   const C=1-Math.abs(2*wp-1);
