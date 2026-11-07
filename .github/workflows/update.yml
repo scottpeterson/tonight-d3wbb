@@ -8,7 +8,14 @@ on:
     # box score snapshots only (fetch_data.py --finals reads just the schedule pages those games need).
     - cron: "*/20 23 * 11,12,1,2,3 *"
     - cron: "*/20 0-5 * 11,12,1,2,3 *"
+    # GitHub starts scheduled runs late on busy nights (3 h 44 min on 2026-11-06), so the Mac also starts the
+    # game-night runs by dispatch: tools/dispatch_finals.sh, run by launchd every 20 minutes.
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "full, or finals for a game-night finals pass"
+        required: false
+        default: "full"
 
 permissions:
   contents: write
@@ -31,6 +38,7 @@ jobs:
         run: |
           mode=""
           case "${{ github.event.schedule }}" in "*/20"*) mode="--finals" ;; esac
+          if [ "${{ github.event.inputs.mode }}" = "finals" ]; then mode="--finals"; fi
           python fetch_data.py $mode || echo "fetch reported errors; building with what it got"
           python build_site.py
       - name: Commit and push when anything changed
@@ -40,6 +48,11 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -m "Update $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git pull --rebase origin main
-            git push origin HEAD:main
+            # Another writer can land first. This run's generated files are the newest, so they win a conflict.
+            for try in 1 2 3; do
+              git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            exit 1
           fi

@@ -11,7 +11,8 @@ from build_site import LIVE_JS
 
 FUNCS = ["logoSlug", "phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
-         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame"]
+         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
+         "remembered", "remember", "initState"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -248,3 +249,21 @@ def test_feed_is_game_on_the_page():
     light = {"sides": FEED["sides"], "lines": None}
     assert run(f"[feedIsGame({json.dumps(ours)},{json.dumps(FEED)}),feedIsGame({json.dumps(other)},{json.dumps(FEED)}),"
                f"feedIsGame({json.dumps(ours)},{json.dumps(light)}),feedIsGame({json.dumps(other)},{json.dumps(light)})]") == [True, False, True, False]
+
+
+STORE = ("(()=>{const m={};globalThis.KEY='t';globalThis.localStorage={getItem:k=>k in m?m[k]:null,"
+         "setItem:(k,v)=>{m[k]=String(v)}};return 0})()")
+
+
+def test_a_final_read_from_the_feed_survives_a_reload():
+    # The feed moves on to the host's next game, and the slate has no final yet: the browser's own read holds the card.
+    g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06"))
+    st = run(f"[{STORE},remember('2026-11-06-union-at-catholic',[93,52],'Final'),initState({g})][2]")
+    assert st["final"] is True and st["score"] == [93, 52] and st["status"] == "Final"
+
+
+def test_the_slate_final_wins_and_old_finals_drop_out():
+    g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06", final=[90, 50]))
+    assert run(f"[{STORE},remember('2026-11-06-union-at-catholic',[93,52],'Final'),initState({g}).score][2]") == [90, 50]
+    old = "remember('2020-01-01-a-at-b',[1,0],'Final'),remember('2099-01-01-c-at-d',[2,0],'Final'),Object.keys(remembered())"
+    assert run(f"[{STORE},{old}][3]") == ["2099-01-01-c-at-d"]

@@ -560,11 +560,25 @@ function newcomerLines(g,s,when){
 function initState(g){
   const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,finalRead:!!g.box_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x)),
     top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x))};
-  if(g.final){st.final=true;st.score=g.final;const lead=g.final[0]-g.final[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
+  // A final this browser read from the feed counts until the slate has one: the feed moves on to the host's next game,
+  // and a reload must not put a finished game back under Not started.
+  const seenFinal=g.final?null:remembered()[g.id];
+  if(seenFinal)st.status=seenFinal.status;
+  const fin=g.final||(seenFinal&&seenFinal.score);
+  if(fin){st.final=true;st.score=fin;const lead=fin[0]-fin[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
   // A score the fetcher read from a box score page during the game, for a game the browser cannot follow.
   else if(g.snapshot){st.snap=g.snapshot;st.score=[g.snapshot.home,g.snapshot.away];}
   st.interest=interest(g,st);
   return st;
+}
+// Finals this browser read from feeds, by game id. Ids start with the date, so entries older than 4 days drop out.
+function remembered(){try{return JSON.parse(localStorage.getItem(KEY+'-finals'))||{}}catch(e){return {}}}
+function remember(id,score,status){
+  try{
+    const cut=new Date(Date.now()-4*86400000).toISOString().slice(0,10),all=remembered(),keep={};
+    Object.keys(all).forEach(k=>{if(k.slice(0,10)>=cut)keep[k]=all[k];});
+    keep[id]={score,status};localStorage.setItem(KEY+'-finals',JSON.stringify(keep));
+  }catch(e){}
 }
 // Every box read feeds both top 15 lists.
 function readBox(g,s,when){addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);}
@@ -582,7 +596,7 @@ async function check(g){
     st.status=s.complete?'Final'+(s.period>s.regulation?' (OT)':''):s.status;
     if(s.lines&&!s.complete)readBox(g,s,'live');
     if(s.complete){
-      st.final=true;st.live=false;
+      st.final=true;st.live=false;remember(g.id,st.score,st.status);
       if(!st.finalRead){
         let full=s;if(g.feed.type!=='presto'&&!s.lines){try{full=await readFeed(g,true)||s;}catch(e){}}
         st.finalRead=true;readBox(g,full,'final');

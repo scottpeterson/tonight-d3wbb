@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scottpeterson.tonight-d3wbb-finals</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/scottpeterson/projects/tonight-d3wbb/tools/dispatch_finals.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>1200</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/scottpeterson/projects/tonight-d3wbb/logs/dispatch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/scottpeterson/projects/tonight-d3wbb/logs/dispatch.err</string>
+</dict>
+</plist>
