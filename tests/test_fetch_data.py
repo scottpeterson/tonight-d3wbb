@@ -679,10 +679,14 @@ def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
         # A Division II opponent by name, and an exhibition, stay out.
         "Calvin": [f.row(day, (19, 0, "America/New_York"), True, False, "Indianapolis", {}, "", "")],
         "Ohio Wesleyan": [f.row(day, (13, 0, "America/New_York"), False, True, "Calvin (Exhibition)", {}, "", "")],
+        # A placeholder row that links the host's site, and a host's listing of another game, name no opponent.
+        "Benedictine": [f.row(day, (12, 0, "America/Chicago"), False, True, "WashU Tournament", {}, "", "", "http://washubears.com/")],
+        "WashU": [f.row(day, (12, 0, "America/Chicago"), False, True, "Benedictine (Ill.) vs. Central College", {}, "", "")],
     }
     schools = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{t.lower().replace(' ', '')}.example/", "tz": "America/New_York"} for t in pages}
     schools["Hope"]["schedule"] = "https://athletics.hope.edu/sports/womens-basketball/schedule"
     schools["Illinois Wesleyan"]["schedule"] = "https://www.iwusports.com/sports/womens-basketball/schedule"
+    schools["WashU"]["schedule"] = "https://washubears.com/sports/womens-basketball/schedule"
     ranks = {"Hope": 6, "Illinois Wesleyan": 41}
     games = f.page_games(day, schools, pages, [], ranks, MEMBERS)
     assert [(g["home"], g["away"], g["neutral"], g["home_rank"], g["away_rank"], g["pregame_wp"]) for g in games] == \

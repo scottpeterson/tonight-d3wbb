@@ -491,6 +491,9 @@ def opponent_division(r, members):
         m = hits[0] if len(hits) == 1 else None
     return (m["division"], m) if m else (None, None)
 
+PLACEHOLDER = re.compile(r"\b(?:Tournament|Tourney|Classic|Invitational|Tip-?Off|Challenge|Shootout|Showcase|TBA|TBD|"
+                         r"Winner|Loser|Consolation|Semifinals?|Championship)\b|\S\s+(?:vs\.?|v\.)\s+\S", re.I)
+
 
 def page_games(day, schools, pages, known, ranks, members):
     """Games on `day` between two D3 teams that a schedule page lists and `known` (the Stat Lab's list) lacks.
@@ -505,7 +508,9 @@ def page_games(day, schools, pages, known, ranks, members):
         if schools.get(team, {}).get("extra"):
             continue
         for r in rows:
-            if r["day"] != day or r["exhibition"]:
+            # A placeholder row ("WashU Tournament" linking the host's site) and a host's listing of another
+            # game ("Benedictine (Ill.) vs. Central College") name no opponent of this team.
+            if r["day"] != day or r["exhibition"] or PLACEHOLDER.search(r["opponent"] or ""):
                 continue
             site = site_of(r.get("opponent_url"))
             opp = sites.get(site)
