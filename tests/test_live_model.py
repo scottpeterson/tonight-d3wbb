@@ -11,8 +11,8 @@ from build_site import LIVE_JS
 
 FUNCS = ["logoSlug", "phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
-         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit"]
-CONSTS = ["TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
+         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame"]
+CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -214,3 +214,24 @@ def test_name_alone_still_flips_a_crew_home_side():
 def test_code_hits():
     assert run("[codeHit('MEDGAR','Medgar Evers'),codeHit('SJLI',\"St. Joseph's Long Island\"),codeHit('WPI','WPI'),"
                "codeHit('CALV','Calvin'),codeHit('SJLI','Medgar Evers'),codeHit('M','Medgar Evers')]") == [1, 1, 1, 1, 0, 0]
+
+
+def tourney(home, away, home_roster, away_roster, home_names, away_names):
+    return {"home": home, "away": away, "home_names": home_names, "away_names": away_names,
+            "home_roster": home_roster, "away_roster": away_roster, "newcomers_home": [], "newcomers_away": []}
+
+
+ME = [f"Ann Medg{c}" for c in "abcdef"]
+SJLI = [f"Bea Long{c}" for c in "abcdef"]
+FEED = {"sides": {"H": {"name": "St. Joseph's Long Island", "id": "MEDGAR"}, "V": {"name": "Medgar Evers", "id": "SJLI"}},
+        "lines": {"H": [{"first": "Ann", "last": n.split()[1], "abbr": "Medg, Ann"} for n in ME],
+                  "V": [{"first": "", "last": "", "abbr": n.split()[1].upper() + ",BEA"} for n in SJLI]}}
+
+
+def test_feed_is_game_on_the_page():
+    ours = tourney("Medgar Evers", "St. Joseph's Long Island", ME, SJLI, ["Medgar Evers"], ["St. Joseph's Long Island", "St. Joseph's (LI)"])
+    other = tourney("St. Joseph's Brooklyn", "Pratt", [f"Cy Bk{c}" for c in "abcdef"], [f"Di Pr{c}" for c in "abcdef"],
+                    ["St. Joseph's Brooklyn", "St. Josephs (Bklyn.)"], ["Pratt", "Pratt Institute"])
+    light = {"sides": FEED["sides"], "lines": None}
+    assert run(f"[feedIsGame({json.dumps(ours)},{json.dumps(FEED)}),feedIsGame({json.dumps(other)},{json.dumps(FEED)}),"
+               f"feedIsGame({json.dumps(ours)},{json.dumps(light)}),feedIsGame({json.dumps(other)},{json.dumps(light)})]") == [True, False, True, False]

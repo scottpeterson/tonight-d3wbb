@@ -13,6 +13,8 @@ Live scores for every Division III women's basketball game that counts for the N
 | `data/ncaa_members.csv` | Every NCAA school with women's basketball: name, division, conference, athletics site. Written by `tools/make_ncaa_members.py` |
 | `tools/make_ncaa_members.py` | Rebuilds `data/ncaa_members.csv` from the NCAA directory |
 | `data/extra_games.json` | Games the schedule pages miss, such as a D3 exhibition at a Division I school on a page the reader cannot parse. The file's `note` lists the fields |
+| `data/team_names.csv`, `data/rosters.csv` | Every name a source uses for each D3 team, and each team's 2026-27 roster. A live stats feed counts for a game only when it shows that game: two of our teams' players in its box score make it ours, none make it another game's (a host's crew can run one feed for its whole tournament), and without players one feed side has to match a team name or code. Written by `tools/make_team_data.py`; rerun it after a roster update |
+| `tools/make_team_data.py` | Rebuilds `data/team_names.csv` from `D3 Schools Name Mapping.csv` and `data/rosters.csv` from `2027/players.csv` in `~/projects/d3-bball-npi` |
 | `tools/make_schools.py` | Rebuilds `data/schools.csv` from `~/projects/d3-bball-npi` (`team_base_websites.csv`, `school_demographics.csv`) |
 | `tools/make_logos.py` | Writes `docs/logos/<slug>.webp` from `logo_thumbs.json` in `~/projects/d3-bball-npi`. GitHub Actions cannot read that repo, so the logos are committed. Rerun it when a school changes its logo or a team joins. A team with no file, such as a D1 or D2 opponent, shows its first letter |
 | `requirements.txt` | BeautifulSoup, for the Presto schedule templates |

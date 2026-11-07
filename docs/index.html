@@ -174,12 +174,37 @@ function codeHit(code,team){
   const c=String(code||'').toLowerCase().replace(/[^a-z]/g,''),t=String(team||'').toLowerCase().replace(/[^a-z]/g,'');
   return c.length>=2&&(teamTokens(team).has(c)||initials(team)===c||(c.length>=4&&t.startsWith(c)))?1:0;
 }
-function sideFit(side,team,roster,lines){
-  return 4*(lines||[]).filter(l=>matchNewcomer(l,roster||[])).length+2*codeHit(side.id,team)+(overlap(side.name,team)>0?1:0);
+const GENERIC_WORDS=new Set(['university','college','of','the','at','vs','state','st','saint','s','institute','inst']),MIN_ROSTER=5;
+// Distinctive words of a team name: "St. Joseph's (LI)" -> josephs, li.
+function nameWords(n){return new Set((String(n||'').toLowerCase().replace(/['\u2019]/g,'').match(/[a-z]+/g)||[]).filter(w=>!GENERIC_WORDS.has(w)));}
+function lineLast(l){const a=String(l.abbr||'').trim();return String(String(l.last||'').trim()||(a.includes(',')?a.split(',')[0]:a.split(/\s+/).pop())).toLowerCase().replace(/[^a-z]/g,'');}
+function rosterOf(g,t){const r=g[t+'_roster']||[];return r.length>=MIN_ROSTER?r:null;}
+function rosterHits(lines,roster){const last=new Set((roster||[]).map(n=>String(n).trim().split(/\s+/).pop().toLowerCase().replace(/[^a-z]/g,'')));return (lines||[]).filter(l=>last.has(lineLast(l))).length;}
+function namesTeam(side,g,t){
+  const w=nameWords(side.name);
+  return (g[t+'_names']||[g[t]]).some(n=>{const v=nameWords(n);return codeHit(side.id,n)||(w.size&&v.size&&([...w].every(x=>v.has(x))||[...v].every(x=>w.has(x))));});
+}
+// A host's crew can run one feed for every game of its tournament (St. Joseph's Brooklyn, 2026-11-06), so a feed
+// counts only when it shows this game: two of our teams' players in the box score make it ours, none make it
+// another game's; without players, one feed side has to match one of our teams by name or code.
+function feedIsGame(g,s){
+  const L=s.lines||{},S=s.sides||{},known=['home','away'].filter(t=>rosterOf(g,t));
+  if(known.length&&(L.H||[]).length+(L.V||[]).length>=MIN_ROSTER){
+    const hits=['H','V'].reduce((n,k)=>n+known.reduce((m,t)=>m+rosterHits(L[k],rosterOf(g,t)),0),0);
+    if(hits>=2)return true;
+    if(hits===0)return false;
+  }
+  if(!Object.values(S).some(x=>x&&(x.name||x.id)))return true;
+  return ['H','V'].some(k=>S[k]&&['home','away'].some(t=>namesTeam(S[k],g,t)));
+}
+function sideFit(side,g,t,lines){
+  const roster=rosterOf(g,t),names=g[t+'_names']||[g[t]];
+  const players=roster?rosterHits(lines,roster):(lines||[]).filter(l=>matchNewcomer(l,g['newcomers_'+t]||[])).length;
+  return 4*players+2*(names.some(n=>codeHit(side.id,n))?1:0)+(names.some(n=>overlap(side.name,n)>0)?1:0);
 }
 function orientFit(g,s,swap){
   const L=s.lines||{},S=s.sides||{},h=swap?'away':'home',a=swap?'home':'away';
-  return sideFit(S.H||{},g[h],g['newcomers_'+h],L.H)+sideFit(S.V||{},g[a],g['newcomers_'+a],L.V);
+  return sideFit(S.H||{},g,h,L.H)+sideFit(S.V||{},g,a,L.V);
 }
 function mdy(day){const [y,m,d]=day.split('-').map(Number);return m+'/'+d+'/'+y;}
 function progressOf(period,clockSec,regulation){
@@ -275,6 +300,7 @@ async function readFeed(g,full){
     s={home:sc.H||0,away:sc.V||0,sides,complete,period,regulation,
        progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:prestoLines(x)};
   }
+  if(f.type!=='espn'&&!feedIsGame(g,s))return null;
   // The stat crew's home side can differ from the schedule's, and so can its labels; flip when the evidence says so.
   if(orientFit(g,s,true)>orientFit(g,s,false)){[s.home,s.away]=[s.away,s.home];if(s.lines)s.lines={H:s.lines.V||[],V:s.lines.H||[]};}
   return s;
@@ -545,7 +571,7 @@ document.addEventListener('tzchange',render);
 go(defaultNight());
 tick();timer=setInterval(tick,5000);
 })();
-</script><footer>Built 2026-11-06 8:04 PM Eastern. Data fetched 2026-11-06 8:02 PM Eastern. This page is not affiliated with any organization it describes.</footer></main><script>
+</script><footer>Built 2026-11-06 8:12 PM Eastern. Data fetched 2026-11-06 8:02 PM Eastern. This page is not affiliated with any organization it describes.</footer></main><script>
 (function(){
 const root=document.documentElement,KEY='tonight-d3wbb';
 // Theme: the viewer's choice wins; otherwise follow the device. Dark Reader is locked out in <head>.

@@ -569,3 +569,43 @@ def test_result_score_reads_the_page_teams_side_from_w_or_l():
     assert f.result_score({"result": "W, 71-44"}, True) == (71, 44)
     assert f.result_score({"result": "W 44-71"}, False) == (44, 71)
     assert f.result_score({"result": ""}, True) is None
+
+
+# St. Joseph's Brooklyn's crew ran one feed for its whole tournament, 2026-11-06: Pratt at St. Joseph's Brooklyn,
+# then St. Joseph's Long Island vs Medgar Evers, with the names typed on the wrong sides.
+def tourney_game(home, away):
+    names, rosters = f.team_names(), f.team_rosters()
+    return {"home": home, "away": away, "home_names": names[home], "away_names": names[away],
+            "home_roster": rosters[home], "away_roster": rosters[away], "newcomers_home": [], "newcomers_away": []}
+
+
+def box_lines(team, n):
+    return [{"first": p.split()[0], "last": p.split()[-1], "abbr": p} for p in f.team_rosters()[team][:n]]
+
+
+TOURNEY_SIDES = {"H": {"name": "St. Joseph's Long Island", "id": "MEDGAR"}, "V": {"name": "Medgar Evers", "id": "SJLI"}}
+
+
+def test_feed_from_another_tournament_game_is_rejected():
+    lines = {"H": box_lines("Medgar Evers", 8), "V": box_lines("St. Joseph's Long Island", 9)}
+    assert f.feed_is_game(tourney_game("Medgar Evers", "St. Joseph's Long Island"), TOURNEY_SIDES, lines)
+    assert not f.feed_is_game(tourney_game("St. Joseph's Brooklyn", "Pratt"), TOURNEY_SIDES, lines)
+
+
+def test_without_players_the_names_and_codes_decide():
+    assert f.feed_is_game(tourney_game("Medgar Evers", "St. Joseph's Long Island"), TOURNEY_SIDES, {})
+    # "St. Joseph's Long Island" shares only generic words with St. Joseph's Brooklyn's names.
+    assert not f.feed_is_game(tourney_game("St. Joseph's Brooklyn", "Pratt"), TOURNEY_SIDES, {})
+    # A source's longer name still matches: Wis.-Platteville, University of Wisconsin-Platteville.
+    game = tourney_game("UW-Platteville", "Hope")
+    assert f.feed_is_game(game, {"H": {"name": "Wisconsin-Platteville"}, "V": {"name": "Hope College"}}, {})
+
+
+def test_players_outrank_names():
+    # Right names, wrong players: the crew left the last game's teams on the feed.
+    sides = {"H": {"name": "St. Joseph's Brooklyn"}, "V": {"name": "Pratt"}}
+    lines = {"H": box_lines("Medgar Evers", 8), "V": box_lines("St. Joseph's Long Island", 9)}
+    assert not f.feed_is_game(tourney_game("St. Joseph's Brooklyn", "Pratt"), sides, lines)
+    # A roster not published yet (fewer than five players listed) leaves it to the names.
+    game = {**tourney_game("St. Joseph's Brooklyn", "Pratt"), "home_roster": ["A B"], "away_roster": []}
+    assert f.feed_is_game(game, sides, lines)

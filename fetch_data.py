@@ -114,18 +114,73 @@ def code_hit(code, team):
     return len(c) >= 2 and (c in name_tokens(team) or c == initials or (len(c) >= 4 and t.startswith(c)))
 
 
-def side_fit(side, team, roster, lines):
+GENERIC_WORDS = {"university", "college", "of", "the", "at", "vs", "state", "st", "saint", "s", "institute", "inst"}
+MIN_ROSTER = 5  # a shorter roster list is a team whose roster is not published yet
+
+
+def name_words(name):
+    """Distinctive words of a team name: "St. Joseph's (LI)" -> {'josephs', 'li'}."""
+    return set(re.findall(r"[a-z]+", re.sub(r"['\u2019]", "", (name or "").lower()))) - GENERIC_WORDS
+
+
+def line_last(line):
+    """A box line's last name, letters only: from 'last', else 'Last, First', else 'F. Last'."""
+    abbr = (line.get("abbr") or "").strip()
+    last = (line.get("last") or "").strip() or (abbr.split(",")[0] if "," in abbr else (abbr.split() or [""])[-1])
+    return norm(last)
+
+
+def roster_of(game, t):
+    roster = game.get(t + "_roster") or []
+    return roster if len(roster) >= MIN_ROSTER else None
+
+
+def roster_hits(lines, roster):
+    last = {norm(n.split()[-1]) for n in roster or [] if n.split()}
+    return sum(1 for line in lines if line_last(line) in last)
+
+
+def names_team(side, game, t):
+    """True when a feed side's code or typed name matches any name a source uses for the team."""
+    words = name_words(side.get("name"))
+    for name in game.get(t + "_names") or [game[t]]:
+        theirs = name_words(name)
+        if code_hit(side.get("id"), name) or (words and theirs and (words <= theirs or theirs <= words)):
+            return True
+    return False
+
+
+def feed_is_game(game, sides, lines):
+    """False when the feed shows another game. A host's crew can run one feed for every game of its tournament
+    (St. Joseph's Brooklyn, 2026-11-06: Pratt's game, then Medgar Evers vs St. Joseph's Long Island). Players
+    decide first: two of our teams' players in the box score make it ours, none make it someone else's. Without
+    them, one feed side has to match one of our teams by name or code."""
+    known = [t for t in ("home", "away") if roster_of(game, t)]
+    if known and sum(len(lines.get(k, [])) for k in "HV") >= MIN_ROSTER:
+        hits = sum(roster_hits(lines.get(k, []), roster_of(game, t)) for k in "HV" for t in known)
+        if hits >= 2:
+            return True
+        if hits == 0:
+            return False
+    if not any(s.get("name") or s.get("id") for s in sides.values()):
+        return True
+    return any(names_team(sides[k], game, t) for k in "HV" if k in sides for t in ("home", "away"))
+
+
+def side_fit(side, game, t, lines):
     """Evidence that a feed side is this team: its players most, then its code, then its typed name."""
-    players = sum(1 for line in lines if match_newcomer(line, roster or []))
-    return 4 * players + 2 * code_hit(side.get("id"), team) + (1 if name_tokens(side.get("name")) & name_tokens(team) else 0)
+    roster = roster_of(game, t)
+    players = roster_hits(lines, roster) if roster else sum(1 for line in lines if match_newcomer(line, game.get("newcomers_" + t) or []))
+    names = game.get(t + "_names") or [game[t]]
+    code = any(code_hit(side.get("id"), n) for n in names)
+    return 4 * players + 2 * code + (1 if any(name_tokens(side.get("name")) & name_tokens(n) for n in names) else 0)
 
 
 def should_flip(game, sides, lines):
     """Crews sometimes type team names on the wrong sides (Medgar Evers vs St. Joseph's Long Island,
     2026-11-06), so orient by players and team code before the typed name."""
     def fit(home, away):
-        return (side_fit(sides["H"], game[home], game.get("newcomers_" + home), lines.get("H", []))
-                + side_fit(sides["V"], game[away], game.get("newcomers_" + away), lines.get("V", [])))
+        return side_fit(sides["H"], game, home, lines.get("H", [])) + side_fit(sides["V"], game, away, lines.get("V", []))
     return fit("away", "home") > fit("home", "away")
 
 
@@ -135,6 +190,25 @@ def statlab(name):
     if STATLAB_DIR:
         return json.loads((Path(STATLAB_DIR) / name).read_text())
     return get(f"{STATLAB}/{name}", as_json=True)
+
+
+def team_names():
+    """{team: [every name a source uses]} from data/team_names.csv (tools/make_team_data.py)."""
+    path = DATA / "team_names.csv"
+    if not path.exists():
+        return {}
+    with open(path, newline="", encoding="utf-8") as f:
+        return {r["team"]: r["names"].split("|") for r in csv.DictReader(f)}
+
+
+def team_rosters():
+    """{team: [player names]} from data/rosters.csv (tools/make_team_data.py)."""
+    path, out = DATA / "rosters.csv", {}
+    if path.exists():
+        with open(path, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                out.setdefault(r["team"], []).append(r["player"])
+    return out
 
 
 def load_schools():
@@ -881,6 +955,8 @@ def read_final(game):
         home_score, away_score = num(g["HomeTeam"]["Score"]), num(g["VisitingTeam"]["Score"])
         feed_sides = {k: {"name": g[key].get("Name"), "id": g[key].get("Id")} for k, key in (("H", "HomeTeam"), ("V", "VisitingTeam"))}
         lines = sidearm_lines(full)
+        if not feed_is_game(game, feed_sides, lines):
+            return None
     else:
         root = ET.fromstring(get(feed["url"]))
         venue, status = root.find(".//venue"), root.find(".//status")
@@ -893,6 +969,8 @@ def read_final(game):
             if t.get("vh") in feed_sides:
                 feed_sides[t.get("vh")] = {"name": t.get("name") or feed_sides[t.get("vh")]["name"], "id": t.get("id")}
         lines = presto_lines(root)
+        if not feed_is_game(game, feed_sides, lines):
+            return None
     return box_result(game, home_score, away_score, feed_sides, lines)
 
 
@@ -965,8 +1043,10 @@ def result_score(r, page_is_home):
     return (mine, theirs) if page_is_home else (theirs, mine)
 
 
-def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None, hub=(), espn=(), others=frozenset()):
+def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None, hub=(), espn=(), others=frozenset(),
+                names=None, rosters=None):
     prev = {g["id"]: g for g in (previous or {}).get("games", [])}
+    names, rosters = names or {}, rosters or {}
     keys = d3_keys(schools)
     out = []
     for g in games:
@@ -1029,6 +1109,9 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "boxscore": next((r["links"]["boxscore"] for r in (home_row, away_row) if r and r["links"].get("boxscore")), None) or old.get("boxscore"),
             "top_lines": old.get("top_lines", []), "box_read": old.get("box_read", False),
             "newcomers_home": newcomers.get(g["home"], []), "newcomers_away": newcomers.get(g["away"], []),
+            # Every name sources use and the full roster, so a feed showing another game can be told apart.
+            "home_names": names.get(g["home"], [g["home"]]), "away_names": names.get(g["away"], [g["away"]]),
+            "home_roster": rosters.get(g["home"], []), "away_roster": rosters.get(g["away"], []),
         })
     return {"date": day.isoformat(), "built": now().isoformat(timespec="seconds"), "games": out}
 
@@ -1054,6 +1137,7 @@ def collect(previous):
         out["dates"] = previous.get("dates", {})
         return out
     extra = read_json(EXTRA, {"schools": {}, "games": []})
+    names, rosters = team_names(), team_rosters()
     for name, school in extra.get("schools", {}).items():
         schools.setdefault(name, {"team": name, "extra": True, **school})
     for g in extra.get("games", []):
@@ -1129,7 +1213,7 @@ def collect(previous):
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(others)
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, by_day.get(d.isoformat(), []) + others, schools, pages, tourn, newcomers, read_json(path),
-                            extra.get("links"), hub, espn, upper_sites(members))
+                            extra.get("links"), hub, espn, upper_sites(members), names, rosters)
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
     # Finals: one read per game without a box score from the last FINALS_DAYS_BACK days, in parallel. The live feed
