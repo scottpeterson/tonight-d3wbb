@@ -168,7 +168,9 @@ def test_checks_stop_when_a_feed_never_shows_the_game():
     # Before the feed shows the game, the wait ends by 45 minutes after tipoff.
     assert run(f"(nextCheck({g},{{interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") == 45
     assert run(f"(nextCheck({g},{{seen:true,live:true,interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") > 45
-    assert run(f"nextCheck({g},{{noStats:true,interest:0,wp:0.5}},{tip}+3600000)") is None
+    # After that, a look every 10 minutes until 4 hours past tipoff: a tournament feed shows the earlier game first.
+    assert run(f"(nextCheck({g},{{noStats:true,interest:0,wp:0.5}},{tip}+3600000)-{tip})/60000") == 70
+    assert run(f"nextCheck({g},{{noStats:true,interest:0,wp:0.5}},{tip}+4*3600000)") is None
 
 
 def _default_night(dates, today, boot_night="2026-11-01"):

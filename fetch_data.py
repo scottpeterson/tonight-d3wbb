@@ -19,13 +19,17 @@ Each run does three things:
    tipoff and the live stats feed, and writes the slate. A row against a school
    that data/ncaa_members.csv lists in Division I or II becomes a game too,
    exhibitions included. Those games carry `division` and do not count for the NPI.
-3. For the last three days, reads each game that has no box score yet. The live
+3. For the last three days, reads each game that has no box score yet. With
+   --finals (the game-night run every 20 minutes), the run does only this step
+   and reads only the schedule pages those games need. The live
    feed comes first. Once a game is 2.5 hours past tipoff and its feed has no
    complete box score (crews reuse a feed for their next game), the fetcher reads
    the Box Score link on either team's schedule page instead: Sidearm HTML or
    Presto StatCrew XML. It stores the final score, the line of every newcomer
    who played, and the game's 15 best lines by any player. A score a schedule
-   page posts outranks the feed's. The page shows the night's top 15 game scores
+   page posts outranks the feed's. A game with no feed the browser can read but
+   a Presto box score page gets a snapshot of its score and period while it is
+   on; the page shows it with the time it was read. The page shows the night's top 15 game scores
    from each list.
 """
 import csv
@@ -844,8 +848,10 @@ def sidearm_box(page):
     tables = [t for t in soup.select("table.overall-stats") if t.select_one("thead") and "Player" in t.select_one("thead").get_text()]
     board = soup.select_one("table.sidearm-table")
     teams = [tr for tr in (board.select("tr")[1:] if board else []) if tr.find_all("td")]
-    if len(tables) != 2 or len(teams) != 2:
+    # Some pages add a box score per period after the full game's two tables.
+    if len(tables) < 2 or len(teams) != 2:
         return None
+    tables = tables[:2]
     board_heads = [c.get_text(" ", strip=True) for c in board.select("tr")[0].find_all(["th", "td"])]
     total = next((i for i, h in enumerate(board_heads) if h.startswith("Total")), None)
     if total is None:
@@ -879,6 +885,61 @@ def sidearm_box(page):
         lines[side] = out
     when = re.search(r"\bon (\d{1,2}/\d{1,2}/\d{4})", soup.title.get_text() if soup.title else "")
     return {"date": when.group(1) if when else None, "sides": sides, "score": score, "lines": lines}
+
+
+PRESTO_COLUMNS = {"MIN": "min", "PTS": "pts", "OREB": "oreb", "DREB": "dreb", "REB": "reb", "AST": "ast", "STL": "stl",
+                  "BLK": "blk", "TO": "to", "PF": "pf"}
+PRESTO_SKIP = {"team", "totals", "starters", "reserves", "bench"}
+
+
+def presto_box(page):
+    """A Presto box score page (the `boxscores/<date>_<id>.xml` link serves HTML): {'status', 'complete', 'sides',
+    'score', 'lines'} keyed 'V' and 'H' like a feed, or None when the page lacks the linescore or two player tables.
+    The page updates during the game, so it also gives a live score. Its date line can run a day ahead (UTC), so
+    the date comes from the link."""
+    soup = BeautifulSoup(page, "html.parser")
+    board = soup.select_one(".linescore table") or soup.select_one("table.table")
+    teams = [tr for tr in board.select("tr") if tr.find("td")] if board else []
+    tables = [t for t in soup.select("table") if t.select("thead tr")
+              and {"Player", "MIN"} <= {c.get_text(" ", strip=True) for c in t.select("thead tr")[-1].find_all(["th", "td"])}]
+    if len(teams) != 2 or len(tables) < 2:
+        return None
+    status = board.select_one("tr th").get_text(" ", strip=True)
+    sides, score, lines = {}, {}, {}
+    for side, tr, table in zip(("V", "H"), teams, tables[:2]):
+        sides[side] = {"name": tr.find("th").get_text(" ", strip=True)}
+        total = tr.select_one("td.total") or tr.find_all("td")[-1]
+        score[side] = num(total.get_text(strip=True))
+        heads = [c.get_text(" ", strip=True) for c in table.select("thead tr")[-1].find_all(["th", "td"])]
+        out = []
+        for row in table.select("tbody tr"):
+            cells = row.find_all(["th", "td"])
+            if len(cells) < len(heads):
+                continue
+            v = dict(zip(heads, (c.get_text(" ", strip=True) for c in cells)))
+            # Most templates mark the name (.player-name); others write "F 5 Marissa Nudd" or "25 - Long,Caroline - F".
+            marked = cells[heads.index("Player")].select_one(".player-name") if "Player" in heads else None
+            name = marked.get_text(" ", strip=True) if marked else v.get("Player", "").strip()
+            name = re.sub(r"^(?:[A-Z]{1,2}(?:/[A-Z]{1,2})?\s+)?(?:\d+\s*-?|-)\s+", "", name)
+            name = re.sub(r"\s+-\s+[A-Z]{1,2}(?:/[A-Z]{1,2})?$", "", name).strip()
+            if not name or name.lower() in PRESTO_SKIP:
+                continue
+            if "," in name:
+                last, _, first = (s.strip() for s in name.partition(","))
+            else:
+                first, _, last = name.partition(" ")
+            fgm, fga = made_attempted(v.get("FGM-A"))
+            ftm, fta = made_attempted(v.get("FTM-A"))
+            out.append({"first": first, "last": last, "abbr": name, "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta,
+                        **{key: num(v.get(col)) for col, key in PRESTO_COLUMNS.items()}})
+        lines[side] = out
+    return {"status": status, "complete": status.lower().startswith("final"), "sides": sides, "score": score, "lines": lines}
+
+
+def presto_box_date(url):
+    """'.../boxscores/20261106_h03q.xml' -> date(2026, 11, 6), or None."""
+    m = re.search(r"/boxscores/(\d{4})(\d{2})(\d{2})_", url or "")
+    return date(int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
 
 
 def espn_lines(summary):
@@ -1003,6 +1064,25 @@ def box_result(game, home_score, away_score, sides, lines):
             "top": sorted(top, key=lambda x: -x["gmsc"])[:TOP_N]}
 
 
+def read_presto_page(game, url):
+    """A Presto box score page for this game, final or in progress, or None when it shows another day or game."""
+    if presto_box_date(url) != date.fromisoformat(game["date"]):
+        return None
+    page = get(url)
+    if page.lstrip().startswith("<?xml"):
+        return None
+    box = presto_box(page)
+    return box if box and feed_is_game(game, box["sides"], box["lines"]) else None
+
+
+def snapshot(game, box):
+    """A score read from a box score page during the game, oriented to the card, for a game the browser cannot follow."""
+    home, away = box["score"]["H"], box["score"]["V"]
+    if should_flip(game, box["sides"], box["lines"]):
+        home, away = away, home
+    return {"home": home, "away": away, "status": box["status"], "at": now().isoformat(timespec="seconds")}
+
+
 def is_over(game, today):
     """True once a game is BOX_PAGE_AFTER past tipoff, or, with no tipoff, once its day has passed."""
     if game.get("tip"):
@@ -1023,8 +1103,9 @@ def box_link(game, pages):
 def read_box_page(game, url):
     """The final from a box score page a schedule links: Presto's StatCrew XML or a Sidearm HTML page."""
     day = date.fromisoformat(game["date"])
-    if url.lower().split("?")[0].endswith(".xml"):
-        return read_final({**game, "feed": {"type": "presto", "url": url}})
+    if presto_box_date(url):
+        box = read_presto_page(game, url)
+        return box_result(game, box["score"]["H"], box["score"]["V"], box["sides"], box["lines"]) if box and box["complete"] else None
     box = sidearm_box(get(url))
     if not box or (box["date"] and not feed_date_matches(box["date"], day)):
         return None
@@ -1114,6 +1195,86 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "home_roster": rosters.get(g["home"], []), "away_roster": rosters.get(g["away"], []),
         })
     return {"date": day.isoformat(), "built": now().isoformat(timespec="seconds"), "games": out}
+
+
+class SchedulePages(dict):
+    """Schedule rows by team, read on first use: the finals-only run reads just the pages its games need."""
+
+    def __init__(self, schools):
+        super().__init__()
+        self.schools = schools
+
+    def get(self, team, default=None):
+        if team not in self:
+            try:
+                self[team] = schedule_rows(self.schools.get(team))
+            except FETCH_ERRORS:
+                self[team] = []
+        return self[team] or default
+
+
+def record_finals(out, today, pages):
+    """For the last FINALS_DAYS_BACK days, read each game without a box score. The live feed comes first; a crew can
+    reuse it for its next game, so once the game is over, the box score page a schedule links is read instead. A
+    score a schedule page posts outranks a feed's. A game the browser cannot follow (no feed, but a Presto box score
+    page) gets a snapshot of its score while it is on."""
+    def final(g):
+        errors, result, snap = [], None, None
+        if g.get("feed"):
+            try:
+                result = read_final(g)
+            except FETCH_ERRORS as exc:
+                errors.append(f'{g["away"]} at {g["home"]} feed: {exc}')
+        link, posted = box_link(g, pages)
+        presto_link = next((u for u in (link, g.get("link")) if presto_box_date(u)), None)
+        try:
+            if not result and presto_link and not g.get("feed"):
+                box = read_presto_page(g, presto_link)
+                if box and box["complete"]:
+                    result = box_result(g, box["score"]["H"], box["score"]["V"], box["sides"], box["lines"])
+                elif box:
+                    snap = snapshot(g, box)
+            if not result and link and is_over(g, today):
+                result = read_box_page(g, link)
+        except FETCH_ERRORS as exc:
+            errors.append(f'{g["away"]} at {g["home"]} box score: {exc}')
+        if result and posted:
+            result["home"], result["away"] = posted
+        return g, result, posted, link, snap, errors
+
+    for d in (today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)):
+        path = SLATES / f"{d.isoformat()}.json"
+        slate = read_json(path)
+        if not slate:
+            continue
+        due = [g for g in slate["games"] if not g.get("box_read")
+               and not (g.get("tip") and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) > now() - timedelta(minutes=10))]
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            for g, result, posted, link, snap, errors in pool.map(final, due):
+                out["errors"].extend(errors)
+                g["boxscore"] = link or g.get("boxscore")
+                if snap:
+                    g["snapshot"] = snap
+                if posted and not result:
+                    g["final"] = list(posted)
+                if result:
+                    g["final"] = [result["home"], result["away"]]
+                    g["newcomer_games"] = result["newcomers"]
+                    g["top_lines"] = result["top"]
+                    g["newcomers_read"] = g["box_read"] = True
+                    g.pop("snapshot", None)
+        path.write_text(json.dumps(slate, separators=(",", ":")))
+
+
+def finals_only(previous):
+    """The game-night run: finals and snapshots only, reading just the schedule pages those games need."""
+    out = {**previous, "fetched_at": now().isoformat(timespec="seconds"), "errors": []}
+    schools = load_schools()
+    for name, school in read_json(EXTRA, {"schools": {}}).get("schools", {}).items():
+        schools.setdefault(name, {"team": name, "extra": True, **school})
+    today = date.fromisoformat(TODAY) if TODAY else datetime.now(EASTERN).date()
+    record_finals(out, today, SchedulePages(schools))
+    return out
 
 
 def read_json(path, default=None):
@@ -1216,52 +1377,14 @@ def collect(previous):
                             extra.get("links"), hub, espn, upper_sites(members), names, rosters)
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
-    # Finals: one read per game without a box score from the last FINALS_DAYS_BACK days, in parallel. The live feed
-    # comes first; a crew can reuse it for its next game, so once the game is over, the box score page a schedule
-    # links is read instead. A score a schedule page posts outranks a feed's.
-    def final(g):
-        errors, result = [], None
-        if g.get("feed"):
-            try:
-                result = read_final(g)
-            except FETCH_ERRORS as exc:
-                errors.append(f'{g["away"]} at {g["home"]} feed: {exc}')
-        link, posted = box_link(g, pages)
-        if not result and link and is_over(g, today):
-            try:
-                result = read_box_page(g, link)
-            except FETCH_ERRORS as exc:
-                errors.append(f'{g["away"]} at {g["home"]} box score: {exc}')
-        if result and posted:
-            result["home"], result["away"] = posted
-        return g, result, posted, link, errors
-
-    for d in (today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)):
-        path = SLATES / f"{d.isoformat()}.json"
-        slate = read_json(path)
-        if not slate:
-            continue
-        due = [g for g in slate["games"] if not g.get("box_read")
-               and not (g.get("tip") and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) > now() - timedelta(hours=2))]
-        with ThreadPoolExecutor(max_workers=12) as pool:
-            for g, result, posted, link, errors in pool.map(final, due):
-                out["errors"].extend(errors)
-                g["boxscore"] = link or g.get("boxscore")
-                if posted and not result:
-                    g["final"] = list(posted)
-                if result:
-                    g["final"] = [result["home"], result["away"]]
-                    g["newcomer_games"] = result["newcomers"]
-                    g["top_lines"] = result["top"]
-                    g["newcomers_read"] = g["box_read"] = True
-        path.write_text(json.dumps(slate, separators=(",", ":")))
+    record_finals(out, today, pages)
     return out
 
 
 def main():
     DATA.mkdir(exist_ok=True)
     previous = read_json(OUT, {})
-    out = collect(previous)
+    out = finals_only(previous) if "--finals" in sys.argv[1:] else collect(previous)
     OUT.write_text(json.dumps(out, indent=1))
     print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {OUT.relative_to(BASE)}")
     if out["errors"]:

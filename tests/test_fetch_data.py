@@ -609,3 +609,43 @@ def test_players_outrank_names():
     # A roster not published yet (fewer than five players listed) leaves it to the names.
     game = {**tourney_game("St. Joseph's Brooklyn", "Pratt"), "home_roster": ["A B"], "away_roster": []}
     assert f.feed_is_game(game, sides, lines)
+
+
+# Eastern Connecticut St. 95, Lasell 72 (2026-11-06): a Presto box score page. The first visiting row is rewritten
+# in Eureka's template ("25 - Nudd,Marissa - F", name marked .player-name).
+PRESTO_URL = "https://laserpride.lasell.edu/sports/wbkb/2026-27/boxscores/20261106_h03q.xml"
+
+
+def presto_page():
+    return (Path(__file__).parent / "fixtures" / "presto_boxscore.html").read_text()
+
+
+def test_presto_box_page():
+    box = f.presto_box(presto_page())
+    assert (box["status"], box["complete"]) == ("Final", True)
+    assert box["sides"] == {"V": {"name": "Eastern Connecticut"}, "H": {"name": "Lasell"}}
+    assert box["score"] == {"V": 95, "H": 72}
+    nudd = box["lines"]["V"][0]
+    assert (nudd["first"], nudd["last"], nudd["min"], nudd["pts"], nudd["fgm"], nudd["fga"], nudd["ftm"], nudd["fta"],
+            nudd["oreb"], nudd["dreb"], nudd["reb"], nudd["ast"]) == ("Marissa", "Nudd", 37, 27, 10, 19, 6, 7, 3, 4, 7, 3)
+    assert box["lines"]["H"][0]["first"] == "Bri" and box["lines"]["H"][0]["last"] == "Franklin"
+    assert not any(line["last"].lower() in ("team", "totals") or line["first"].upper() == "STARTERS"
+                   for side in "VH" for line in box["lines"][side])
+
+
+def test_read_box_page_reads_presto_html_and_dates_it_by_the_link(monkeypatch):
+    monkeypatch.setattr(f, "get", lambda *a, **k: presto_page())
+    game = {"date": "2026-11-06", "home": "Lasell", "away": "Eastern Connecticut St.", "newcomers_home": [], "newcomers_away": []}
+    result = f.read_box_page(game, PRESTO_URL)
+    assert (result["home"], result["away"]) == (72, 95)
+    assert result["top"][0]["team"] == "Eastern Connecticut St."
+    assert f.presto_box_date(PRESTO_URL) == date(2026, 11, 6)
+    assert f.read_box_page({**game, "date": "2026-11-07"}, PRESTO_URL) is None
+
+
+def test_snapshot_orients_a_live_presto_score(monkeypatch):
+    monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 7, 1, 0, tzinfo=timezone.utc))
+    box = f.presto_box(presto_page())
+    box["status"], box["complete"] = "3rd Quarter", False
+    game = {"home": "Lasell", "away": "Eastern Connecticut St.", "newcomers_home": [], "newcomers_away": []}
+    assert f.snapshot(game, box) == {"home": 72, "away": 95, "status": "3rd Quarter", "at": "2026-11-07T01:00:00+00:00"}

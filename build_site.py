@@ -351,9 +351,12 @@ function waitMs(g,st){
 function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
 // A feed that has not shown tonight's game this long after tipoff is not covering it: the crew posts elsewhere
 // or not at all. Checks stop there.
-const GIVE_UP_MS=45*60000;
+const GIVE_UP_MS=45*60000,RETRY_MS=10*60000,LAST_LOOK_MS=4*3600000;
 function nextCheck(g,st,now){
-  if(st.final||st.noStats||!g.feed)return null;
+  if(st.final||!g.feed)return null;
+  // A feed that has not shown this game by GIVE_UP_MS gets a look every RETRY_MS until LAST_LOOK_MS: a tournament
+  // host's feed shows the earlier game first, and some crews start late.
+  if(st.noStats){const tip=tipMs(g);return tip&&now<tip+LAST_LOOK_MS?now+RETRY_MS:null;}
   const tip=tipMs(g);
   if(tip&&now<tip+5*60000&&!st.live)return tip+5*60000;
   const end=(tip||now)+GAME_MS;
@@ -545,6 +548,8 @@ function initState(g){
   const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,finalRead:!!g.box_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x)),
     top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x))};
   if(g.final){st.final=true;st.score=g.final;const lead=g.final[0]-g.final[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
+  // A score the fetcher read from a box score page during the game, for a game the browser cannot follow.
+  else if(g.snapshot){st.snap=g.snapshot;st.score=[g.snapshot.home,g.snapshot.away];}
   st.interest=interest(g,st);
   return st;
 }
@@ -557,6 +562,7 @@ async function check(g){
   const now=Date.now();
   if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
   if(s){
+    st.noStats=false;st.snap=null;
     st.seen=true;st.live=!s.complete;st.score=[s.home,s.away];st.progress=s.progress;
     const lead=s.home-s.away;
     st.wp=s.complete?(lead>0?1:lead<0?0:0.5):winProb(g,lead,s.progress);
@@ -583,9 +589,29 @@ function addNewcomers(g,list){
 function todayET(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date());}
 function isToday(){const t=todayET();return night===t||night===prevDay(t);}
 function prevDay(d){const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()-1);return x.toISOString().slice(0,10);}
+// The fetcher reads box score pages every 20 minutes on game nights, so an open page rereads its slate for finals,
+// box score lines, and scores it cannot read itself.
+const SLATE_MS=10*60000;let slateAt=Date.now();
+async function refreshSlate(){
+  slateAt=Date.now();
+  let fresh;try{const r=await fetch('slates/'+night+'.json',{cache:'no-store'});if(!r.ok)return;fresh=await r.json();}catch(e){return;}
+  if(fresh.date!==night)return;
+  const byId=new Map(fresh.games.map(x=>[x.id,x]));
+  games.forEach(g=>{
+    const x=byId.get(g.id);if(!x||g.st.final)return;
+    ['feed','link','boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
+    if(x.final){
+      Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[]});
+      const st=initState(g);st.nextAt=null;g.st=st;
+    }else if(x.snapshot&&!g.st.live){g.st.snap=x.snapshot;g.st.score=[x.snapshot.home,x.snapshot.away];}
+    if(x.feed&&!g.st.nextAt&&!g.st.final)g.st.nextAt=Date.now();
+  });
+  renderNewcomers();render();
+}
 async function tick(){
   if(document.hidden||!isToday())return;
   const now=Date.now();
+  if(now-slateAt>=SLATE_MS)refreshSlate();
   while(tokens.length&&tokens[0]<now-60000)tokens.shift();
   const due=games.filter(g=>g.feed&&g.st.nextAt&&g.st.nextAt<=now).sort((a,b)=>b.st.interest-a.st.interest);
   const room=Math.max(0,BUDGET_PER_MIN-tokens.length);
@@ -633,13 +659,14 @@ function card(g){
   let state;
   if(st.final)state=esc(st.status||'Final');
   else if(st.live)state='\u{1F534} '+esc(st.status);
+  else if(st.snap)state=esc(st.snap.status)+' \u00b7 '+ago(Date.parse(st.snap.at));
   else state=g.tip?fmtTime(g.tip):'Time TBA';
   const teams=line(g,'away',1)+line(g,'home',0);
   const wc=winCell(g,st),lev=leverage(g),side=['<span class="state">'+state+'</span>'],meta=[];
   if(wc!=='-'){const m=/^(.*) (\S+%)$/.exec(wc);side.push('<span class="wc" title="'+wc+'"><span class="who">'+m[1]+'</span><span class="pct">'+m[2]+'</span></span>');};
   if(!g.division&&lev>0)side.push('<span class="lv" title="Leverage">'+(lev>=15?'⚡ ':'')+'Lev '+lev.toFixed(1)+'</span>');
   const w=tags(g,st);if(w)meta.push(w);
-  if((!g.feed||st.noStats)&&!st.final)meta.push('<span class="tag quiet">no live stats</span>');
+  if((!g.feed||st.noStats)&&!st.final&&!st.snap)meta.push('<span class="tag quiet">no live stats</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
   return '<article class="gc '+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+

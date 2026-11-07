@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: "7 11,17,21 * * *"   # 6 a.m., noon, and 4 p.m. Eastern standard time: slates for today and tomorrow
     - cron: "37 7 * 11,12,1,2,3 *"   # 2:37 a.m. Eastern standard time, November to March: final scores and newcomer lines
+    # Game nights, November to March: every 20 minutes from 6 p.m. to 1 a.m. Eastern standard time, finals and
+    # box score snapshots only (fetch_data.py --finals reads just the schedule pages those games need).
+    - cron: "*/20 23 * 11,12,1,2,3 *"
+    - cron: "*/20 0-5 * 11,12,1,2,3 *"
   workflow_dispatch:
 
 permissions:
@@ -25,7 +29,9 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Fetch data and build the page
         run: |
-          python fetch_data.py || echo "fetch reported errors; building with what it got"
+          mode=""
+          case "${{ github.event.schedule }}" in "*/20"*) mode="--finals" ;; esac
+          python fetch_data.py $mode || echo "fetch reported errors; building with what it got"
           python build_site.py
       - name: Commit and push when anything changed
         run: |
