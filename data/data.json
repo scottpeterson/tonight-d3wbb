@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-07T20:50:25+00:00",
+ "fetched_at": "2026-11-07T21:01:49+00:00",
  "errors": [
   "Albertus Magnus schedule: HTTP Error 405: Not Allowed",
   "Anderson schedule: HTTP Error 405: Not Allowed",
@@ -25,9 +25,6 @@
   "Lesley schedule: HTTP Error 405: Not Allowed",
   "MCLA schedule: HTTP Error 405: Not Allowed",
   "Mitchell schedule: HTTP Error 405: Not Allowed",
-  "Moravian schedule: HTTP Error 405: Not Allowed",
-  "Mt. Holyoke schedule: HTTP Error 405: Not Allowed",
-  "Muskingum schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Rhodes at Hendrix feed: HTTP Error 500: Internal Server Error",
   "Bluffton at Olivet feed: not well-formed (invalid token): line 1, column 0",
