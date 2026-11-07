@@ -11,7 +11,7 @@ from build_site import LIVE_JS
 
 FUNCS = ["logoSlug", "phi", "winProb", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
-         "num", "ma", "espnState", "espnLines"]
+         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit"]
 CONSTS = ["TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -141,7 +141,7 @@ def test_espn_light_feed_and_summary():
     fix = Path(__file__).parent / "fixtures"
     event, summary = (fix / "espn_event.json").read_text(), (fix / "espn_summary.json").read_text()
     s = run(f"espnState({event})")
-    assert (s["home"], s["away"], s["feedHome"], s["complete"], s["progress"], s["lines"]) == (56, 71, "Marquette", True, 1, None)
+    assert (s["home"], s["away"], s["sides"]["H"]["name"], s["complete"], s["progress"], s["lines"]) == (56, 71, "Marquette", True, 1, None)
     s = run(f"espnState({summary})")
     strong = next(l for l in s["lines"]["V"] if l["last"] == "Strong")
     assert (strong["first"], strong["pts"], strong["fgm"], strong["fga"], strong["min"]) == ("Sarah", 22, 9, 20, 27)
@@ -191,3 +191,26 @@ def test_logo_slug_matches_the_file_names():
     from tools.make_logos import slug
     for name in ("Hope", "St. John's", "Frank. & Mar.", "Trinity (CT)", "UW-La Crosse", "Mass-Boston"):
         assert run(f"logoSlug({json.dumps(name)})") == slug(name)
+
+
+# Medgar Evers vs St. Joseph's Long Island, 2026-11-06: the crew typed each team's name on the other side.
+SWAPPED_NAMES = {"home": 1, "away": 24, "sides": {"H": {"name": "St. Joseph's Long Island", "id": "MEDGAR"},
+                                                   "V": {"name": "Medgar Evers", "id": "SJLI"}}}
+MEDGAR_GAME = {"home": "Medgar Evers", "away": "St. Joseph's Long Island", "newcomers_home": [], "newcomers_away": []}
+
+
+def test_team_code_beats_swapped_names():
+    keep, swap = run(f"[orientFit({json.dumps(MEDGAR_GAME)},{json.dumps(SWAPPED_NAMES)},false),"
+                     f"orientFit({json.dumps(MEDGAR_GAME)},{json.dumps(SWAPPED_NAMES)},true)]")
+    assert keep > swap
+
+
+def test_name_alone_still_flips_a_crew_home_side():
+    s = {"sides": {"H": {"name": "St. Joseph's Long Island"}, "V": {"name": "Medgar Evers"}}}
+    keep, swap = run(f"[orientFit({json.dumps(MEDGAR_GAME)},{json.dumps(s)},false),orientFit({json.dumps(MEDGAR_GAME)},{json.dumps(s)},true)]")
+    assert swap > keep
+
+
+def test_code_hits():
+    assert run("[codeHit('MEDGAR','Medgar Evers'),codeHit('SJLI',\"St. Joseph's Long Island\"),codeHit('WPI','WPI'),"
+               "codeHit('CALV','Calvin'),codeHit('SJLI','Medgar Evers'),codeHit('M','Medgar Evers')]") == [1, 1, 1, 1, 0, 0]

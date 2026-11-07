@@ -365,6 +365,21 @@ function nextCheck(g,st,now){
 // ---------- feeds
 function teamTokens(n){return new Set(String(n||'').toLowerCase().match(/[a-z]+/g)||[]);}
 function overlap(a,b){const B=teamTokens(b);let n=0;teamTokens(a).forEach(t=>{if(B.has(t)&&!['college','university','of','the','state'].includes(t))n++;});return n;}
+// Orienting a feed to the schedule. Crews sometimes type the team names on the wrong sides (Medgar Evers vs
+// St. Joseph's Long Island, 2026-11-06: the side coded MEDGAR, carrying Medgar Evers' players and score, was named
+// St. Joseph's Long Island). So the box score's players count most, then the team code, then the typed name.
+function initials(n){return (String(n||'').replace(/['\u2019]/g,'').match(/[A-Za-z]+/g)||[]).map(w=>w[0]).join('').toLowerCase();}
+function codeHit(code,team){
+  const c=String(code||'').toLowerCase().replace(/[^a-z]/g,''),t=String(team||'').toLowerCase().replace(/[^a-z]/g,'');
+  return c.length>=2&&(teamTokens(team).has(c)||initials(team)===c||(c.length>=4&&t.startsWith(c)))?1:0;
+}
+function sideFit(side,team,roster,lines){
+  return 4*(lines||[]).filter(l=>matchNewcomer(l,roster||[])).length+2*codeHit(side.id,team)+(overlap(side.name,team)>0?1:0);
+}
+function orientFit(g,s,swap){
+  const L=s.lines||{},S=s.sides||{},h=swap?'away':'home',a=swap?'home':'away';
+  return sideFit(S.H||{},g[h],g['newcomers_'+h],L.H)+sideFit(S.V||{},g[a],g['newcomers_'+a],L.V);
+}
 function mdy(day){const [y,m,d]=day.split('-').map(Number);return m+'/'+d+'/'+y;}
 function progressOf(period,clockSec,regulation){
   const len=regulation===2?1200:600,total=regulation*len;
@@ -411,7 +426,8 @@ function espnState(j){
   const side=h=>c.competitors.find(x=>x.homeAway===h)||{},regulation=4,period=num(st.period),
     clock=typeof st.clock==='number'?Math.round(st.clock):clockToSec(st.displayClock||'0:00');
   const complete=!!type.completed;
-  return {home:num(side('home').score),away:num(side('away').score),feedHome:(side('home').team||{}).location,complete,period,regulation,
+  const tm=h=>({name:(side(h).team||{}).location,id:(side(h).team||{}).abbreviation});
+  return {home:num(side('home').score),away:num(side('away').score),sides:{H:tm('home'),V:tm('away')},complete,period,regulation,
     progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:j.boxscore?espnLines(j):null};
 }
 function espnLines(j){
@@ -444,20 +460,22 @@ async function readFeed(g,full){
     const regulation=num((G.Rules||{}).PeriodMinutes)>=20?2:4,period=num(G.Period),clock=num(G.ClockSeconds);
     // Some crews never set IsComplete (Butler, 2026-10-28). The clock at 0:00 in the last period with no tie is a final.
     const complete=!!G.IsComplete||(period>=regulation&&G.ClockSeconds===0&&num(G.HomeTeam.Score)!==num(G.VisitingTeam.Score));
-    s={home:num(G.HomeTeam.Score),away:num(G.VisitingTeam.Score),feedHome:G.HomeTeam.Name,complete,period,regulation,
+    s={home:num(G.HomeTeam.Score),away:num(G.VisitingTeam.Score),sides:{H:{name:G.HomeTeam.Name,id:G.HomeTeam.Id},V:{name:G.VisitingTeam.Name,id:G.VisitingTeam.Id}},complete,period,regulation,
        progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:full?sidearmLines(j):null};
   }else{
     const x=new DOMParser().parseFromString(await r.text(),'application/xml');
     const venue=x.querySelector('venue'),st=x.querySelector('status'),rules=x.querySelector('rules');
     if(!venue||!st||venue.getAttribute('date')!==mdy(g.date)||!x.querySelector('play'))return null;
     const regulation=+(rules&&rules.getAttribute('prds'))||4,period=num(st.getAttribute('period')),clock=clockToSec(st.getAttribute('clock'));
-    const sc={};x.querySelectorAll('team').forEach(t=>{const ls=t.querySelector('linescore');sc[t.getAttribute('vh')]=num(ls&&ls.getAttribute('score'));});
+    const sc={},sides={H:{name:venue.getAttribute('homename')},V:{name:venue.getAttribute('visname')}};
+    x.querySelectorAll('team').forEach(t=>{const ls=t.querySelector('linescore'),vh=t.getAttribute('vh');sc[vh]=num(ls&&ls.getAttribute('score'));
+      if(sides[vh])sides[vh]={name:t.getAttribute('name')||sides[vh].name,id:t.getAttribute('id')};});
     const complete=st.getAttribute('complete')==='Y';
-    s={home:sc.H||0,away:sc.V||0,feedHome:venue.getAttribute('homename'),complete,period,regulation,
+    s={home:sc.H||0,away:sc.V||0,sides,complete,period,regulation,
        progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:prestoLines(x)};
   }
-  // The stat crew's home side can differ from the schedule's; flip when the feed's home name matches our away team.
-  if(overlap(s.feedHome,g.away)>overlap(s.feedHome,g.home)){[s.home,s.away]=[s.away,s.home];if(s.lines)s.lines={H:s.lines.V||[],V:s.lines.H||[]};}
+  // The stat crew's home side can differ from the schedule's, and so can its labels; flip when the evidence says so.
+  if(orientFit(g,s,true)>orientFit(g,s,false)){[s.home,s.away]=[s.away,s.home];if(s.lines)s.lines={H:s.lines.V||[],V:s.lines.H||[]};}
   return s;
 }
 

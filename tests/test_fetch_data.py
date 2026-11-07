@@ -493,3 +493,21 @@ def test_sidearm_over_without_is_complete():
     assert not f.sidearm_over(dict(game, Period=3))
     assert not f.sidearm_over(dict(game, VisitingTeam={"Score": 114}))  # tied: overtime comes next
     assert not f.sidearm_over(dict(game, ClockSeconds=None))
+
+
+def test_should_flip_trusts_team_code_over_swapped_names():
+    game = {"home": "Medgar Evers", "away": "St. Joseph's Long Island", "newcomers_home": [], "newcomers_away": []}
+    swapped = {"H": {"name": "St. Joseph's Long Island", "id": "MEDGAR"}, "V": {"name": "Medgar Evers", "id": "SJLI"}}
+    assert not f.should_flip(game, swapped, {})
+    crew_home = {"H": {"name": "St. Joseph's Long Island", "id": "SJLI"}, "V": {"name": "Medgar Evers", "id": "MEDGAR"}}
+    assert f.should_flip(game, crew_home, {})
+
+
+def test_should_flip_counts_roster_players_first():
+    roster = [{"name": "Ann Lee", "reason": "FR"}, {"name": "Bea Cole", "reason": "TR"}]
+    game = {"home": "Calvin", "away": "Hope", "newcomers_home": roster, "newcomers_away": []}
+    lines = [{"first": n.split()[0], "last": n.split()[1], "abbr": n} for n in ("Ann Lee", "Bea Cole")]
+    sides = {"H": {"name": "Calvin", "id": "CALV"}, "V": {"name": "Hope", "id": "HOPE"}}
+    # Names and codes say keep (3 each side); two Calvin newcomers on the visiting side say flip.
+    assert f.should_flip(game, sides, {"H": [], "V": lines})
+    assert not f.should_flip(game, sides, {"H": lines, "V": []})

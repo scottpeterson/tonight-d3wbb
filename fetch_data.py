@@ -101,6 +101,29 @@ def name_tokens(name):
     return set(re.findall(r"[a-z]+", (name or "").lower())) - {"university", "college", "of", "the", "at", "vs", "state"}
 
 
+def code_hit(code, team):
+    """True when a feed's team code names the team: a word of it (MEDGAR), its initials (SJLI), or its start."""
+    c = re.sub(r"[^a-z]", "", (code or "").lower())
+    t = re.sub(r"[^a-z]", "", (team or "").lower())
+    initials = "".join(w[0] for w in re.findall(r"[a-z]+", re.sub(r"['\u2019]", "", (team or "").lower())))
+    return len(c) >= 2 and (c in name_tokens(team) or c == initials or (len(c) >= 4 and t.startswith(c)))
+
+
+def side_fit(side, team, roster, lines):
+    """Evidence that a feed side is this team: its players most, then its code, then its typed name."""
+    players = sum(1 for line in lines if match_newcomer(line, roster or []))
+    return 4 * players + 2 * code_hit(side.get("id"), team) + (1 if name_tokens(side.get("name")) & name_tokens(team) else 0)
+
+
+def should_flip(game, sides, lines):
+    """Crews sometimes type team names on the wrong sides (Medgar Evers vs St. Joseph's Long Island,
+    2026-11-06), so orient by players and team code before the typed name."""
+    def fit(home, away):
+        return (side_fit(sides["H"], game[home], game.get("newcomers_" + home), lines.get("H", []))
+                + side_fit(sides["V"], game[away], game.get("newcomers_" + away), lines.get("V", [])))
+    return fit("away", "home") > fit("home", "away")
+
+
 # ---------------------------------------------------------------- inputs
 
 def statlab(name):
@@ -795,7 +818,8 @@ def read_final(game):
             return None
         sides = {c["homeAway"]: c for c in comp["competitors"]}
         home_score, away_score = num(sides["home"].get("score")), num(sides["away"].get("score"))
-        feed_home = sides["home"]["team"].get("location") or ""
+        feed_sides = {k: {"name": sides[h]["team"].get("location"), "id": sides[h]["team"].get("abbreviation")}
+                      for k, h in (("H", "home"), ("V", "away"))}
         lines = espn_lines(summary)
     elif feed["type"] == "sidearm":
         full = get(feed["url"] + "?detail=full", as_json=True)
@@ -803,7 +827,7 @@ def read_final(game):
         if not sidearm_over(g) or not feed_date_matches(g.get("Date"), day):
             return None
         home_score, away_score = num(g["HomeTeam"]["Score"]), num(g["VisitingTeam"]["Score"])
-        feed_home = g["HomeTeam"]["Name"]
+        feed_sides = {k: {"name": g[key].get("Name"), "id": g[key].get("Id")} for k, key in (("H", "HomeTeam"), ("V", "VisitingTeam"))}
         lines = sidearm_lines(full)
     else:
         root = ET.fromstring(get(feed["url"]))
@@ -812,11 +836,13 @@ def read_final(game):
             return None
         scores = {t.get("vh"): num((t.find("linescore").attrib if t.find("linescore") is not None else {}).get("score")) for t in root.iter("team")}
         home_score, away_score = scores.get("H", 0), scores.get("V", 0)
-        feed_home = venue.get("homename") or ""
+        feed_sides = {"H": {"name": venue.get("homename")}, "V": {"name": venue.get("visname")}}
+        for t in root.iter("team"):
+            if t.get("vh") in feed_sides:
+                feed_sides[t.get("vh")] = {"name": t.get("name") or feed_sides[t.get("vh")]["name"], "id": t.get("id")}
         lines = presto_lines(root)
     # The feed's home side follows the stat crew; flip when the crew lists our away team as home.
-    flip = len(name_tokens(feed_home) & name_tokens(game["away"])) > len(name_tokens(feed_home) & name_tokens(game["home"]))
-    if flip:
+    if should_flip(game, feed_sides, lines):
         home_score, away_score = away_score, home_score
         lines = {"H": lines.get("V", []), "V": lines.get("H", [])}
     found = []
