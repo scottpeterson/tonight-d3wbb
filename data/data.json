@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-07T23:01:52+00:00",
+ "fetched_at": "2026-11-07T23:21:54+00:00",
  "errors": [
   "Kenyon at Anderson box score: HTTP Error 405: Not Allowed",
   "Grove City at Carlow box score: HTTP Error 405: Not Allowed",
@@ -10,7 +10,6 @@
   "Rhodes at Hendrix feed: HTTP Error 500: Internal Server Error",
   "York (NY) at Mitchell box score: HTTP Error 405: Not Allowed",
   "Mary Hardin-Baylor at Trinity (TX) feed: HTTP Error 404: Not Found",
-  "Catholic at McDaniel feed: IncompleteRead(48801 bytes read, 218905 more expected)",
   "Bluffton at Olivet feed: not well-formed (invalid token): line 1, column 0",
   "New England College at Wentworth box score: HTTP Error 403: Forbidden",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found",
