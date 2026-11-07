@@ -166,11 +166,16 @@ def feed_is_game(game, sides, lines):
     them, one feed side has to match one of our teams by name or code."""
     known = [t for t in ("home", "away") if roster_of(game, t)]
     if known and sum(len(lines.get(k, [])) for k in "HV") >= MIN_ROSTER:
-        hits = sum(roster_hits(lines.get(k, []), roster_of(game, t)) for k in "HV" for t in known)
-        if hits >= 2:
-            return True
-        if hits == 0:
+        hits = {t: sum(roster_hits(lines.get(k, []), roster_of(game, t)) for k in "HV") for t in known}
+        if sum(hits.values()) == 0:
             return False
+        # Both rosters known and both sides listed: a team with no player in the box score is not playing. Principia's
+        # tournament feed (2026-11-07) showed Aurora vs Westminster, and Aurora's players alone must not make it the
+        # phantom Aurora at Principia.
+        if len(known) == 2 and all(lines.get(k) for k in "HV") and min(hits.values()) == 0:
+            return False
+        if sum(hits.values()) >= 2:
+            return True
     if not any(s.get("name") or s.get("id") for s in sides.values()):
         return True
     return any(names_team(sides[k], game, t) for k in "HV" if k in sides for t in ("home", "away"))
@@ -515,6 +520,10 @@ def page_games(day, schools, pages, known, ranks, members):
                 continue
             site = site_of(r.get("opponent_url"))
             opp = sites.get(site)
+            # A neutral row's link often points at the tournament host, not the opponent (Aurora's "Westminster
+            # University" linked principiaathletics.com, 2026-11-07), so the link counts only when the name fits.
+            if opp and r["neutral"] and not (name_key(r["opponent"]) & name_key(opp)):
+                opp = None
             if not opp and site not in upper:
                 hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) if k in keys}
                 above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]

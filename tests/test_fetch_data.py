@@ -683,6 +683,17 @@ def test_without_players_the_names_and_codes_decide():
     assert f.feed_is_game(game, {"H": {"name": "Wisconsin-Platteville"}, "V": {"name": "Hope College"}}, {})
 
 
+def test_a_team_with_no_player_on_the_feed_is_not_playing():
+    # Principia's tournament, 2026-11-07: the host's feed showed Aurora vs Westminster (MO). Aurora's players alone
+    # made it count for the phantom "Aurora at Principia" too, so both lists showed each Aurora line twice.
+    lines = {"H": box_lines("Aurora", 8), "V": box_lines("Westminster (MO)", 7)}
+    sides = {"H": {"name": "Aurora"}, "V": {"name": "Westminster"}}
+    assert f.feed_is_game(tourney_game("Aurora", "Westminster (MO)"), sides, lines)
+    assert not f.feed_is_game(tourney_game("Principia", "Aurora"), sides, lines)
+    # One side's lines missing: the rule waits for both sides.
+    assert f.feed_is_game(tourney_game("Principia", "Aurora"), sides, {"H": box_lines("Aurora", 8)})
+
+
 def test_players_outrank_names():
     # Right names, wrong players: the crew left the last game's teams on the feed.
     sides = {"H": {"name": "St. Joseph's Brooklyn"}, "V": {"name": "Pratt"}}
@@ -788,11 +799,15 @@ def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
         # A placeholder row that links the host's site, and a host's listing of another game, name no opponent.
         "Benedictine": [f.row(day, (12, 0, "America/Chicago"), False, True, "WashU Tournament", {}, "", "", "http://washubears.com/")],
         "WashU": [f.row(day, (12, 0, "America/Chicago"), False, True, "Benedictine (Ill.) vs. Central College", {}, "", "")],
+        # A neutral row whose link points at the tournament host (Principia) names a Westminster, not the host.
+        "Aurora": [f.row(day, (14, 0, "America/Chicago"), False, True, "Westminster University", {}, "", "", "http://principiaathletics.com")],
+        "Principia": [], "Westminster (MO)": [], "Westminster (PA)": [],
     }
     schools = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{t.lower().replace(' ', '')}.example/", "tz": "America/New_York"} for t in pages}
     schools["Hope"]["schedule"] = "https://athletics.hope.edu/sports/womens-basketball/schedule"
     schools["Illinois Wesleyan"]["schedule"] = "https://www.iwusports.com/sports/womens-basketball/schedule"
     schools["WashU"]["schedule"] = "https://washubears.com/sports/womens-basketball/schedule"
+    schools["Principia"]["schedule"] = "https://principiaathletics.com/sports/womens-basketball/schedule"
     ranks = {"Hope": 6, "Illinois Wesleyan": 41}
     games = f.page_games(day, schools, pages, [], ranks, MEMBERS)
     assert [(g["home"], g["away"], g["neutral"], g["home_rank"], g["away_rank"], g["pregame_wp"]) for g in games] == \

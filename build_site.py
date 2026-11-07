@@ -432,9 +432,12 @@ function namesTeam(side,g,t){
 function feedIsGame(g,s){
   const L=s.lines||{},S=s.sides||{},known=['home','away'].filter(t=>rosterOf(g,t));
   if(known.length&&(L.H||[]).length+(L.V||[]).length>=MIN_ROSTER){
-    const hits=['H','V'].reduce((n,k)=>n+known.reduce((m,t)=>m+rosterHits(L[k],rosterOf(g,t)),0),0);
-    if(hits>=2)return true;
-    if(hits===0)return false;
+    const hits=known.map(t=>['H','V'].reduce((n,k)=>n+rosterHits(L[k],rosterOf(g,t)),0)),total=hits.reduce((a,b)=>a+b,0);
+    if(total===0)return false;
+    // Both rosters known and both sides listed: a team with no player in the box score is not playing (Principia's
+    // tournament feed showed Aurora vs Westminster; Aurora's players alone must not make it Aurora at Principia).
+    if(known.length===2&&(L.H||[]).length&&(L.V||[]).length&&Math.min(...hits)===0)return false;
+    if(total>=2)return true;
   }
   if(!Object.values(S).some(x=>x&&(x.name||x.id)))return true;
   return ['H','V'].some(k=>S[k]&&['home','away'].some(t=>namesTeam(S[k],g,t)));

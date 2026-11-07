@@ -251,6 +251,17 @@ def test_feed_is_game_on_the_page():
                f"feedIsGame({json.dumps(ours)},{json.dumps(light)}),feedIsGame({json.dumps(other)},{json.dumps(light)})]") == [True, False, True, False]
 
 
+def test_a_team_with_no_player_on_the_feed_is_not_playing():
+    aur, west, prin = [f"Ann Aur{c}" for c in "abcdef"], [f"Bea West{c}" for c in "abcdef"], [f"Cy Prin{c}" for c in "abcdef"]
+    feed = {"sides": {"H": {"name": "Aurora"}, "V": {"name": "Westminster"}},
+            "lines": {"H": [{"first": "Ann", "last": n.split()[1], "abbr": ""} for n in aur], "V": [{"first": "Bea", "last": n.split()[1], "abbr": ""} for n in west]}}
+    real = tourney("Aurora", "Westminster (MO)", aur, west, ["Aurora"], ["Westminster (MO)", "Westminster"])
+    phantom = tourney("Principia", "Aurora", prin, aur, ["Principia"], ["Aurora"])
+    one_side = dict(feed, lines={"H": feed["lines"]["H"]})
+    assert run(f"[feedIsGame({json.dumps(real)},{json.dumps(feed)}),feedIsGame({json.dumps(phantom)},{json.dumps(feed)}),"
+               f"feedIsGame({json.dumps(phantom)},{json.dumps(one_side)})]") == [True, False, True]
+
+
 STORE = ("(()=>{const m={};globalThis.KEY='t';globalThis.localStorage={getItem:k=>k in m?m[k]:null,"
          "setItem:(k,v)=>{m[k]=String(v)}};return 0})()")
 
