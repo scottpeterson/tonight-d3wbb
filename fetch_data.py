@@ -80,6 +80,7 @@ SEASON_START_YEAR = 2026
 SLATE_DAYS_AHEAD = 1  # today and tomorrow
 FINALS_DAYS_BACK = 3  # schools post a box score link hours or a day late
 BOX_PAGE_AFTER = timedelta(hours=2, minutes=30)  # a game this long past tipoff is over; its box score page is the record
+FINAL_EARLIEST = timedelta(minutes=45)  # no game ends sooner after tipoff, so a final before that is not this game's
 
 
 def now():
@@ -1133,6 +1134,22 @@ def is_over(game, today):
     return date.fromisoformat(game["date"]) < today
 
 
+def final_can_exist(game, today=None):
+    """False while the game cannot have ended: before FINAL_EARLIEST past a known tipoff, or, with no tipoff, before
+    its day. A final stored earlier came from something else (a result typed on a page's wrong row, a host's feed
+    showing its earlier game, a development run), and a slate carries a final forward run after run, so the check
+    runs on every build and finals pass. UW-Stevens Point vs St. Scholastica, 2026-11-07, showed a final from a
+    2026-10-27 build for eleven days."""
+    if game.get("tip"):
+        return datetime.fromisoformat(game["tip"].replace("Z", "+00:00")) <= now() - FINAL_EARLIEST
+    return date.fromisoformat(game["date"]) <= (today or now().astimezone(EASTERN).date())
+
+
+def drop_final(game):
+    """Forget a stored final and what was read with it."""
+    game.update(final=None, newcomer_games=[], top_lines=[], box_read=False)
+
+
 def box_link(game, pages):
     """The Box Score link and posted result from either team's schedule page: (link, (home, away) or None)."""
     day = date.fromisoformat(game["date"])
@@ -1222,7 +1239,7 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
         if not final:
             score = result_score(home_row, True) or result_score(away_row, False)
             final = list(score) if score else old.get("final")
-        out.append({
+        entry = {
             "id": gid, "date": g["date"], "tip": tip or old.get("tip"), "tbd": tbd and not old.get("tip"),
             "home": g["home"], "away": g["away"], "neutral": g["neutral"],
             "home_rank": g.get("home_rank"), "away_rank": g.get("away_rank"), "label": g.get("label"),
@@ -1239,7 +1256,10 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             # Every name sources use and the full roster, so a feed showing another game can be told apart.
             "home_names": names.get(g["home"], [g["home"]]), "away_names": names.get(g["away"], [g["away"]]),
             "home_roster": rosters.get(g["home"], []), "away_roster": rosters.get(g["away"], []),
-        })
+        }
+        if entry["final"] and not final_can_exist(entry):
+            drop_final(entry)
+        out.append(entry)
     return {"date": day.isoformat(), "built": now().isoformat(timespec="seconds"), "games": out}
 
 
@@ -1300,6 +1320,9 @@ def record_finals(out, today, pages):
         slate = read_json(path)
         if not slate:
             continue
+        for g in slate["games"]:
+            if g.get("final") and not final_can_exist(g, today):
+                drop_final(g)
         due = [g for g in slate["games"] if not g.get("box_read")
                and not (g.get("tip") and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) > now() - timedelta(minutes=10))]
         with ThreadPoolExecutor(max_workers=12) as pool:

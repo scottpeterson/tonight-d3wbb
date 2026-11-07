@@ -669,6 +669,30 @@ def test_a_cut_off_read_costs_one_game_not_the_finals_pass(monkeypatch, tmp_path
     assert json.loads((tmp_path / "2026-11-06.json").read_text())["games"][1]["final"] == [70, 60]
 
 
+def test_a_final_the_game_cannot_have_yet_is_dropped(monkeypatch, tmp_path):
+    # UW-Stevens Point vs St. Scholastica, 2026-11-07: a final from a 2026-10-27 build rode along in every slate
+    # until the game day. A build and a finals pass both drop a final that predates 45 minutes after tipoff.
+    monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 7, 17, 0, tzinfo=timezone.utc))
+    old = {"id": "2026-11-07-uwstevenspoint-at-stscholastica", "tip": "2026-11-07T19:00:00Z", "final": [64, 53],
+           "top_lines": [{"team": "St. Norbert"}], "newcomer_games": [], "box_read": True}
+    game = {"date": "2026-11-07", "home": "St. Scholastica", "away": "UW-Stevens Point", "neutral": True}
+    built = f.build_slate(date(2026, 11, 7), [game], {}, {}, {}, {}, {"games": [old]})["games"][0]
+    assert (built["final"], built["top_lines"], built["box_read"], built["tip"]) == (None, [], False, "2026-11-07T19:00:00Z")
+    # The same carried final counts once the game can be over, and a game with no tipoff keeps its final on its day.
+    monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 7, 19, 45, tzinfo=timezone.utc))
+    assert f.build_slate(date(2026, 11, 7), [game], {}, {}, {}, {}, {"games": [old]})["games"][0]["final"] == [64, 53]
+    assert f.final_can_exist({"date": "2026-11-07"}, date(2026, 11, 7)) and not f.final_can_exist({"date": "2026-11-08"}, date(2026, 11, 7))
+
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 7, 17, 0, tzinfo=timezone.utc))
+    slate_game = {**old, "date": "2026-11-07", "home": "St. Scholastica", "away": "UW-Stevens Point", "neutral": True,
+                  "newcomers_home": [], "newcomers_away": []}
+    (tmp_path / "2026-11-07.json").write_text(json.dumps({"date": "2026-11-07", "games": [slate_game]}))
+    f.record_finals({"errors": []}, date(2026, 11, 7), {})
+    written = json.loads((tmp_path / "2026-11-07.json").read_text())["games"][0]
+    assert written["final"] is None and written["box_read"] is False
+
+
 def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
     # Hope vs Illinois Wesleyan on 2026-11-07: a tournament's second day, TBA on the pages until the first day ended,
     # so gameLeverages.json did not list it. Both pages list it now; the pair joins once.

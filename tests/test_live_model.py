@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -257,13 +257,24 @@ STORE = ("(()=>{const m={};globalThis.KEY='t';globalThis.localStorage={getItem:k
 
 def test_a_final_read_from_the_feed_survives_a_reload():
     # The feed moves on to the host's next game, and the slate has no final yet: the browser's own read holds the card.
-    g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06"))
+    g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06", tip="2026-11-06T23:00:00Z"))
     st = run(f"[{STORE},remember('2026-11-06-union-at-catholic',[93,52],'Final'),initState({g})][2]")
     assert st["final"] is True and st["score"] == [93, 52] and st["status"] == "Final"
 
 
+def test_no_final_counts_before_the_game_can_have_ended():
+    # UW-Stevens Point vs St. Scholastica, 2026-11-07: the slate carried a final from a 2026-10-27 build. A slate
+    # final, a remembered final, and a feed read showing a complete game all wait until 45 minutes after tipoff.
+    g = json.dumps(dict(GAME, id="2099-01-01-a-at-b", date="2099-01-01", tip="2099-01-01T19:00:00Z", final=[64, 53]))
+    st = run(f"[{STORE},remember('2099-01-01-a-at-b',[64,53],'Final'),initState({g})][2]")
+    assert st["final"] is False and st["score"] is None and st["status"] is None
+    tbd = json.dumps(dict(GAME, id="2099-01-01-a-at-b", date="2099-01-01", tip=None, final=[64, 53]))
+    assert run(f"initState({tbd}).final") is False
+    assert run(f"canBeFinal({json.dumps(dict(GAME, tip='2020-01-01T19:00:00Z'))})") is True
+
+
 def test_the_slate_final_wins_and_old_finals_drop_out():
-    g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06", final=[90, 50]))
+    g = json.dumps(dict(GAME, id="2026-11-06-union-at-catholic", date="2026-11-06", tip="2026-11-06T23:00:00Z", final=[90, 50]))
     assert run(f"[{STORE},remember('2026-11-06-union-at-catholic',[93,52],'Final'),initState({g}).score][2]") == [90, 50]
     old = "remember('2020-01-01-a-at-b',[1,0],'Final'),remember('2099-01-01-c-at-d',[2,0],'Final'),Object.keys(remembered())"
     assert run(f"[{STORE},{old}][3]") == ["2099-01-01-c-at-d"]

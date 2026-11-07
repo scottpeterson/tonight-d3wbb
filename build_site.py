@@ -374,7 +374,10 @@ function waitMs(g,st){
 function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
 // A feed that has not shown tonight's game this long after tipoff is not covering it: the crew posts elsewhere
 // or not at all. Checks stop there.
-const GIVE_UP_MS=45*60000,RETRY_MS=10*60000,LAST_LOOK_MS=4*3600000;
+const GIVE_UP_MS=45*60000,RETRY_MS=10*60000,LAST_LOOK_MS=4*3600000,FINAL_EARLIEST_MS=45*60000;
+// No game ends within 45 minutes of tipoff, so a final before that (in the slate, in this browser's memory, or on a
+// feed showing the host's earlier game) is not this game's.
+function canBeFinal(g){const t=tipMs(g);return t?Date.now()>=t+FINAL_EARLIEST_MS:g.date<=todayET();}
 function nextCheck(g,st,now){
   if(st.final||!g.feed)return null;
   // A feed that has not shown this game by GIVE_UP_MS gets a look every RETRY_MS until LAST_LOOK_MS: a tournament
@@ -577,9 +580,9 @@ function initState(g){
     top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x))};
   // A final this browser read from the feed counts until the slate has one: the feed moves on to the host's next game,
   // and a reload must not put a finished game back under Not started.
-  const seenFinal=g.final?null:remembered()[g.id];
+  const possible=canBeFinal(g),slateFinal=possible?g.final:null,seenFinal=slateFinal||!possible?null:remembered()[g.id];
   if(seenFinal)st.status=seenFinal.status;
-  const fin=g.final||(seenFinal&&seenFinal.score);
+  const fin=slateFinal||(seenFinal&&seenFinal.score);
   if(fin){st.final=true;st.score=fin;const lead=fin[0]-fin[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
   // A score the fetcher read from a box score page during the game, for a game the browser cannot follow.
   else if(g.snapshot){st.snap=g.snapshot;st.score=[g.snapshot.home,g.snapshot.away];}
@@ -601,6 +604,7 @@ async function check(g){
   const st=g.st;let s=null;
   // Every check of an unfinished game reads the full box, so both top 15 lists move with the score.
   try{s=await readFeed(g,!st.final);}catch(e){s=null;}
+  if(s&&s.complete&&!canBeFinal(g))s=null;
   const now=Date.now();
   if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
   if(s){
