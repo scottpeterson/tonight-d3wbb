@@ -578,17 +578,74 @@ def live_feed(url):
         elif p:
             feed = {"type": "presto", "url": f"https://data.prestolivestats.com/xml/{p.group(1)}/events/{p.group(2)}.xml"}
         elif s:
-            # The stat crew publishes under the folder name, which can differ from the client name
-            # (Case Western: client "casewestern", folder "case").
-            page = get(url)
-            client = (re.search(r'livestats_foldername\s*=\s*"([^"]+)"', page)
-                      or re.search(r'client_shortname\s*=\s*"([^"]+)"', page))
+            client = sidearm_client(s.group(1), url)
             if client:
-                feed = {"type": "sidearm", "url": f"https://sidearmstats.com/{client.group(1)}/{s.group(2)}/game.json"}
+                feed = {"type": "sidearm", "url": f"https://sidearmstats.com/{client}/{s.group(2)}/game.json"}
     except FETCH_ERRORS:
         feed = None
     _feed_cache[url] = feed
     return feed
+
+
+_client_cache = {}
+
+
+def sidearm_client(site, url):
+    """The Sidearm client a school's stats pages publish under, read from the page at `url`. The crew publishes
+    under the folder name, which can differ from the client name (Case Western: client "casewestern", folder
+    "case"). A school has one client, so one page read serves its other feeds (wbball2) with no second read."""
+    if site not in _client_cache:
+        page = get(url)
+        client = (re.search(r'livestats_foldername\s*=\s*"([^"]+)"', page)
+                  or re.search(r'client_shortname\s*=\s*"([^"]+)"', page))
+        if not client:
+            return None
+        _client_cache[site] = client.group(1)
+    return _client_cache[site]
+
+
+SIBLING_FEEDS = 2  # a host's other courts: wbball2 and wbball3
+
+
+def sibling_feeds(feed):
+    """A Sidearm host's other women's basketball feeds. A tournament host runs its own game on wbball and the
+    other game on wbball2 (Hope's Michele Schoon Tournament, 2026-11-07), and the schools' pages can link either
+    folder until the crews settle which game is on which."""
+    if (feed or {}).get("type") != "sidearm":
+        return []
+    m = re.match(r"(https://sidearmstats\.com/[^/]+/)([a-z]+?)(\d*)/game\.json$", feed["url"])
+    if not m:
+        return []
+    folders = [m.group(2)] + [f"{m.group(2)}{n}" for n in range(2, SIBLING_FEEDS + 2)]
+    return [{"type": "sidearm", "url": f"{m.group(1)}{x}/game.json"} for x in folders if x != m.group(2) + m.group(3)]
+
+
+def sibling_link(link, feed):
+    """The stats page behind `feed` when `link` is the same host's page for another folder; else `link` as is."""
+    folder = re.search(r"/([a-z]+?\d*)/game\.json$", feed["url"]).group(1)
+    return re.sub(r"/sidearmstats/[a-z]+?\d*/", f"/sidearmstats/{folder}/", link) if link else link
+
+
+def sidearm_sides(g):
+    return {k: {"name": (g.get(key) or {}).get("Name"), "id": (g.get(key) or {}).get("Id")}
+            for k, key in (("H", "HomeTeam"), ("V", "VisitingTeam"))}
+
+
+def find_sibling(game, day):
+    """The host's other feed that shows this game today, or None. Reads each sibling's game.json (about 4 KB)."""
+    for feed in sibling_feeds(game.get("feed")):
+        try:
+            g = get(feed["url"], as_json=True)["Game"]
+        except (*FETCH_ERRORS, TypeError, AttributeError):
+            continue
+        if g.get("HasStarted") and feed_date_matches(g.get("Date"), day) and feed_is_game(game, sidearm_sides(g), {}):
+            return feed
+    return None
+
+
+def adopt_feed(game, feed):
+    game["link"] = sibling_link(game.get("link"), feed)
+    game["feed"] = feed
 
 
 def sidearm_over(g):
@@ -840,11 +897,12 @@ def sidearm_lines(full):
     """{'H'|'V': [{'first','last','abbr', stats...}]} from a ?detail=full Sidearm feed."""
     out = {}
     for side, key in (("H", "HomeTeam"), ("V", "VisitingTeam")):
-        team = full["Stats"][key]
+        # A feed read before its game starts can carry no stats block yet.
+        team = (full.get("Stats") or {}).get(key) or {}
         people = {p.get("PersonId"): p for p in team.get("Players") or [] if p.get("PersonId")}
         by_uni = {p.get("UniformNumber"): p for p in team.get("Players") or []}
         lines = []
-        for v in team["PlayerGroups"]["Players"]["Values"]:
+        for v in ((team.get("PlayerGroups") or {}).get("Players") or {}).get("Values") or []:
             person = people.get(v.get("PersonId")) or by_uni.get(v.get("Uni")) or {}
             fgm, fga = made_attempted(v.get("Fgam"))
             ftm, fta = made_attempted(v.get("Ftma"))
@@ -1051,13 +1109,18 @@ def read_final(game):
     elif feed["type"] == "sidearm":
         full = get(feed["url"] + "?detail=full", as_json=True)
         g = full["Game"]
-        if not sidearm_over(g) or not feed_date_matches(g.get("Date"), day):
+        if not feed_date_matches(g.get("Date"), day) or not feed_is_game(game, sidearm_sides(g), sidearm_lines(full)):
+            # The feed shows another game. A tournament host runs the other game on another court's feed.
+            sibling = find_sibling(game, day)
+            if not sibling:
+                return None
+            adopt_feed(game, sibling)
+            full = get(sibling["url"] + "?detail=full", as_json=True)
+            g = full["Game"]
+        if not sidearm_over(g):
             return None
         home_score, away_score = num(g["HomeTeam"]["Score"]), num(g["VisitingTeam"]["Score"])
-        feed_sides = {k: {"name": g[key].get("Name"), "id": g[key].get("Id")} for k, key in (("H", "HomeTeam"), ("V", "VisitingTeam"))}
-        lines = sidearm_lines(full)
-        if not feed_is_game(game, feed_sides, lines):
-            return None
+        feed_sides, lines = sidearm_sides(g), sidearm_lines(full)
     else:
         root = ET.fromstring(get(feed["url"]))
         venue, status = root.find(".//venue"), root.find(".//status")
@@ -1158,6 +1221,27 @@ def box_link(game, pages):
     away_row = find_row(pages.get(game["away"], []), day, game["home"], exhibition)
     link = next((r["links"]["boxscore"] for r in (home_row, away_row) if r and r["links"].get("boxscore")), None)
     return link or game.get("boxscore"), result_score(home_row, True) or result_score(away_row, False)
+
+
+def refresh_feed(game, pages, links=None):
+    """Take a live stats link a schedule page added or changed since the last full run. Schools post the link on
+    game day, and a tournament host moved its second game from wbball to wbball2 in the hour before tipoff (Hope,
+    2026-11-07). A new link counts when the game has no feed or when it sits on the same site as the old link, so
+    another school's own stats page never replaces the host's. A link set in extra_games.json stays."""
+    if (links or {}).get(game.get("id")):
+        return False
+    day = date.fromisoformat(game["date"])
+    exhibition = None if game.get("division") else game.get("label") == "Exhibition"
+    rows = (find_row(pages.get(game["home"], []), day, game["away"], exhibition),
+            find_row(pages.get(game["away"], []), day, game["home"], exhibition))
+    old = game.get("link")
+    for url in (r["links"].get("live_stats") for r in rows if r):
+        if url and url != old and (not old or not game.get("feed") or site_of(url) == site_of(old)):
+            feed = live_feed(url)
+            if feed and feed != game.get("feed"):
+                game["feed"], game["link"] = feed, url
+                return True
+    return False
 
 
 def read_box_page(game, url):
@@ -1279,11 +1363,12 @@ class SchedulePages(dict):
         return self[team] or default
 
 
-def record_finals(out, today, pages):
-    """For the last FINALS_DAYS_BACK days, read each game without a box score. The live feed comes first; a crew can
-    reuse it for its next game, so once the game is over, the box score page a schedule links is read instead. A
-    score a schedule page posts outranks a feed's. A game the browser cannot follow (no feed, but a Presto box score
-    page) gets a snapshot of its score while it is on."""
+def record_finals(out, today, pages, links=None):
+    """For the last FINALS_DAYS_BACK days, read each game without a box score. An unfinished game first takes any
+    live stats link its schedule pages added or changed since the last full run. The live feed comes first; a crew
+    can reuse it for its next game, so once the game is over, the box score page a schedule links is read instead.
+    A score a schedule page posts outranks a feed's. A game the browser cannot follow (no feed, but a Presto box
+    score page) gets a snapshot of its score while it is on."""
     def final(g):
         try:
             return read_game(g)
@@ -1293,6 +1378,11 @@ def record_finals(out, today, pages):
 
     def read_game(g):
         errors, result, snap = [], None, None
+        if not g.get("final"):
+            try:
+                refresh_feed(g, pages, links)
+            except FETCH_ERRORS as exc:
+                errors.append(f'{g["away"]} at {g["home"]} live stats link: {exc}')
         if g.get("feed"):
             try:
                 result = read_final(g)
@@ -1346,10 +1436,11 @@ def finals_only(previous):
     """The game-night run: finals and snapshots only, reading just the schedule pages those games need."""
     out = {**previous, "fetched_at": now().isoformat(timespec="seconds"), "errors": []}
     schools = load_schools()
-    for name, school in read_json(EXTRA, {"schools": {}}).get("schools", {}).items():
+    extra = read_json(EXTRA, {"schools": {}})
+    for name, school in extra.get("schools", {}).items():
         schools.setdefault(name, {"team": name, "extra": True, **school})
     today = date.fromisoformat(TODAY) if TODAY else datetime.now(EASTERN).date()
-    record_finals(out, today, SchedulePages(schools))
+    record_finals(out, today, SchedulePages(schools), extra.get("links"))
     return out
 
 
@@ -1436,7 +1527,7 @@ def collect(previous):
                             extra.get("links"), hub, (), upper_sites(members), names, rosters)
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
-    record_finals(out, today, pages)
+    record_finals(out, today, pages, extra.get("links"))
     return out
 
 

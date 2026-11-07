@@ -118,6 +118,88 @@ def test_live_feed_maps_links_to_feeds(monkeypatch):
     assert f.live_feed("https://www.statbroadcast.com/events/statmonitr.php?gid=x") is None
 
 
+def test_live_feed_reads_a_hosts_client_once(monkeypatch):
+    f._feed_cache.clear()
+    f._client_cache.clear()
+    calls = []
+
+    def get(url, as_json=False, timeout=30):
+        calls.append(url)
+        return 'var client_shortname = "hopecollege";'
+
+    monkeypatch.setattr(f, "get", get)
+    assert f.live_feed("https://athletics.hope.edu/sidearmstats/wbball/summary")["url"] == "https://sidearmstats.com/hopecollege/wbball/game.json"
+    assert f.live_feed("https://athletics.hope.edu/sidearmstats/wbball2/summary")["url"] == "https://sidearmstats.com/hopecollege/wbball2/game.json"
+    assert calls == ["https://athletics.hope.edu/sidearmstats/wbball/summary"]
+
+
+def test_sibling_feeds_name_the_hosts_other_courts():
+    one = {"type": "sidearm", "url": "https://sidearmstats.com/hopecollege/wbball/game.json"}
+    two = {"type": "sidearm", "url": "https://sidearmstats.com/hopecollege/wbball2/game.json"}
+    assert [x["url"] for x in f.sibling_feeds(one)] == \
+        ["https://sidearmstats.com/hopecollege/wbball2/game.json", "https://sidearmstats.com/hopecollege/wbball3/game.json"]
+    assert [x["url"] for x in f.sibling_feeds(two)] == \
+        ["https://sidearmstats.com/hopecollege/wbball/game.json", "https://sidearmstats.com/hopecollege/wbball3/game.json"]
+    assert f.sibling_feeds({"type": "presto", "url": "https://data.prestolivestats.com/xml/a/events/b.xml"}) == []
+    assert f.sibling_feeds(None) == []
+    assert f.sibling_link("https://athletics.hope.edu/sidearmstats/wbball/summary", two) == "https://athletics.hope.edu/sidearmstats/wbball2/summary"
+    assert f.sibling_link("https://www.youtube.com/hopeathletics", two) == "https://www.youtube.com/hopeathletics"
+    assert f.sibling_link(None, two) is None
+
+
+def test_read_final_adopts_the_hosts_other_feed(monkeypatch):
+    # Hope's Michele Schoon Tournament, 2026-11-07: the slate named wbball, where Hope's own game sat unstarted,
+    # while the game ran on wbball2. The pass adopts wbball2 and reads the final there.
+    full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
+    idle = {"Game": {"HasStarted": False, "IsComplete": False, "Date": full["Game"]["Date"],
+                     "HomeTeam": {"Name": "Hope", "Id": "TB", "Score": 0}, "VisitingTeam": {"Name": "Illinois Wesleyan", "Id": "TA", "Score": 0}}}
+    calls = []
+
+    def get(url, as_json=False, timeout=30):
+        calls.append(url)
+        return full if "/wbball2/" in url else idle
+
+    monkeypatch.setattr(f, "get", get)
+    game = nyu_game(link="https://gonyuathletics.com/sidearmstats/wbball/summary")
+    out = f.read_final(game)
+    assert (out["home"], out["away"]) == (80, 58)
+    assert game["feed"]["url"] == "https://sidearmstats.com/nyu/wbball2/game.json"
+    assert game["link"] == "https://gonyuathletics.com/sidearmstats/wbball2/summary"
+    # The primary's full read, one small read of the sibling, then the sibling's full read.
+    assert calls == ["https://sidearmstats.com/nyu/wbball/game.json?detail=full", "https://sidearmstats.com/nyu/wbball2/game.json",
+                     "https://sidearmstats.com/nyu/wbball2/game.json?detail=full"]
+    # No sibling shows the game: nothing changes.
+    monkeypatch.setattr(f, "get", lambda *a, **k: idle)
+    game = nyu_game()
+    assert f.read_final(game) is None and game["feed"]["url"].endswith("/wbball/game.json")
+
+
+def test_refresh_feed_takes_a_link_a_page_added_on_game_day(monkeypatch):
+    f._feed_cache.clear()
+    f._client_cache.clear()
+    monkeypatch.setattr(f, "get", lambda url, *a, **k: 'var client_shortname = "' + ("hopecollege" if "hope.edu" in url else "owu") + '";')
+    day = date(2026, 11, 7)
+    game = {"id": "2026-11-07-ohiowesleyan-at-uwplatteville", "date": "2026-11-07", "home": "UW-Platteville", "away": "Ohio Wesleyan",
+            "link": "https://athletics.hope.edu/sidearmstats/wbball/summary",
+            "feed": {"type": "sidearm", "url": "https://sidearmstats.com/hopecollege/wbball/game.json"}}
+    moved = {"UW-Platteville": [f.row(day, (12, 0, "America/Chicago"), False, True, "Ohio Wesleyan",
+                                      {"live_stats": "https://athletics.hope.edu/sidearmstats/wbball2/summary"}, "", "")]}
+    assert f.refresh_feed(game, moved)
+    assert game["feed"]["url"] == "https://sidearmstats.com/hopecollege/wbball2/game.json"
+    assert game["link"] == "https://athletics.hope.edu/sidearmstats/wbball2/summary"
+    # The same link again: no change. Another school's own stats page does not replace the host's.
+    assert not f.refresh_feed(game, moved)
+    own = {"Ohio Wesleyan": [f.row(day, (13, 0, "America/New_York"), False, True, "UW-Platteville",
+                                   {"live_stats": "https://battlingbishops.com/sidearmstats/wbball/summary"}, "", "")]}
+    assert not f.refresh_feed(game, own)
+    # A game with no feed takes the first link a page offers.
+    bare = {k: v for k, v in game.items() if k not in ("link", "feed")}
+    assert f.refresh_feed(bare, own) and bare["feed"]["url"] == "https://sidearmstats.com/owu/wbball/game.json"
+    # A link set by hand in extra_games.json stays.
+    pinned = {k: v for k, v in game.items() if k != "feed"}
+    assert not f.refresh_feed(pinned, moved, {game["id"]: "http://stats.statbroadcast.com/x"})
+
+
 # ---------------------------------------------------------------- box scores and newcomers
 
 LINE = {"first": "", "last": "", "abbr": "", "min": 30, "pts": 0, "fgm": 0, "fga": 0, "ftm": 0, "fta": 0, "oreb": 0,

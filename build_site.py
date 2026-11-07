@@ -304,7 +304,7 @@ HOW = f"""<dl class="terms">
 <dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more, and a rank near the top counts far more than one in the middle: the gap between 13th and 39th counts about four times the gap between 213th and 239th.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The preseason efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>Tournament chances lower a finished game's score by at most half.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
-<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
+<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that preseason efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
 </dl>"""
@@ -378,6 +378,17 @@ function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
 // A feed that has not shown tonight's game this long after tipoff is not covering it: the crew posts elsewhere
 // or not at all. Checks stop there.
 const GIVE_UP_MS=45*60000,RETRY_MS=10*60000,LAST_LOOK_MS=4*3600000,FINAL_EARLIEST_MS=45*60000;
+const SIBLING_FEEDS=2;
+// A tournament host runs its own game on wbball and the other game on wbball2 (Hope, 2026-11-07), and the schools'
+// pages can link either folder until the crews settle which game is on which. When a Sidearm feed shows another
+// game after tipoff, the host's other feeds get a look.
+function siblingFeeds(f){
+  const m=f&&f.type==='sidearm'?/^(https:\/\/sidearmstats\.com\/[^/]+\/)([a-z]+?)(\d*)\/game\.json$/.exec(f.url):null;
+  if(!m)return [];
+  const folders=[m[2]];for(let n=2;n<=SIBLING_FEEDS+1;n++)folders.push(m[2]+n);
+  return folders.filter(x=>x!==m[2]+m[3]).map(x=>({type:'sidearm',url:m[1]+x+'/game.json'}));
+}
+function siblingLink(link,f){const m=/\/([a-z]+?\d*)\/game\.json$/.exec(f.url);return link&&m?link.replace(/\/sidearmstats\/[a-z]+?\d*\//,'/sidearmstats/'+m[1]+'/'):link;}
 // No game ends within 45 minutes of tipoff, so a final before that (in the slate, in this browser's memory, or on a
 // feed showing the host's earlier game) is not this game's.
 function canBeFinal(g){const t=tipMs(g);return t?Date.now()>=t+FINAL_EARLIEST_MS:g.date<=todayET();}
@@ -607,6 +618,14 @@ async function check(g){
   const st=g.st;let s=null;
   // Every check of an unfinished game reads the full box, so both top 15 lists move with the score.
   try{s=await readFeed(g,!st.final);}catch(e){s=null;}
+  // A feed that has never shown this game, after tipoff: the host's other courts, once every RETRY_MS.
+  if(!s&&!st.seen&&tipMs(g)&&Date.now()>=tipMs(g)&&!(st.probed&&Date.now()-st.probed<RETRY_MS)){
+    st.probed=Date.now();
+    for(const f of siblingFeeds(g.feed)){
+      let t=null;try{t=await readFeed(Object.assign({},g,{feed:f}),!st.final);}catch(e){}
+      if(t){g.link=siblingLink(g.link,f);g.feed=f;s=t;break;}
+    }
+  }
   if(s&&s.complete&&!canBeFinal(g))s=null;
   const now=Date.now();
   if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
@@ -648,7 +667,9 @@ async function refreshSlate(){
   const byId=new Map(fresh.games.map(x=>[x.id,x]));
   games.forEach(g=>{
     const x=byId.get(g.id);if(!x||g.st.final)return;
-    ['feed','link','boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
+    // A feed this page has seen the game on stays, even when the slate still names the host's other court.
+    ['feed','link'].forEach(k=>{if(x[k]&&!g.st.seen)g[k]=x[k];});
+    ['boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
     if(x.final){
       Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[]});
       const st=initState(g);st.nextAt=null;g.st=st;

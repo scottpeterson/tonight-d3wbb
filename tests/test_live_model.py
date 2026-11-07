@@ -12,8 +12,8 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET"]
-CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink"]
+CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -320,3 +320,19 @@ def test_overtime_counts_as_the_closest_finish_and_dead_teams_rank_lower():
     assert final_score(WJ, [70, 62], "Final (OT)") > final_score(WJ, [70, 62])
     dead = dict(WJ, home_tourn=0, away_tourn=0)
     assert 0 < final_score(dead, [62, 58]) < final_score(WJ, [62, 58])
+
+
+def test_sibling_feeds_name_the_hosts_other_courts():
+    # Hope's Michele Schoon Tournament, 2026-11-07: Hope's game on wbball, Ohio Wesleyan vs UW-Platteville on wbball2.
+    one = {"type": "sidearm", "url": "https://sidearmstats.com/hopecollege/wbball/game.json"}
+    two = {"type": "sidearm", "url": "https://sidearmstats.com/hopecollege/wbball2/game.json"}
+    assert run(f"siblingFeeds({json.dumps(one)}).map(x=>x.url)") == \
+        ["https://sidearmstats.com/hopecollege/wbball2/game.json", "https://sidearmstats.com/hopecollege/wbball3/game.json"]
+    assert run(f"siblingFeeds({json.dumps(two)}).map(x=>x.url)") == \
+        ["https://sidearmstats.com/hopecollege/wbball/game.json", "https://sidearmstats.com/hopecollege/wbball3/game.json"]
+    assert run("siblingFeeds({type:'presto',url:'https://data.prestolivestats.com/xml/a/events/b.xml'})") == []
+    assert run("siblingFeeds(null)") == []
+    assert run(f"siblingLink('https://athletics.hope.edu/sidearmstats/wbball/summary',{json.dumps(two)})") == \
+        "https://athletics.hope.edu/sidearmstats/wbball2/summary"
+    assert run(f"siblingLink('https://www.youtube.com/hopeathletics',{json.dumps(two)})") == "https://www.youtube.com/hopeathletics"
+    assert run(f"siblingLink(null,{json.dumps(two)})") is None
