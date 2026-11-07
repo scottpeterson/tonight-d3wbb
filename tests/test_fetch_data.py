@@ -667,3 +667,25 @@ def test_a_cut_off_read_costs_one_game_not_the_finals_pass(monkeypatch, tmp_path
     f.record_finals(out, date(2026, 11, 7), {})
     assert len(out["errors"]) == 1 and "IncompleteRead" in out["errors"][0]
     assert json.loads((tmp_path / "2026-11-06.json").read_text())["games"][1]["final"] == [70, 60]
+
+
+def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
+    # Hope vs Illinois Wesleyan on 2026-11-07: a tournament's second day, TBA on the pages until the first day ended,
+    # so gameLeverages.json did not list it. Both pages list it now; the pair joins once.
+    day = date(2026, 11, 7)
+    pages = {
+        "Hope": [f.row(day, (15, 0, "America/New_York"), True, False, "Illinois Wesleyan University", {}, "", "", "https://www.iwusports.com/")],
+        "Illinois Wesleyan": [f.row(day, (14, 0, "America/Chicago"), False, False, "Hope College", {}, "", "", "https://athletics.hope.edu/")],
+        # A Division II opponent by name, and an exhibition, stay out.
+        "Calvin": [f.row(day, (19, 0, "America/New_York"), True, False, "Indianapolis", {}, "", "")],
+        "Ohio Wesleyan": [f.row(day, (13, 0, "America/New_York"), False, True, "Calvin (Exhibition)", {}, "", "")],
+    }
+    schools = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{t.lower().replace(' ', '')}.example/", "tz": "America/New_York"} for t in pages}
+    schools["Hope"]["schedule"] = "https://athletics.hope.edu/sports/womens-basketball/schedule"
+    schools["Illinois Wesleyan"]["schedule"] = "https://www.iwusports.com/sports/womens-basketball/schedule"
+    ranks = {"Hope": 6, "Illinois Wesleyan": 41}
+    games = f.page_games(day, schools, pages, [], ranks, MEMBERS)
+    assert [(g["home"], g["away"], g["neutral"], g["home_rank"], g["away_rank"], g["pregame_wp"]) for g in games] == \
+        [("Hope", "Illinois Wesleyan", False, 6, 41, 0.5)]
+    # A game the Stat Lab already lists is not added again.
+    assert f.page_games(day, schools, pages, [{"home": "Hope", "away": "Illinois Wesleyan"}], ranks, MEMBERS) == []

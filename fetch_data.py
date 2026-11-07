@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Build each night's slate of NPI games, plus D3 games against Division I and II
-teams, into data/slates/YYYY-MM-DD.json.
+"""Build each night's slate of NPI games into data/slates/YYYY-MM-DD.json.
 
 Rules this file enforces for every project built from the html-report template:
 
@@ -16,9 +15,11 @@ Each run does three things:
    teams that count for the NPI, with preseason ranks, pregame win probability,
    and leverage), seasonSimulations.json (tournament chance), and newcomers.json.
 2. For today and tomorrow (Eastern), reads every D3 team's schedule page to find
-   tipoff and the live stats feed, and writes the slate. A row against a school
-   that data/ncaa_members.csv lists in Division I or II becomes a game too,
-   exhibitions included. Those games carry `division` and do not count for the NPI.
+   tipoff and the live stats feed, and writes the slate. A page row against another
+   D3 team that gameLeverages.json lacks becomes a game too, with no win chance or
+   leverage until the next NPI update: a tournament's second-day game shows as TBA
+   on the pages until the first day ends. Games against Division I and II teams,
+   exhibitions, and games against NAIA and two-year schools do not appear.
 3. For the last three days, reads each game that has no box score yet. With
    --finals (the game-night run every 20 minutes), the run does only this step
    and reads only the schedule pages those games need. The live
@@ -489,6 +490,36 @@ def opponent_division(r, members):
         hits = members["name"].get(name_key(r["opponent"]), [])
         m = hits[0] if len(hits) == 1 else None
     return (m["division"], m) if m else (None, None)
+
+
+def page_games(day, schools, pages, known, ranks, members):
+    """Games on `day` between two D3 teams that a schedule page lists and `known` (the Stat Lab's list) lacks.
+    A tournament's second-day game shows as TBA on the pages until the first day ends, so games.txt and
+    gameLeverages.json pick it up a day late. The opponent resolves by its link's site, then by a name that fits
+    one D3 school and no Division I or II member (Pacific). Win chance and leverage stay at 0.5 and 0 until the
+    next NPI update lists the game; the slate's previous entry keeps nothing, because the ids match."""
+    sites, keys, upper = team_sites(schools), d3_keys(schools), upper_sites(members)
+    pairs = {frozenset((g["home"], g["away"])) for g in known}
+    games = []
+    for team, rows in sorted(pages.items()):
+        if schools.get(team, {}).get("extra"):
+            continue
+        for r in rows:
+            if r["day"] != day or r["exhibition"]:
+                continue
+            site = site_of(r.get("opponent_url"))
+            opp = sites.get(site)
+            if not opp and site not in upper:
+                hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) if k in keys}
+                above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]
+                opp = hits.pop() if len(hits) == 1 and not above else None
+            if not opp or opp == team or frozenset((team, opp)) in pairs:
+                continue
+            pairs.add(frozenset((team, opp)))
+            home, away = (team, opp) if r["home"] else (opp, team)
+            games.append({"date": day.isoformat(), "home": home, "away": away, "neutral": r["neutral"], "label": None,
+                          "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0})
+    return games
 
 
 def other_games(day, schools, pages, members, ranks, covered):
@@ -1138,6 +1169,9 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
     keys = d3_keys(schools)
     out = []
     for g in games:
+        # Games against Division I and II teams (extra_games.json can still carry them) stay off the page.
+        if g.get("division"):
+            continue
         gid = f'{g["date"]}-{norm(g["away"])}-at-{norm(g["home"])}'
         # A Division I host and its D3 guest often disagree on whether a game is an exhibition.
         exhibition = None if g.get("division") else g.get("label") == "Exhibition"
@@ -1355,11 +1389,6 @@ def collect(previous):
                 ranks[g[side]] = g[f"{side}_rank"]
     for g in extra.get("games", []):
         g["home_rank"], g["away_rank"] = g.get("home_rank") or ranks.get(g["home"]), g.get("away_rank") or ranks.get(g["away"])
-    covered = {(g["date"], t) for g in extra.get("games", []) for t in (g["home"], g["away"])}
-    # A D3 page that could not be read (Presto sites behind AWS WAF answer 405) hides that team's games against
-    # Division I and II teams; ESPN lists the regular-season ones.
-    blocked = {t for t in schools if not schools[t].get("extra") and not pages.get(t)}
-
     def listing(source, reader, d):
         try:
             return reader(d)
@@ -1369,26 +1398,14 @@ def collect(previous):
             return []
 
     for d in window:
-        others, hosts = other_games(d, schools, pages, members, ranks, covered)
-        hub, espn = listing("Sidearm hub", hub_games, d), listing("ESPN", espn_games, d)
-        taken = {t for g in by_day.get(d.isoformat(), []) + others for t in (g["home"], g["away"])}
-        listed, listed_hosts = listed_games(d, hub, espn, schools, members, ranks, taken, blocked)
-        others += listed
-        hosts.update(listed_hosts)
-        new_hosts = {name: school for name, school in hosts.items() if name not in schools}
-        schools.update(new_hosts)
-        # Host pages fill tipoffs and live stats links. A host page that fails costs nothing, so its error is not kept.
-        with ThreadPoolExecutor(max_workers=12) as pool:
-            for team, rows, _err in pool.map(load, sorted(n for n in new_hosts if n not in pages)):
-                pages[team] = rows
-        # ESPN names a non-D1 team by its location only, so an ESPN game stays only when the host's page links the
-        # D3 team's site that day.
-        others = [g for g in others if g.pop("source", None) != "espn" or espn_confirmed(g, d, schools, pages)]
-        if others:
-            out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(others)
+        hub = listing("Sidearm hub", hub_games, d)
+        known = by_day.get(d.isoformat(), [])
+        added = page_games(d, schools, pages, known, ranks, members)
+        if added:
+            out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(added)
         path = SLATES / f"{d.isoformat()}.json"
-        slate = build_slate(d, by_day.get(d.isoformat(), []) + others, schools, pages, tourn, newcomers, read_json(path),
-                            extra.get("links"), hub, espn, upper_sites(members), names, rosters)
+        slate = build_slate(d, known + added, schools, pages, tourn, newcomers, read_json(path),
+                            extra.get("links"), hub, (), upper_sites(members), names, rosters)
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
     record_finals(out, today, pages)

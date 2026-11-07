@@ -1,13 +1,13 @@
 # Tonight in D3 WBB
 
-Live scores for every Division III women's basketball game that counts for the NPI, plus D3 games against Division I and II teams, sorted by how interesting each game is right now. `PLAN.md` holds the design: the interest score, the win probability model, the check schedule, and the newcomer rules.
+Live scores for every Division III women's basketball game that counts for the NPI, sorted by how interesting each game is right now. `PLAN.md` holds the design: the interest score, the win probability model, the check schedule, and the newcomer rules.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `site.json` | Name, domain, analytics code, time zones, accent colors |
-| `fetch_data.py` | Builds `data/slates/YYYY-MM-DD.json` for today and tomorrow, records finals, newcomer lines, and top lines for the last three days (from the live feed, then from the Box Score link on either team's schedule page once the game is 2.5 hours past tipoff), and writes `data/data.json` (fetch time, errors, game count per date). For a D1 or D2 game it also reads the host's schedule page, the Sidearm hub, and ESPN |
+| `fetch_data.py` | Builds `data/slates/YYYY-MM-DD.json` for today and tomorrow, records finals, newcomer lines, and top lines for the last three days (from the live feed, then from the Box Score link on either team's schedule page once the game is 2.5 hours past tipoff), and writes `data/data.json` (fetch time, errors, game count per date). A D3 game a schedule page lists before the Stat Lab's `gameLeverages.json` does (a tournament's second-day game, TBA on the pages until the first day ends) joins the slate with an even win chance and no leverage until the next NPI update. Games against Division I and II teams do not appear |
 | `build_site.py` | Renders `docs/index.html`, embeds the default night's slate, and copies the slates to `docs/slates/`. `LIVE_JS` holds the browser model and scheduler |
 | `data/schools.csv` | Each school's schedule page, page type (Sidearm or Presto), and time zone. Written by `tools/make_schools.py` |
 | `data/ncaa_members.csv` | Every NCAA school with women's basketball: name, division, conference, athletics site. Written by `tools/make_ncaa_members.py` |
