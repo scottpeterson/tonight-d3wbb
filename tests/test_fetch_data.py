@@ -649,3 +649,21 @@ def test_snapshot_orients_a_live_presto_score(monkeypatch):
     box["status"], box["complete"] = "3rd Quarter", False
     game = {"home": "Lasell", "away": "Eastern Connecticut St.", "newcomers_home": [], "newcomers_away": []}
     assert f.snapshot(game, box) == {"home": 72, "away": 95, "status": "3rd Quarter", "at": "2026-11-07T01:00:00+00:00"}
+
+
+def test_a_cut_off_read_costs_one_game_not_the_finals_pass(monkeypatch, tmp_path):
+    import http.client
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 7, 5, 0, tzinfo=timezone.utc))
+    base = {"date": "2026-11-06", "tip": "2026-11-07T00:00:00Z", "neutral": False, "newcomers_home": [], "newcomers_away": []}
+    games = [{**base, "id": "a", "home": "A", "away": "B", "feed": {"type": "sidearm", "url": "https://sidearmstats.com/a/wbball/game.json"}},
+             {**base, "id": "c", "home": "C", "away": "D", "final": [70, 60], "box_read": True}]
+    (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
+
+    def cut_off(*a, **k):
+        raise http.client.IncompleteRead(b"x", 10)
+    monkeypatch.setattr(f, "get", cut_off)
+    out = {"errors": []}
+    f.record_finals(out, date(2026, 11, 7), {})
+    assert len(out["errors"]) == 1 and "IncompleteRead" in out["errors"][0]
+    assert json.loads((tmp_path / "2026-11-06.json").read_text())["games"][1]["final"] == [70, 60]

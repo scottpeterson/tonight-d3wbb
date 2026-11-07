@@ -34,6 +34,7 @@ Each run does three things:
 """
 import csv
 import html
+import http.client
 import json
 import math
 import os
@@ -61,7 +62,9 @@ SITE = json.loads((BASE / "site.json").read_text())
 UA = {"User-Agent": f"Mozilla/5.0 ({re.sub(r'^www\.', '', SITE.get('domain') or SITE['slug'])} page builder)",
       "Accept": "text/html,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"}
 TAG = re.compile(r"<[^>]+>")
-FETCH_ERRORS = (urllib.error.URLError, TimeoutError, ValueError, KeyError, IndexError, ET.ParseError)
+# HTTPException covers a body cut off partway (IncompleteRead) and a dropped connection; OSError covers resets.
+FETCH_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError, TimeoutError, ValueError, KeyError, IndexError,
+                ET.ParseError)
 EASTERN = ZoneInfo("America/New_York")
 STATLAB = "https://thed3statlab.com/data"
 # Testing aids: read The D3 Stat Lab files from a local checkout, and pretend today is another date.
@@ -1219,6 +1222,13 @@ def record_finals(out, today, pages):
     score a schedule page posts outranks a feed's. A game the browser cannot follow (no feed, but a Presto box score
     page) gets a snapshot of its score while it is on."""
     def final(g):
+        try:
+            return read_game(g)
+        except (*FETCH_ERRORS, AttributeError, TypeError) as exc:
+            # One game's odd page or feed costs that game this run, never the whole pass.
+            return g, None, None, g.get("boxscore"), None, [f'{g["away"]} at {g["home"]}: {exc!r}']
+
+    def read_game(g):
         errors, result, snap = [], None, None
         if g.get("feed"):
             try:
