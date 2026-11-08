@@ -305,13 +305,13 @@ def sections():
 
 HOW = f"""<dl class="terms">
 <dt>This page</dt><dd>{esc(SITE["intro"])}</dd>
-<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its season efficiency rank among Division III teams, and a filled badge marks the top 25. The rating starts at the preseason projection and moves in equal steps to the team's box-score rating over its first eight games. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev).<br>Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
+<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its season efficiency rank among Division III teams, and a filled badge marks the top 25. The rating starts at the preseason projection and moves in equal steps to the team's box-score rating over its first eight games. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Before tipoff the win chance comes from the efficiency margin line. During the game the line counts as one game of evidence and the score so far as the part of a game played, so a heavy favorite that leads by one after a quarter sits near 97%, not 99%.<br>Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
 <dt>Order</dt><dd>Games group as live, not started, and final. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
 <dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Exhibitions, games against Division I, II, NAIA, and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it. Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win chance and no leverage until the next NPI update.</dd>
 <dt>Interest</dt><dd>A score from 0 to 100.<ul><li>The season efficiency ranks of both teams. The better team counts more. A rank near the top counts far more than one in the middle. The gap between 13th and 39th counts about four times the gap between 213th and 239th.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The season efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>The upset and closeness parts count in full between top teams. Between teams ranked near 400, they count about a third as much. A one-point upset in the middle of the table therefore sits below a six-point game between two top-50 teams. Tournament chances lower a finished game's score by at most half.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the season efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
-<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score.<br>A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check.<br>A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds and every other feed the schedule pages gave. A feed that has not shown its game yet gets a look every 5 minutes for 45 minutes after tipoff, whatever the game's interest. If it still does not show the game, the page stops checking and the game shows "no live stats".</dd>
+<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A game is "decided" when the model's win chance, from the pregame line and the score, passes 98% and the score and clock alone put the comeback chance under 20%. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score.<br>A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check.<br>A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds and every other feed the schedule pages gave. A feed that has not shown its game yet gets a look every 5 minutes for 45 minutes after tipoff, whatever the game's interest. If it still does not show the game, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset. It marks a team that won after the model gave it 35% or less before tipoff. It also marks a team whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag.<br>Postponed or Canceled replaces the tipoff time when a schedule page says so. Final pending marks a game whose host's feed has moved on to its next game before a box score is posted. The score follows once a schedule page links the box score. Gray marks a game with nothing left to decide.<br>A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that season efficiency rank or better. The choice applies to both lists, and this browser remembers it.<br>Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO. The lists rank players by adjusted game score: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</dd>
 </dl>"""
@@ -335,10 +335,25 @@ const tokens=[];                   // timestamps of recent feed reads, for the b
 // ---------- model
 function phi(z){const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2);const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return z>0?1-p:p;}
 // Home team's chance to win. lead is home minus away; progress is the share of regulation played.
+// The chance the leader holds on from the score and clock alone, with no pregame line. "Decided" needs both the
+// model (line and score) under 2% and this under SCORE_DECIDED: Haverford trailed #2 NYU by one after a quarter
+// (2026-11-08) and the line alone said 99%.
+const SCORE_DECIDED=0.2;
+function scoreWp(lead,progress){
+  const left=Math.max(0,1-progress);
+  if(left<=0)return lead>0?1:lead<0?0:0.5;
+  return phi(lead/(SD*Math.sqrt(left)));
+}
+// Live win chance. The pregame line is a prior on the true margin worth one game of evidence (LINE_SD), and the
+// score so far is `progress` of a game of evidence, so a quarter played at even terms pulls a 35-point line toward
+// the scoreboard (#2 NYU led Haverford by one after a quarter, 2026-11-08: 99.8% as a certain line, 97% here).
+const LINE_SD=SD;
 function winProb(g,lead,progress){
   const left=Math.max(0,1-progress);
   if(left<=0)return lead>0?1:lead<0?0:0.5;
-  return phi((lead+g.pregame_margin*left)/(SD*Math.sqrt(left)));
+  const precision=1/(LINE_SD*LINE_SD)+progress/(SD*SD);
+  const margin=(g.pregame_margin/(LINE_SD*LINE_SD)+lead/(SD*SD))/precision;
+  return phi((lead+margin*left)/Math.sqrt(SD*SD*left+left*left/precision));
 }
 // Team quality: a team outside Division III has no season rank; it counts as an average team. The better team counts
 // more. The curve is cubic, so a rank near the top counts far more than one in the middle: 13th against 39th is a
@@ -751,7 +766,8 @@ function tags(g,st){
   const dogWp=g.pregame_wp<0.5?st.wp-g.pregame_wp:(1-st.wp)-(1-g.pregame_wp);
   if(modeled(g)&&dogChance(g)<=UPSET_MAX_DOG&&(st.live||st.final)&&dogWp>0.2)out.push(['upset','\u{1F6A8}',st.final?'upset':'upset alert']);
   if(st.live&&Math.min(st.wp,1-st.wp)>0.3)out.push(['close','\u{1F525}','close']);
-  if(st.live&&Math.min(st.wp,1-st.wp)<0.02)out.push(['quiet','\u{1F512}','decided']);
+  const sw=st.live&&st.score?scoreWp(st.score[0]-st.score[1],st.progress||0):0.5;
+  if(st.live&&Math.min(st.wp,1-st.wp)<0.02&&Math.min(sw,1-sw)<SCORE_DECIDED)out.push(['quiet','\u{1F512}','decided']);
   if(!g.division&&Math.max(g.home_tourn,g.away_tourn)<0.005)out.push(['quiet','\u{1F4A4}','no tournament stakes']);
   return out.map(t=>'<span class="tag '+t[0]+'">'+(t[1]?t[1]+'\u00a0':'')+esc(t[2])+'</span>').join('');
 }

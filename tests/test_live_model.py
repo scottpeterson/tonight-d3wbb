@@ -9,12 +9,12 @@ import pytest
 
 from build_site import LIVE_JS
 
-FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
+FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
          "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf"]
-CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
-          "QUALITY_GATE"]
+CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
+          "QUALITY_GATE", "SCORE_DECIDED"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -47,7 +47,12 @@ DEAD = dict(GAME, home_rank=350, away_rank=360, home_lev=0, away_lev=0, home_tou
 
 
 def test_win_chance_at_tipoff_uses_the_pregame_margin():
-    assert run(f"winProb({json.dumps(GAME)},0,0)") == pytest.approx(0.599, abs=0.002)
+    # The line is a prior worth one game of evidence, so at tipoff the chance is phi(margin / sqrt(2) / SD).
+    assert run(f"winProb({json.dumps(GAME)},0,0)") == pytest.approx(0.571, abs=0.002)
+    # #2 NYU (35.5-point line) up one after a quarter: 97%, not the 99.8% a certain line gives (2026-11-08).
+    nyu = json.dumps(dict(GAME, pregame_margin=35.5, pregame_wp=0.999))
+    assert run(f"winProb({nyu},1,0.25)") == pytest.approx(0.971, abs=0.003)
+    assert run(f"winProb({nyu},1,0.75)") < run(f"winProb({nyu},1,0.25)")
 
 
 def test_win_chance_up_30_at_half_is_near_certain():
@@ -129,7 +134,14 @@ def test_tags_mark_upsets_close_games_and_dead_games():
     g = json.dumps(dict(GAME, pregame_wp=0.9))
     upset = run(f"tags({g},{{live:true,wp:0.45}})")
     assert "upset alert" in upset and "close" in upset
-    assert "decided" in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995}})")
+    # Decided needs the model (line and score) past 98% and the score and clock alone under a 20% comeback chance:
+    # a one-point game after a quarter stays open however lopsided the line, a 10-point halftime lead for a heavy
+    # favorite does not.
+    assert "decided" not in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995,score:[21,20],progress:0.25}})")
+    assert "decided" in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995,score:[45,35],progress:0.5}})")
+    assert "decided" in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995,score:[70,50],progress:0.875}})")
+    assert "decided" not in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.93,score:[40,30],progress:0.5}})")
+    assert "decided" not in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995}})")
     assert "no tournament stakes" in run(f"tags({json.dumps(DEAD)},{{wp:0.5}})")
     assert "upset" not in run(f"tags({json.dumps(GAME)},{{final:true,wp:1}})")
 
