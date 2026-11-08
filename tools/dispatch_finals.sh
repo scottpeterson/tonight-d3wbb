@@ -83,3 +83,4 @@ if "$GH" workflow run update.yml -R "$REPO" -f mode=$mode; then
   echo "$(date -u '+%F %T') dispatched a $mode run"
   [ "$mode" = full ] && echo "$slot" > "$MARK"
 fi
+exit 0
