@@ -144,7 +144,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .nc td.n{display:none}.nc td.p{grid-area:p}.nc td.t{grid-area:t;color:var(--muted);font-size:var(--fs-sm)}
 .nc td.m{display:block;grid-area:m;font-variant-numeric:tabular-nums;padding-top:2px}
 .nc td.gs{grid-area:g;align-self:center;text-align:right;font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums}
-.nc td.gs::after{content:"game score";display:block;font-size:.68rem;font-weight:400;color:var(--muted);letter-spacing:.02em}
+.nc td.gs::after{content:"adjusted game score";display:block;font-size:.68rem;font-weight:400;color:var(--muted);letter-spacing:.02em}
 .nc td.gm{grid-area:gm;font-size:.78rem;color:var(--muted)}.nc td.lead.gm .reason{display:inline}.nc td.gm .reason::before{content:" · "}}
 .empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
 dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2) var(--s4);margin:0}dl.terms dt{font-weight:600}dl.terms dd{margin:0;color:var(--muted)}dl.terms ul{margin:var(--s1) 0;padding-left:1.2em}
@@ -279,10 +279,10 @@ def sections():
                           for n, label in ((0, "All teams"), (200, "Top 200"), (100, "Top 100")))
         return (f'<div class="sortbar ctl"><span class="seglabel caption" id="lbl-cut-{list_id}">Teams</span>'
                 f'<div class="seg" role="group" aria-labelledby="lbl-cut-{list_id}">{buttons}</div></div>')
-    newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
+    newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best adjusted game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
                        'Lines update with every score check, so players in games still going count too.</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
-    topgames = twisty("Top 15 game scores", '<p class="small">The 15 best game scores on this night by any player, in every game with a live stats feed. '
+    topgames = twisty("Top 15 game scores", '<p class="small">The 15 best adjusted game scores on this night by any player, in every game with a live stats feed. '
                       'Lines update with every score check, so players in games still going count too.</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
@@ -298,15 +298,15 @@ def sections():
 
 HOW = f"""<dl class="terms">
 <dt>This page</dt><dd>{esc(SITE["intro"])}</dd>
-<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its preseason efficiency rank among Division III teams, and a filled badge marks the top 25. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
+<dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its season efficiency rank among Division III teams, and a filled badge marks the top 25. The rating starts at the preseason projection and moves in equal steps to the team's box-score rating over its first eight games. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
 <dt>Order</dt><dd>Games group as live, not started, and final. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
 <dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Exhibitions, games against Division I, II, NAIA, and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it. A game the schedule pages list before the NPI data does, such as a tournament's second-day game, shows an even win chance and no leverage until the next NPI update.</dd>
-<dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The preseason efficiency ranks of both teams. The better team counts more, and a rank near the top counts far more than one in the middle: the gap between 13th and 39th counts about four times the gap between 213th and 239th.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The preseason efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>The upset and closeness parts count in full between top teams and about a third as much between teams ranked near 400, so a one-point upset in the middle of the table sits below a six-point game between two top-50 teams. Tournament chances lower a finished game's score by at most half.</dd>
-<dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
+<dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The season efficiency ranks of both teams. The better team counts more, and a rank near the top counts far more than one in the middle: the gap between 13th and 39th counts about four times the gap between 213th and 239th.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The season efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>The upset and closeness parts count in full between top teams and about a third as much between teams ranked near 400, so a one-point upset in the middle of the table sits below a six-point game between two top-50 teams. Tournament chances lower a finished game's score by at most half.</dd>
+<dt>Win chance</dt><dd>Before tipoff: the season efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: a team the model gave 35% or less before tipoff that won, or whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag. Postponed or Canceled replaces the tipoff time when a schedule page says so. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
-<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that preseason efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
+<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that season efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO. The lists rank players by adjusted game score: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</dd>
 </dl>"""
 
 LIVE_JS = r"""
@@ -333,7 +333,7 @@ function winProb(g,lead,progress){
   if(left<=0)return lead>0?1:lead<0?0:0.5;
   return phi((lead+g.pregame_margin*left)/(SD*Math.sqrt(left)));
 }
-// Team quality: a team outside Division III has no preseason rank; it counts as an average team. The better team counts
+// Team quality: a team outside Division III has no season rank; it counts as an average team. The better team counts
 // more. The curve is cubic, so a rank near the top counts far more than one in the middle: 13th against 39th is a
 // gap of 0.17, 213th against 239th a gap of 0.04. On a linear scale Concordia (MN) at Wartburg (22 at 13, leverage
 // 23) ranked below RIT at Rochester (39 at 54) on 2026-11-07 because the second game was a little closer.
@@ -707,7 +707,7 @@ async function tick(){
 
 // ---------- render
 function rank(r){return r?'<span class="rk'+(r<=25?' top':'')+'">#'+r+'</span>':'';}
-// A Division I or II opponent gets its division badge where a D3 team shows its preseason rank.
+// A Division I or II opponent gets its division badge where a D3 team shows its season rank.
 function sideTag(g,side){return g.division&&g[side]!==g.d3?'<span class="dv">D'+g.division+'</span>':rank(g[side+'_rank']);}
 // tools/make_logos.py writes the files, and its slug() must match this.
 function logoSlug(n){return String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
@@ -810,18 +810,21 @@ function renderNext(){
   games.forEach(g=>{if(g.st.checked>latest)latest=g.st.checked;});
   $('#checked').textContent=latest?'Latest check '+ago(latest):'';
 }
+// The opponent's defense factor (D3 average adjusted defense / the opponent's). An opponent outside Division III counts as average.
+function defFactor(x){const g=x.game,f=x.team===g.home?g.away_def:x.team===g.away?g.home_def:null;return f||1;}
 function renderLines(id,box,list,empty){
   if(rankCut){list=list.filter(x=>lineRank(x)<=rankCut);if(list.length===0)empty='No player from a top '+rankCut+' team has a line on this night yet.';}
-  list.sort((a,b)=>b.gmsc-a.gmsc);list.splice(TOP_N);
+  list.forEach(x=>{x.adj=Math.round(x.gmsc*defFactor(x)*10)/10;});
+  list.sort((a,b)=>b.adj-a.adj||b.gmsc-a.gmsc);list.splice(TOP_N);
   const sec=$('#'+id);sec.querySelector('.count').textContent=list.length;
   if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
   const rows=list.map(x=>{const l=x.line,g=x.game;
     // td.m repeats the five stat cells as one line; the phone layout shows it in their place.
     return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+'</td>'+
       '<td class="n">'+l.pts+'</td><td class="n">'+l.reb+'</td><td class="n">'+l.ast+'</td><td class="n">'+(l.stl+l.blk)+'</td><td class="n">'+l.fgm+'-'+l.fga+'</td>'+
-      '<td class="m">'+l.pts+' PTS · '+l.reb+' REB · '+l.ast+' AST · '+(l.stl+l.blk)+' STL+BLK · '+l.fgm+'-'+l.fga+' FG</td>'+
-      '<td class="gs">'+x.gmsc.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
-  $(box).innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+      '<td class="m">'+l.pts+' PTS · '+l.reb+' REB · '+l.ast+' AST · '+(l.stl+l.blk)+' STL+BLK · '+l.fgm+'-'+l.fga+' FG · '+x.gmsc.toFixed(1)+' game score</td>'+
+      '<td class="n">'+x.gmsc.toFixed(1)+'</td><td class="gs">'+x.adj.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
+  $(box).innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th>Adjusted game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderNewcomers(){
   document.querySelectorAll('.cut').forEach(b=>b.classList.toggle('active',+b.dataset.cut===rankCut));

@@ -12,7 +12,7 @@ Rules this file enforces for every project built from the html-report template:
 Each run does three things:
 
 1. Reads The D3 Stat Lab's gameLeverages.json (every scheduled game between two
-   teams that count for the NPI, with preseason ranks, pregame win probability,
+   teams that count for the NPI, with season efficiency ranks, pregame win probability,
    and leverage), seasonSimulations.json (tournament chance), and newcomers.json.
 2. For today and tomorrow (Eastern), reads every D3 team's schedule page to find
    tipoff and the live stats feed, and writes the slate. A page row against another
@@ -1670,7 +1670,10 @@ def collect(previous):
     SLATES.mkdir(parents=True, exist_ok=True)
     schools = load_schools()
     try:
-        games = statlab("gameLeverages.json")["games"]
+        statlab_games = statlab("gameLeverages.json")
+        games = statlab_games["games"]
+        # Average adjusted defense / the team's own: the page multiplies it into each opposing player's game score.
+        defense = statlab_games.get("defense", {})
         tourn = tournament_chance()
         newcomers = newcomers_by_team()
     except FETCH_ERRORS as exc:
@@ -1742,6 +1745,8 @@ def collect(previous):
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, known + added, schools, pages, tourn, newcomers, read_json(path),
                             extra.get("links"), hub, (), upper_sites(members), names, rosters)
+        for g in slate["games"]:
+            g["home_def"], g["away_def"] = defense.get(g["home"]), defense.get(g["away"])
         path.write_text(json.dumps(slate, separators=(",", ":")))
 
     record_finals(out, today, pages, extra.get("links"))
