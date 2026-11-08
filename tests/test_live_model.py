@@ -12,8 +12,8 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink"]
-CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "modeled", "dogChance"]
+CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -347,3 +347,27 @@ def test_sibling_feeds_name_the_hosts_other_courts():
         "https://athletics.hope.edu/sidearmstats/wbball2/summary"
     assert run(f"siblingLink('https://www.youtube.com/hopeathletics',{json.dumps(two)})") == "https://www.youtube.com/hopeathletics"
     assert run(f"siblingLink(null,{json.dumps(two)})") is None
+
+
+def test_a_win_by_a_near_even_team_is_no_upset():
+    # William Peace (41% at Roanoke) won 62-59 on 2026-11-07 and the card said upset. The bar is 35%.
+    roanoke = json.dumps(dict(GAME, home="Roanoke", away="William Peace", pregame_wp=0.59, pregame_margin=2.5))
+    assert "upset" not in run(f"tags({roanoke},{{final:true,wp:0}})")
+    assert "upset" not in run(f"tags({roanoke},{{live:true,wp:0.2}})")
+    dog = json.dumps(dict(GAME, pregame_wp=0.7, pregame_margin=5.8))
+    assert "upset" in run(f"tags({dog},{{final:true,wp:0}})")
+    assert "upset alert" in run(f"tags({dog},{{live:true,wp:0.25}})")
+
+
+def test_a_game_with_no_line_gets_no_upset_tag_or_upset_interest():
+    # Ohio Wesleyan (#41) vs UW-Platteville (#136), 2026-11-07, came from the schedule pages at 50% and showed upset.
+    g = json.dumps(dict(GAME, pregame_wp=0.5, pregame_margin=0, modeled=False))
+    assert "upset" not in run(f"tags({g},{{final:true,wp:0}})")
+    assert run(f"interest({g},{{progress:0.5,wp:0.1}})") == run(f"interest({g},{{progress:0.5,wp:0.9}})")
+
+
+def test_a_postponed_game_is_never_checked_and_has_no_interest():
+    g = json.dumps(dict(GAME, off="Postponed"))
+    assert run(f"nextCheck({g},{{interest:50,wp:0.6}},Date.parse('2026-11-14T20:00:00Z'))") is None
+    assert run(f"initState({g}).interest") == 0
+    assert run(f"interest({json.dumps(GAME)},{{progress:0,wp:0.6}})") > 0

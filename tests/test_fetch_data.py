@@ -814,3 +814,151 @@ def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
         [("Hope", "Illinois Wesleyan", False, 6, 41, 0.5)]
     # A game the Stat Lab already lists is not added again.
     assert f.page_games(day, schools, pages, [{"home": "Hope", "away": "Illinois Wesleyan"}], ranks, MEMBERS) == []
+
+
+# ---------------------------------------------------------------- postponed games, projected pairings
+
+HENDRIX_ROW = """<li class="sidearm-schedule-game sidearm-schedule-home-game sidearm-schedule-game-completed">
+<div class="sidearm-schedule-game-row"><div class="sidearm-schedule-game-details"><div>
+<span class="sidearm-schedule-game-opponent-date flex-item-1"><span>Nov 7 (Sat)</span></span><span>/</span>
+<span class="sidearm-schedule-game-result-final">Final</span></div></div>
+<div class="sidearm-schedule-game-opponent-text"><span class="sidearm-schedule-game-opponent-name">
+<a aria-label="Rhodes College on November 7 1:00 PM" href="http://www.rhodeslynx.com/">Rhodes College</a></span></div>
+<div class="sidearm-schedule-game-result "><span>Postponed</span></div></div></li>"""
+
+
+def test_sidearm_result_reads_postponed_not_the_final_label(monkeypatch):
+    # Hendrix vs Rhodes, 2026-11-07: the row carries a "...-result-final">Final</span> before the result "Postponed".
+    monkeypatch.setattr(f, "get", lambda *a, **k: HENDRIX_ROW)
+    r = f.sidearm_rows("https://hendrixwarriors.com/sports/womens-basketball/schedule", "America/Chicago")[0]
+    assert (r["opponent"], r["result"]) == ("Rhodes College", "Postponed")
+    assert f.off_status(r) == "Postponed"
+    assert f.off_status({"result": "Cancelled"}) == "Canceled" and f.off_status({"result": "W, 70-62"}) is None
+
+
+def test_a_postponed_game_shows_no_final_and_the_finals_pass_skips_it(monkeypatch, tmp_path):
+    day = date(2026, 11, 7)
+    pages = {"Hendrix": [f.row(day, (13, 0, "America/Chicago"), True, False, "Rhodes College", {}, "Postponed", "")]}
+    game = {"date": "2026-11-07", "home": "Hendrix", "away": "Rhodes", "neutral": False, "pregame_margin": 18.0, "pregame_wp": 0.949}
+    old = {"id": "2026-11-07-rhodes-at-hendrix", "final": [70, 60], "box_read": True, "top_lines": [{"team": "Hendrix"}], "newcomer_games": []}
+    built = f.build_slate(day, [game], {}, pages, {}, {}, {"games": [old]})["games"][0]
+    assert (built["off"], built["final"], built["box_read"], built["modeled"]) == ("Postponed", None, False, True)
+    # The finals pass reads nothing for it, and drops a final it still carries.
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("read a postponed game")))
+    slate_game = {**built, "feed": {"type": "sidearm", "url": "https://sidearmstats.com/hendrix/wbball/game.json"}, "final": [70, 60],
+                  "newcomers_home": [], "newcomers_away": []}
+    (tmp_path / "2026-11-07.json").write_text(json.dumps({"date": "2026-11-07", "games": [slate_game]}))
+    out = {"errors": []}
+    f.record_finals(out, day, {})
+    written = json.loads((tmp_path / "2026-11-07.json").read_text())["games"][0]
+    assert out["errors"] == [] and written["final"] is None
+
+
+def test_page_games_are_unmodeled_and_stat_lab_games_are_modeled():
+    day = date(2026, 11, 7)
+    added = {"date": "2026-11-07", "home": "UW-Platteville", "away": "Ohio Wesleyan", "neutral": True, "pregame_wp": 0.5,
+             "pregame_margin": 0.0, "modeled": False}
+    priced = {"date": "2026-11-07", "home": "Roanoke", "away": "William Peace", "neutral": False, "pregame_wp": 0.59, "pregame_margin": 2.5}
+    built = f.build_slate(day, [added, priced], {}, {}, {}, {}, {})["games"]
+    assert [g["modeled"] for g in built] == [False, True]
+
+
+def widener_pages():
+    day = date(2026, 11, 7)
+    return {
+        "Salisbury": [f.row(day, (15, 0, "America/New_York"), False, True, "Widener", {}, "L, 60-85", "", "https://widenerpride.com/")],
+        "Marywood": [f.row(day, None, False, True, "Centenary University", {}, "Final", "", "https://centenarycyclones.com/")],
+        "Widener": [f.row(day, None, True, False, "Centenary vs Marywood", {}, "Final", ""),
+                    f.row(day, None, True, False, "Salisbury", {}, "Final", "", "https://suseagulls.com/")],
+        "Centenary (NJ)": [f.row(day, (13, 0, "America/New_York"), False, True, "Marywood University", {}, "L, 49-70", "", "https://marywoodpacers.com/")],
+    }
+
+
+WIDENER_SCHOOLS = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{s}/sports/womens-basketball/schedule", "tz": "America/New_York"}
+                   for t, s in (("Salisbury", "suseagulls.com"), ("Marywood", "marywoodpacers.com"), ("Widener", "widenerpride.com"),
+                                ("Centenary (NJ)", "centenarycyclones.com"))}
+
+
+def test_a_projected_pairing_both_pages_contradict_is_left_out():
+    # Salisbury at Marywood, 2026-11-07, from the Stat Lab's list: Salisbury's page said Widener, Marywood's said
+    # Centenary, and both of those pages named them back.
+    day, pages = date(2026, 11, 7), widener_pages()
+    resolve = f.opponent_resolver(WIDENER_SCHOOLS, MEMBERS)
+    assert f.contradicted({"home": "Marywood", "away": "Salisbury"}, day, pages, resolve)
+    # The games the pages agree on stay, and so does a game one page lists under a name nobody resolves.
+    assert not f.contradicted({"home": "Widener", "away": "Salisbury"}, day, pages, resolve)
+    assert not f.contradicted({"home": "Marywood", "away": "Centenary (NJ)"}, day, pages, resolve)
+    pages["Salisbury"] = [f.row(day, None, False, True, "Marywood Pacers (exact name unknown)", {}, "", "")]
+    assert not f.contradicted({"home": "Marywood", "away": "Salisbury"}, day, pages, resolve)
+    # A team with no row that day is not contradicted.
+    assert not f.contradicted({"home": "Marywood", "away": "Hope"}, day, pages, resolve)
+
+
+# ---------------------------------------------------------------- the Mac's Presto cache
+
+PRESTO_SCHOOL = {"team": "Lasell", "type": "Presto", "schedule": "https://laserpride.lasell.edu/sports/wbkb/2025-26/schedule", "tz": "America/New_York"}
+
+
+def refused(*a, **k):
+    import urllib.error
+    raise urllib.error.HTTPError(a[0] if a else "", 405, "Not Allowed", {}, None)
+
+
+def test_schedule_rows_fall_back_to_the_macs_copy_when_presto_refuses(monkeypatch):
+    day = date(2026, 11, 6)
+    cache = {"pages": {"Lasell": [f.row_to_json(f.row(day, (19, 0, "America/New_York"), True, False, "Emerson", {}, "W, 70-60", ""))]}}
+    monkeypatch.setattr(f, "_presto_cache", cache)
+    monkeypatch.setattr(f, "get", refused)
+    rows = f.schedule_rows(PRESTO_SCHOOL)
+    assert [(r["day"], r["time"], r["opponent"]) for r in rows] == [(day, (19, 0, "America/New_York"), "Emerson")]
+    # A Sidearm page, and a Presto school the Mac has no copy of, still raise.
+    with pytest.raises(f.FETCH_ERRORS):
+        f.schedule_rows({**PRESTO_SCHOOL, "team": "Emerson"})
+    with pytest.raises(f.FETCH_ERRORS):
+        f.schedule_rows({**PRESTO_SCHOOL, "type": "Sidearm"})
+    # The Mac's own run never reads the cache.
+    with pytest.raises(f.FETCH_ERRORS):
+        f.schedule_rows(PRESTO_SCHOOL, fallback=False)
+
+
+def test_read_presto_page_uses_the_cached_box_when_presto_refuses(monkeypatch):
+    box = f.presto_box(presto_page())
+    game = {"date": "2026-11-06", "home": "Lasell", "away": "Emerson", "neutral": False}
+    at = f.now().isoformat(timespec="seconds")
+    monkeypatch.setattr(f, "_presto_cache", {"boxes": {PRESTO_URL: {"at": at, "box": box}}})
+    monkeypatch.setattr(f, "get", refused)
+    assert f.read_presto_page(game, PRESTO_URL)["score"] == box["score"]
+    # A score in progress counts only while the Mac's copy is fresh; a final counts at any age.
+    stale = (f.now() - f.PRESTO_CACHE_LIVE - f.timedelta(minutes=1)).isoformat(timespec="seconds")
+    monkeypatch.setattr(f, "_presto_cache", {"boxes": {PRESTO_URL: {"at": stale, "box": {**box, "complete": False}}}})
+    with pytest.raises(f.FETCH_ERRORS):
+        f.read_presto_page(game, PRESTO_URL)
+    monkeypatch.setattr(f, "_presto_cache", {"boxes": {PRESTO_URL: {"at": stale, "box": box}}})
+    assert f.read_presto_page(game, PRESTO_URL)["complete"] is True
+
+
+def test_presto_snapshot_writes_rows_and_boxes_for_unread_games(monkeypatch, tmp_path):
+    schedule = (FIX / "presto_willamette_2025.html").read_text()
+
+    def served(url, *a, **k):
+        if "/boxscores/" in url:
+            return presto_page()
+        if "schedule" in url:
+            return schedule
+        raise AssertionError(url)
+    monkeypatch.setattr(f, "get", served)
+    monkeypatch.setattr(f, "load_schools", lambda: {"Lasell": PRESTO_SCHOOL, "Hope": {"team": "Hope", "type": "Sidearm", "schedule": "https://x/", "tz": "America/New_York"}})
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "PRESTO_CACHE", tmp_path / "presto_cache.json")
+    monkeypatch.setattr(f, "EXTRA", tmp_path / "none.json")
+    monkeypatch.setattr(f, "_presto_cache", None)
+    monkeypatch.setattr(f, "TODAY", "2026-11-06")
+    games = [{"id": "a", "date": "2026-11-06", "home": "Lasell", "away": "Emerson", "neutral": False, "link": PRESTO_URL},
+             {"id": "b", "date": "2026-11-06", "home": "Lasell", "away": "Hope", "neutral": False, "boxscore": PRESTO_URL.replace("h03q", "zzzz"), "box_read": True}]
+    (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
+    out = f.presto_snapshot()
+    cache = json.loads((tmp_path / "presto_cache.json").read_text())
+    assert out["errors"] == [] and set(cache["pages"]) == {"Lasell"} and list(cache["boxes"]) == [PRESTO_URL]
+    assert cache["boxes"][PRESTO_URL]["box"]["complete"] is True
+    assert f.row_from_json(cache["pages"]["Lasell"][0])["day"].year in (2025, 2026)

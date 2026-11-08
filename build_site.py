@@ -305,7 +305,7 @@ HOW = f"""<dl class="terms">
 <dt>Win chance</dt><dd>Before tipoff: the preseason efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
-<dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: an underdog that won, or whose win chance is now more than 20 points above its pregame chance. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
+<dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: a team the model gave 35% or less before tipoff that won, or whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag. Postponed or Canceled replaces the tipoff time when a schedule page says so. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that preseason efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO.</dd>
 </dl>"""
 
@@ -354,6 +354,7 @@ function finalInterest(g,st){
   return Math.min(100,100*(0.5+0.5*S)*(0.30*quality(g)+0.30*dogSurprise(g,st.score)+0.25*C+0.15*stakes(g)));
 }
 function interest(g,st){
+  if(g.off)return 0;
   if(st.final&&st.score)return finalInterest(g,st);
   const Q=quality(g),L=stakes(g);
   const T=Math.max(g.home_tourn,g.away_tourn),S=T/(T+0.01);
@@ -361,7 +362,7 @@ function interest(g,st){
   const C=1-Math.abs(2*wp-1);
   const homeDog=g.pregame_wp<0.5;
   // A game against a Division I or II team has no pregame model, so it has no upset term.
-  const U=g.division?0:Math.max(0,homeDog?wp-g.pregame_wp:(1-wp)-(1-g.pregame_wp));
+  const U=g.division||g.modeled===false?0:Math.max(0,homeDog?wp-g.pregame_wp:(1-wp)-(1-g.pregame_wp));
   // Rank and leverage fade as the result becomes certain: at the final whistle of a blowout they count for little.
   const settled=1-P*(1-Math.sqrt(C));
   return Math.min(100,100*S*((0.30*Q+0.25*L)*settled+(0.20+0.15*P)*C+0.25*U));
@@ -379,6 +380,11 @@ function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
 // or not at all. Checks stop there.
 const GIVE_UP_MS=45*60000,RETRY_MS=10*60000,LAST_LOOK_MS=4*3600000,FINAL_EARLIEST_MS=45*60000;
 const SIBLING_FEEDS=2;
+// A win by a team given more than this before tipoff is no upset: William Peace (41%) won at Roanoke, 2026-11-07.
+const UPSET_MAX_DOG=0.35;
+// A game with a pregame line: the Stat Lab's games. One the schedule pages added sits at 50% with no line.
+function modeled(g){return !g.division&&g.modeled!==false;}
+function dogChance(g){return Math.min(g.pregame_wp,1-g.pregame_wp);}
 // A tournament host runs its own game on wbball and the other game on wbball2 (Hope, 2026-11-07), and the schools'
 // pages can link either folder until the crews settle which game is on which. When a Sidearm feed shows another
 // game after tipoff, the host's other feeds get a look.
@@ -393,7 +399,7 @@ function siblingLink(link,f){const m=/\/([a-z]+?\d*)\/game\.json$/.exec(f.url);r
 // feed showing the host's earlier game) is not this game's.
 function canBeFinal(g){const t=tipMs(g);return t?Date.now()>=t+FINAL_EARLIEST_MS:g.date<=todayET();}
 function nextCheck(g,st,now){
-  if(st.final||!g.feed)return null;
+  if(st.final||!g.feed||g.off)return null;
   // A feed that has not shown this game by GIVE_UP_MS gets a look every RETRY_MS until LAST_LOOK_MS: a tournament
   // host's feed shows the earlier game first, and some crews start late.
   if(st.noStats){const tip=tipMs(g);return tip&&now<tip+LAST_LOOK_MS?now+RETRY_MS:null;}
@@ -673,11 +679,12 @@ async function refreshSlate(){
     // A feed this page has seen the game on stays, even when the slate still names the host's other court.
     ['feed','link'].forEach(k=>{if(x[k]&&!g.st.seen)g[k]=x[k];});
     ['boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
+    if(x.off&&!g.off){g.off=x.off;g.st=initState(g);g.st.nextAt=null;}
     if(x.final){
       Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[]});
       const st=initState(g);st.nextAt=null;g.st=st;
     }else if(x.snapshot&&!g.st.live){g.st.snap=x.snapshot;g.st.score=[x.snapshot.home,x.snapshot.away];}
-    if(x.feed&&!g.st.nextAt&&!g.st.final)g.st.nextAt=Date.now();
+    if(x.feed&&!g.st.nextAt&&!g.st.final&&!g.off)g.st.nextAt=Date.now();
   });
   renderNewcomers();render();
 }
@@ -713,7 +720,7 @@ function tags(g,st){
   // Each tag: [class, symbol, words]. Red marks a live game, green a winner, amber an upset, gray a game with nothing left to decide.
   const out=g.label?[['quiet','',g.label.toLowerCase()]]:[];
   const dogWp=g.pregame_wp<0.5?st.wp-g.pregame_wp:(1-st.wp)-(1-g.pregame_wp);
-  if(!g.division&&(st.live||st.final)&&dogWp>0.2)out.push(['upset','\u{1F6A8}',st.final?'upset':'upset alert']);
+  if(modeled(g)&&dogChance(g)<=UPSET_MAX_DOG&&(st.live||st.final)&&dogWp>0.2)out.push(['upset','\u{1F6A8}',st.final?'upset':'upset alert']);
   if(st.live&&Math.min(st.wp,1-st.wp)>0.3)out.push(['close','\u{1F525}','close']);
   if(st.live&&Math.min(st.wp,1-st.wp)<0.02)out.push(['quiet','\u{1F512}','decided']);
   if(!g.division&&Math.max(g.home_tourn,g.away_tourn)<0.005)out.push(['quiet','\u{1F4A4}','no tournament stakes']);
@@ -730,7 +737,8 @@ function line(g,side,i){
 function card(g){
   const st=g.st,I=Math.round(st.interest),starred=stars.has(g.id);
   let state;
-  if(st.final)state=esc(st.status||'Final');
+  if(g.off)state=esc(g.off);
+  else if(st.final)state=esc(st.status||'Final');
   else if(st.live)state='\u{1F534} '+esc(st.status);
   else if(st.snap)state=esc(st.snap.status)+' \u00b7 '+ago(Date.parse(st.snap.at));
   else state=g.tip?fmtTime(g.tip):'Time TBA';
@@ -739,7 +747,7 @@ function card(g){
   if(wc!=='-'){const m=/^(.*) (\S+%)$/.exec(wc);side.push('<span class="wc" title="'+wc+'"><span class="who">'+m[1]+'</span><span class="pct">'+m[2]+'</span></span>');};
   if(!g.division&&lev>0)side.push('<span class="lv" title="Leverage">'+(lev>=15?'⚡ ':'')+'Lev '+lev.toFixed(1)+'</span>');
   const w=tags(g,st);if(w)meta.push(w);
-  if((!g.feed||st.noStats)&&!st.final&&!st.snap)meta.push('<span class="tag quiet">no live stats</span>');
+  if((!g.feed||st.noStats)&&!st.final&&!st.snap&&!g.off)meta.push('<span class="tag quiet">no live stats</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
   return '<article class="gc '+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+
@@ -832,7 +840,7 @@ function showNight(slate){
   render();
 }
 function firstCheck(g,now){
-  if(g.st.final||!g.feed)return null;
+  if(g.st.final||!g.feed||g.off)return null;
   const tip=tipMs(g);
   if(!tip)return now;                               // time TBA: look now, then by interest
   if(now<tip+5*60000)return tip+5*60000;

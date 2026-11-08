@@ -32,6 +32,12 @@ Each run does three things:
    a Presto box score page gets a snapshot of its score and period while it is
    on; the page shows it with the time it was read. The page shows the night's top 15 game scores
    from each list.
+
+4. `python fetch_data.py --presto`, on the Mac before each dispatched run: Presto's
+   CloudFront answers 405 to every GitHub runner, so the Mac reads every Presto
+   school's schedule page and the Presto box score page of every game still
+   without one, and writes data/presto_cache.json. The runner falls back to that
+   copy when a Presto page refuses it.
 """
 import csv
 import html
@@ -57,6 +63,9 @@ DATA = BASE / "data"
 SLATES = DATA / "slates"
 OUT = DATA / "data.json"
 EXTRA = DATA / "extra_games.json"
+# The Mac's copy of what Presto sites refuse the runner; tools/dispatch_finals.sh runs `fetch_data.py --presto` to write it.
+PRESTO_CACHE = DATA / "presto_cache.json"
+PRESTO_CACHE_LIVE = timedelta(hours=2)  # a cached in-progress box score older than this is no snapshot
 MEMBERS = DATA / "ncaa_members.csv"
 SITE = json.loads((BASE / "site.json").read_text())
 # The bare domain: ESPN answers 403 to this user agent when it names www.tonightind3wbb.com.
@@ -309,7 +318,8 @@ def sidearm_rows(url, tz):
         date_m = re.search(r'sidearm-schedule-game-opponent-date[^>]*>(.*?)</div>', b, re.S)
         spans = [text(s) for s in re.findall(r"<span[^>]*>(.*?)</span>", date_m.group(1), re.S)] if date_m else []
         opp_m = re.search(r'sidearm-schedule-game-opponent-name[^>]*>(.*?)</div>', b, re.S)
-        result_m = re.search(r'sidearm-schedule-game-result[^>]*>(.*?)</div>', b, re.S)
+        # The class must end there: a postponed game also carries "sidearm-schedule-game-result-final">Final (Hendrix, 2026-11-07).
+        result_m = re.search(r'sidearm-schedule-game-result[\s"][^>]*>(.*?)</div>', b, re.S)
         note_m = re.search(r'sidearm-schedule-game-tournament[^>]*>(.*?)</div>', b, re.S)
         # "Exhibition" and "Scrimmage" sometimes sit in the promotion line instead.
         promo_m = re.search(r'sidearm-schedule-game-promotion-name[^>]*>(.*?)</span>', b, re.S)
@@ -431,12 +441,113 @@ def season_url(url):
     return re.sub(r"/\d{4}-\d{2}(?=/|$)", f"/{label}", url)
 
 
-def schedule_rows(school):
+def schedule_rows(school, fallback=True):
     if not school or not school.get("schedule"):
         return []
-    reader, url = (presto_rows, season_url(school["schedule"])) if school["type"] == "Presto" else (sidearm_rows, school["schedule"])
-    # Some sites now and then serve a page with no games and a 200; one more read fixes it.
-    return reader(url, school["tz"]) or reader(url, school["tz"])
+    presto = school["type"] == "Presto"
+    reader, url = (presto_rows, season_url(school["schedule"])) if presto else (sidearm_rows, school["schedule"])
+    try:
+        # Some sites now and then serve a page with no games and a 200; one more read fixes it.
+        rows = reader(url, school["tz"]) or reader(url, school["tz"])
+    except FETCH_ERRORS:
+        # Presto's CloudFront answers 405 to every GitHub runner (schedule and box score pages alike, 2026-11-07),
+        # and answers the Mac, so the Mac's copy stands in.
+        rows = cached_rows(school["team"]) if presto and fallback else None
+        if rows is None:
+            raise
+    return rows or (cached_rows(school["team"]) if presto and fallback else None) or []
+
+
+# ---------------------------------------------------------------- the Mac's Presto cache
+
+_presto_cache = None
+
+
+def presto_cache():
+    global _presto_cache
+    if _presto_cache is None:
+        _presto_cache = read_json(PRESTO_CACHE, {}) or {}
+    return _presto_cache
+
+
+def row_to_json(r):
+    return {**r, "day": r["day"].isoformat()}
+
+
+def row_from_json(d):
+    return {**d, "day": date.fromisoformat(d["day"]), "time": tuple(d["time"]) if d["time"] else None}
+
+
+def cached_rows(team):
+    rows = presto_cache().get("pages", {}).get(team)
+    return [row_from_json(r) for r in rows] if rows else None
+
+
+def cached_box(url):
+    """A box score page the Mac read: a final at any age, a score in progress only while it is fresh."""
+    entry = presto_cache().get("boxes", {}).get(url)
+    if not entry:
+        return None
+    if not entry["box"]["complete"] and now() - datetime.fromisoformat(entry["at"]) > PRESTO_CACHE_LIVE:
+        return None
+    return entry["box"]
+
+
+def presto_snapshot(previous=None):
+    """The Mac's run (`fetch_data.py --presto`): read every Presto school's schedule page and the Presto box score
+    page of every game in the finals window still without one, and write data/presto_cache.json for the runner,
+    which Presto's CloudFront refuses. A page that fails this run keeps its last copy."""
+    out = {"fetched_at": now().isoformat(timespec="seconds"), "errors": []}
+    schools = load_schools()
+    extra = read_json(EXTRA, {"schools": {}})
+    for name, school in extra.get("schools", {}).items():
+        schools.setdefault(name, {"team": name, "extra": True, **school})
+    old = presto_cache()
+    presto = [s for s in schools.values() if s["type"] == "Presto"]
+
+    def load(school):
+        try:
+            return school["team"], [row_to_json(r) for r in schedule_rows(school, fallback=False)], None
+        except FETCH_ERRORS as exc:
+            return school["team"], old.get("pages", {}).get(school["team"]), f'{school["team"]} schedule: {exc}'
+
+    pages = {}
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        for team, rows, err in pool.map(load, presto):
+            if rows:
+                pages[team] = rows
+            if err:
+                out["errors"].append(err)
+
+    today = date.fromisoformat(TODAY) if TODAY else datetime.now(EASTERN).date()
+    urls = set()
+    for d in (today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)):
+        for g in (read_json(SLATES / f"{d.isoformat()}.json") or {}).get("games", []):
+            if g.get("box_read") or g.get("off"):
+                continue
+            rows = {t: [row_from_json(r) for r in pages.get(t, [])] for t in (g["home"], g["away"])}
+            link, _ = box_link(g, rows)
+            urls.update(u for u in (link, g.get("boxscore"), g.get("link")) if presto_box_date(u))
+
+    def read(url):
+        try:
+            page = get(url)
+            return url, None if page.lstrip().startswith("<?xml") else presto_box(page), None
+        except FETCH_ERRORS as exc:
+            return url, None, f"{url}: {exc}"
+
+    boxes = {}
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        for url, box, err in pool.map(read, sorted(urls)):
+            if box:
+                boxes[url] = {"at": out["fetched_at"], "box": box}
+            elif url in old.get("boxes", {}):
+                boxes[url] = old["boxes"][url]
+            if err:
+                out["errors"].append(err)
+    PRESTO_CACHE.write_text(json.dumps({"fetched_at": out["fetched_at"], "pages": pages, "boxes": boxes}, separators=(",", ":")))
+    out["pages"], out["boxes"] = len(pages), len(boxes)
+    return out
 
 
 def find_row(rows, day, opponent, exhibition=False):
@@ -507,34 +618,60 @@ def page_games(day, schools, pages, known, ranks, members):
     gameLeverages.json pick it up a day late. The opponent resolves by its link's site, then by a name that fits
     one D3 school and no Division I or II member (Pacific). Win chance and leverage stay at 0.5 and 0 until the
     next NPI update lists the game; the slate's previous entry keeps nothing, because the ids match."""
-    sites, keys, upper = team_sites(schools), d3_keys(schools), upper_sites(members)
+    resolve = opponent_resolver(schools, members)
     pairs = {frozenset((g["home"], g["away"])) for g in known}
     games = []
     for team, rows in sorted(pages.items()):
         if schools.get(team, {}).get("extra"):
             continue
         for r in rows:
-            # A placeholder row ("WashU Tournament" linking the host's site) and a host's listing of another
-            # game ("Benedictine (Ill.) vs. Central College") name no opponent of this team.
-            if r["day"] != day or r["exhibition"] or PLACEHOLDER.search(r["opponent"] or ""):
+            if r["day"] != day or r["exhibition"]:
                 continue
-            site = site_of(r.get("opponent_url"))
-            opp = sites.get(site)
-            # A neutral row's link often points at the tournament host, not the opponent (Aurora's "Westminster
-            # University" linked principiaathletics.com, 2026-11-07), so the link counts only when the name fits.
-            if opp and r["neutral"] and not (name_key(r["opponent"]) & name_key(opp)):
-                opp = None
-            if not opp and site not in upper:
-                hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) if k in keys}
-                above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]
-                opp = hits.pop() if len(hits) == 1 and not above else None
+            opp = resolve(r)
             if not opp or opp == team or frozenset((team, opp)) in pairs:
                 continue
             pairs.add(frozenset((team, opp)))
             home, away = (team, opp) if r["home"] else (opp, team)
             games.append({"date": day.isoformat(), "home": home, "away": away, "neutral": r["neutral"], "label": None,
-                          "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0})
+                          "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0,
+                          "modeled": False})
     return games
+
+
+def opponent_resolver(schools, members):
+    """A function from a schedule row to the D3 school its opponent names, or None: by the link's site, then by a
+    name that fits one D3 school and no Division I or II member. A placeholder row ("WashU Tournament" linking the
+    host's site) and a host's listing of another game ("Benedictine (Ill.) vs. Central College") name no opponent."""
+    sites, keys, upper = team_sites(schools), d3_keys(schools), upper_sites(members)
+
+    def resolve(r):
+        if PLACEHOLDER.search(r["opponent"] or ""):
+            return None
+        site = site_of(r.get("opponent_url"))
+        opp = sites.get(site)
+        # A neutral row's link often points at the tournament host, not the opponent (Aurora's "Westminster
+        # University" linked principiaathletics.com, 2026-11-07), so the link counts only when the name fits.
+        if opp and r["neutral"] and not (name_key(r["opponent"]) & name_key(opp)):
+            opp = None
+        if not opp and site not in upper:
+            hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) if k in keys}
+            above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]
+            opp = hits.pop() if len(hits) == 1 and not above else None
+        return opp
+    return resolve
+
+
+def contradicted(g, day, pages, resolve):
+    """True when each team's schedule page lists other D3 opponents on `day`, none of them the partner, and one of
+    those opponents' pages names the team back. The Stat Lab's list carries a tournament's projected second-day
+    pairings: Salisbury at Marywood, 2026-11-07, when the pages said Salisbury vs Widener and Marywood vs Centenary."""
+    def named(team):
+        return {resolve(r) for r in pages.get(team, []) if r["day"] == day and not r["exhibition"]} - {None}
+    for team, partner in ((g["home"], g["away"]), (g["away"], g["home"])):
+        others = named(team)
+        if not others or partner in others or not any(team in named(o) for o in others):
+            return False
+    return True
 
 
 def other_games(day, schools, pages, members, ranks, covered):
@@ -557,7 +694,8 @@ def other_games(day, schools, pages, members, ranks, covered):
                 home, away = opp, team
             games.append({"date": day.isoformat(), "home": home, "away": away, "neutral": r["neutral"],
                           "label": "Exhibition" if r["exhibition"] else None, "division": division, "d3": team,
-                          "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0})
+                          "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0,
+                          "modeled": False})
             if member["site"] and opp not in schools:
                 # The host's own schedule page fills a tipoff or live stats link the D3 page leaves out, and its
                 # Sidearm feed is a fallback. Its times print without a zone; the D3 team's zone is the best guess.
@@ -1184,10 +1322,16 @@ def read_presto_page(game, url):
     """A Presto box score page for this game, final or in progress, or None when it shows another day or game."""
     if presto_box_date(url) != date.fromisoformat(game["date"]):
         return None
-    page = get(url)
-    if page.lstrip().startswith("<?xml"):
-        return None
-    box = presto_box(page)
+    try:
+        page = get(url)
+    except FETCH_ERRORS:
+        box = cached_box(url)  # Presto refuses the runner; the Mac's copy stands in
+        if box is None:
+            raise
+    else:
+        if page.lstrip().startswith("<?xml"):
+            return None
+        box = presto_box(page)
     return box if box and feed_is_game(game, box["sides"], box["lines"]) else None
 
 
@@ -1266,6 +1410,15 @@ def read_box_page(game, url):
 
 
 
+OFF = re.compile(r"\b(postponed|ppd|cancel+ed)\b", re.I)
+
+
+def off_status(r):
+    """'Postponed' or 'Canceled' when a schedule row's result column says so (Hendrix vs Rhodes, 2026-11-07), else None."""
+    m = OFF.search((r or {}).get("result") or "")
+    return None if not m else "Canceled" if m.group(1).lower().startswith("c") else "Postponed"
+
+
 def result_score(r, page_is_home):
     """'W 70-62' or 'L, 106-26' on a schedule page -> (home, away). Pages put the winner's score first, or
     sometimes their own, so the W or L decides which score is the page team's."""
@@ -1328,8 +1481,9 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
         link = (links or {}).get(gid) or link or away_link
         video = (home_row or {}).get("links", {}).get("video") or (away_row or {}).get("links", {}).get("video")
         old = prev.get(gid, {})
+        off = off_status(home_row) or off_status(away_row)
         final = list(g["final"]) if g.get("final") else None
-        if not final:
+        if not final and not off:
             score = result_score(home_row, True) or result_score(away_row, False)
             final = list(score) if score else old.get("final")
         entry = {
@@ -1338,6 +1492,8 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "home_rank": g.get("home_rank"), "away_rank": g.get("away_rank"), "label": g.get("label"),
             "division": g.get("division"), "d3": g.get("d3"),
             "pregame_wp": g.get("pregame_wp", 0.5), "pregame_margin": g.get("pregame_margin", 0.0),
+            # False for a game no model priced (one the schedule pages added): the page then calls no result an upset.
+            "modeled": g.get("modeled", True) and g.get("pregame_margin") is not None, "off": off,
             "home_lev": g.get("home_lev") or 0, "away_lev": g.get("away_lev") or 0,
             "home_tourn": round(tourn.get(g["home"], 0.0), 4), "away_tourn": round(tourn.get(g["away"], 0.0), 4),
             "feed": feed or old.get("feed"), "link": link or old.get("link"),
@@ -1350,7 +1506,7 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "home_names": names.get(g["home"], [g["home"]]), "away_names": names.get(g["away"], [g["away"]]),
             "home_roster": rosters.get(g["home"], []), "away_roster": rosters.get(g["away"], []),
         }
-        if entry["final"] and not final_can_exist(entry):
+        if off or (entry["final"] and not final_can_exist(entry)):
             drop_final(entry)
         out.append(entry)
     return {"date": day.isoformat(), "built": now().isoformat(timespec="seconds"), "games": out}
@@ -1359,16 +1515,18 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
 class SchedulePages(dict):
     """Schedule rows by team, read on first use: the finals-only run reads just the pages its games need."""
 
-    def __init__(self, schools):
+    def __init__(self, schools, errors=None):
         super().__init__()
         self.schools = schools
+        self.errors = errors if errors is not None else []
 
     def get(self, team, default=None):
         if team not in self:
             try:
                 self[team] = schedule_rows(self.schools.get(team))
-            except FETCH_ERRORS:
+            except FETCH_ERRORS as exc:
                 self[team] = []
+                self.errors.append(f"{team} schedule: {exc}")
         return self[team] or default
 
 
@@ -1420,9 +1578,9 @@ def record_finals(out, today, pages, links=None):
         if not slate:
             continue
         for g in slate["games"]:
-            if g.get("final") and not final_can_exist(g, today):
+            if g.get("final") and (g.get("off") or not final_can_exist(g, today)):
                 drop_final(g)
-        due = [g for g in slate["games"] if not g.get("box_read")
+        due = [g for g in slate["games"] if not g.get("box_read") and not g.get("off")
                and not (g.get("tip") and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) > now() - timedelta(minutes=10))]
         with ThreadPoolExecutor(max_workers=12) as pool:
             for g, result, posted, link, snap, errors in pool.map(final, due):
@@ -1449,7 +1607,7 @@ def finals_only(previous):
     for name, school in extra.get("schools", {}).items():
         schools.setdefault(name, {"team": name, "extra": True, **school})
     today = date.fromisoformat(TODAY) if TODAY else datetime.now(EASTERN).date()
-    record_finals(out, today, SchedulePages(schools), extra.get("links"))
+    record_finals(out, today, SchedulePages(schools, out["errors"]), extra.get("links"))
     return out
 
 
@@ -1525,9 +1683,16 @@ def collect(previous):
             out["errors"].append(f"{source} {d.isoformat()}: {exc!r}")
             return []
 
+    resolve = opponent_resolver(schools, members)
+    out["notes"] = []
     for d in window:
         hub = listing("Sidearm hub", hub_games, d)
-        known = by_day.get(d.isoformat(), [])
+        known = []
+        for g in by_day.get(d.isoformat(), []):
+            if contradicted(g, d, pages, resolve):
+                out["notes"].append(f'{g["away"]} at {g["home"]} {d.isoformat()}: both schedule pages list other opponents, left out')
+            else:
+                known.append(g)
         added = page_games(d, schools, pages, known, ranks, members)
         if added:
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(added)
@@ -1542,10 +1707,16 @@ def collect(previous):
 
 def main():
     DATA.mkdir(exist_ok=True)
-    previous = read_json(OUT, {})
-    out = finals_only(previous) if "--finals" in sys.argv[1:] else collect(previous)
-    OUT.write_text(json.dumps(out, indent=1))
-    print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {OUT.relative_to(BASE)}")
+    if "--presto" in sys.argv[1:]:
+        out = presto_snapshot()
+        print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {PRESTO_CACHE.relative_to(BASE)}: {out['pages']} schedule pages, {out['boxes']} box scores")
+    else:
+        previous = read_json(OUT, {})
+        out = finals_only(previous) if "--finals" in sys.argv[1:] else collect(previous)
+        OUT.write_text(json.dumps(out, indent=1))
+        print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {OUT.relative_to(BASE)}")
+    for note in out.get("notes") or []:
+        print(f"  note: {note}")
     if out["errors"]:
         print(f"{len(out['errors'])} errors:", *out["errors"][:40], sep="\n  ", file=sys.stderr)
         return 1

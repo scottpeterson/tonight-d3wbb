@@ -8,6 +8,8 @@ on:
     # box score snapshots only (fetch_data.py --finals reads just the schedule pages those games need).
     - cron: "*/20 23 * 11,12,1,2,3 *"
     - cron: "*/20 0-5 * 11,12,1,2,3 *"
+    # Weekend afternoons, November to March: tournaments tip off from noon Eastern (2026-11-07).
+    - cron: "*/20 17-22 * 11,12,1,2,3 0,6"
     # GitHub starts scheduled runs late on busy nights (3 h 44 min on 2026-11-06), so the Mac also starts the
     # game-night runs by dispatch: tools/dispatch_finals.sh, run by launchd every 20 minutes.
   workflow_dispatch:
