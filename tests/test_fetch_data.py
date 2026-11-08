@@ -962,3 +962,43 @@ def test_presto_snapshot_writes_rows_and_boxes_for_unread_games(monkeypatch, tmp
     assert out["errors"] == [] and set(cache["pages"]) == {"Lasell"} and list(cache["boxes"]) == [PRESTO_URL]
     assert cache["boxes"][PRESTO_URL]["box"]["complete"] is True
     assert f.row_from_json(cache["pages"]["Lasell"][0])["day"].year in (2025, 2026)
+
+
+def test_page_games_skip_a_scrimmage_the_other_page_labels():
+    # Merchant Marine at Lehman, 2026-11-07: Lehman's row said nothing, Merchant Marine's said "Lehman (Scrimmage)".
+    day = date(2026, 11, 7)
+    pages = {
+        "Lehman": [f.row(day, None, True, False, "United States Merchant Marine Academy", {}, "", "", "http://www.usmmasports.com/")],
+        "Merchant Marine": [f.row(day, (11, 0, "America/New_York"), False, False, "Lehman (Scrimmage)", {}, "Final", "", "http://www.lehmanathletics.com/")],
+    }
+    schools = {"Lehman": {"team": "Lehman", "type": "Sidearm", "schedule": "https://lehmanathletics.com/sports/womens-basketball/schedule", "tz": "America/New_York"},
+               "Merchant Marine": {"team": "Merchant Marine", "type": "Sidearm", "schedule": "https://usmmasports.com/sports/womens-basketball/schedule", "tz": "America/New_York"}}
+    assert f.page_games(day, schools, pages, [], {}, MEMBERS) == []
+    # Without the label, the same pair joins once.
+    pages["Merchant Marine"][0]["exhibition"] = False
+    assert [(g["home"], g["away"]) for g in f.page_games(day, schools, pages, [], {}, MEMBERS)] == [("Lehman", "Merchant Marine")]
+
+
+def test_a_game_the_pages_date_differently_moves_or_goes():
+    # The Stat Lab listed La Verne vs Pacific on 2026-11-07 and 11-08; La Verne's page said Sunday the 8th.
+    nov7, nov8 = date(2026, 11, 7), date(2026, 11, 8)
+    pages = {"La Verne": [f.row(nov8, (11, 0, "America/Los_Angeles"), True, False, "Pacific University", {}, "", "", "http://www.goboxers.com/")],
+             "Pacific": []}
+    schools = {"La Verne": {"team": "La Verne", "type": "Sidearm", "schedule": "https://leopardathletics.com/x", "tz": "America/Los_Angeles"},
+               "Pacific": {"team": "Pacific", "type": "Sidearm", "schedule": "https://goboxers.com/x", "tz": "America/Los_Angeles"}}
+    resolve = f.opponent_resolver(schools, MEMBERS)
+    game = {"date": "2026-11-07", "home": "La Verne", "away": "Pacific", "neutral": False}
+    assert f.rescheduled(game, nov7, pages, resolve) == nov8
+    # With the pair on the 8th in the list too, the 7th copy goes; alone, it moves to the 8th.
+    notes = []
+    twice = f.place_games([game, {**game, "date": "2026-11-08"}], [nov7, nov8], pages, resolve, notes)
+    assert ([g["date"] for g in twice[nov7]], [g["date"] for g in twice[nov8]]) == ([], ["2026-11-08"]) and "left out" in notes[0]
+    once = f.place_games([game], [nov7, nov8], pages, resolve, [])
+    assert ([g["date"] for g in once[nov7]], [g["date"] for g in once[nov8]]) == ([], ["2026-11-08"])
+    # A page that lists the partner on the day, or says nothing, leaves the game where the list has it.
+    pages["La Verne"].append(f.row(nov7, None, True, False, "Pacific University", {}, "", "", "http://www.goboxers.com/"))
+    assert f.rescheduled(game, nov7, pages, resolve) is None
+    assert f.rescheduled(game, nov7, {"La Verne": [], "Pacific": []}, resolve) is None
+    # A row more than three days off is another game.
+    far = {"La Verne": [f.row(date(2026, 11, 20), None, True, False, "Pacific University", {}, "", "", "http://www.goboxers.com/")]}
+    assert f.rescheduled(game, nov7, far, resolve) is None

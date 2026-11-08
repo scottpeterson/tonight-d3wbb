@@ -616,7 +616,8 @@ def page_games(day, schools, pages, known, ranks, members):
     """Games on `day` between two D3 teams that a schedule page lists and `known` (the Stat Lab's list) lacks.
     A tournament's second-day game shows as TBA on the pages until the first day ends, so games.txt and
     gameLeverages.json pick it up a day late. The opponent resolves by its link's site, then by a name that fits
-    one D3 school and no Division I or II member (Pacific). Win chance and leverage stay at 0.5 and 0 until the
+    one D3 school and no Division I or II member (Pacific). A game either page calls an exhibition or scrimmage
+    stays out. Win chance and leverage stay at 0.5 and 0 until the
     next NPI update lists the game; the slate's previous entry keeps nothing, because the ids match."""
     resolve = opponent_resolver(schools, members)
     pairs = {frozenset((g["home"], g["away"])) for g in known}
@@ -629,6 +630,10 @@ def page_games(day, schools, pages, known, ranks, members):
                 continue
             opp = resolve(r)
             if not opp or opp == team or frozenset((team, opp)) in pairs:
+                continue
+            # The other page can call it a scrimmage when this one does not (Lehman listed Merchant Marine plain,
+            # Merchant Marine listed "Lehman (Scrimmage)", 2026-11-07).
+            if any(o["exhibition"] for o in pages.get(opp, []) if o["day"] == day and resolve(o) == team):
                 continue
             pairs.add(frozenset((team, opp)))
             home, away = (team, opp) if r["home"] else (opp, team)
@@ -659,6 +664,48 @@ def opponent_resolver(schools, members):
             opp = hits.pop() if len(hits) == 1 and not above else None
         return opp
     return resolve
+
+
+RESCHEDULE_DAYS = 3
+
+
+def rescheduled(g, day, pages, resolve):
+    """The day the schedule pages put a Stat Lab game on, when neither page lists the partner on `day` and the
+    pages agree on one day within RESCHEDULE_DAYS. The Stat Lab listed La Verne vs Pacific on 2026-11-07 and
+    2026-11-08; La Verne's page said Sunday the 8th only. None when the pages list it on `day` or say nothing."""
+    found = set()
+    for team, partner in ((g["home"], g["away"]), (g["away"], g["home"])):
+        rows = [r for r in pages.get(team, []) if not r["exhibition"] and resolve(r) == partner]
+        if any(r["day"] == day for r in rows):
+            return None
+        found |= {r["day"] for r in rows if 0 < abs((r["day"] - day).days) <= RESCHEDULE_DAYS}
+    return found.pop() if len(found) == 1 else None
+
+
+def place_games(games, days, pages, resolve, notes):
+    """The Stat Lab's games for `days`, by day, after the schedule pages have their say: a projected pairing both
+    pages contradict is left out, and a game the pages date differently moves to their day (or goes, when the
+    list already has the pair there)."""
+    by_day = {d: [] for d in days}
+    listed = {(g["date"], frozenset((g["home"], g["away"]))) for g in games}
+    for g in games:
+        d = date.fromisoformat(g["date"])
+        if d not in by_day:
+            continue
+        if contradicted(g, d, pages, resolve):
+            notes.append(f'{g["away"]} at {g["home"]} {d.isoformat()}: both schedule pages list other opponents, left out')
+            continue
+        moved = rescheduled(g, d, pages, resolve)
+        if moved and (moved.isoformat(), frozenset((g["home"], g["away"]))) in listed:
+            notes.append(f'{g["away"]} at {g["home"]} {d.isoformat()}: the pages list it on {moved.isoformat()}, where the list has it too, left out')
+            continue
+        if moved:
+            notes.append(f'{g["away"]} at {g["home"]} {d.isoformat()}: the pages list it on {moved.isoformat()}, moved')
+            g = {**g, "date": moved.isoformat()}
+            if moved not in by_day:
+                continue
+        by_day[date.fromisoformat(g["date"])].append(g)
+    return by_day
 
 
 def contradicted(g, day, pages, resolve):
@@ -1685,14 +1732,10 @@ def collect(previous):
 
     resolve = opponent_resolver(schools, members)
     out["notes"] = []
+    placed = place_games(games, window, pages, resolve, out["notes"])
     for d in window:
         hub = listing("Sidearm hub", hub_games, d)
-        known = []
-        for g in by_day.get(d.isoformat(), []):
-            if contradicted(g, d, pages, resolve):
-                out["notes"].append(f'{g["away"]} at {g["home"]} {d.isoformat()}: both schedule pages list other opponents, left out')
-            else:
-                known.append(g)
+        known = placed[d]
         added = page_games(d, schools, pages, known, ranks, members)
         if added:
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(added)
