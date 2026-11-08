@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS"]
 
@@ -453,3 +453,14 @@ def test_a_game_between_two_low_ranked_teams_scores_below_a_decided_game_between
     # A close game and an upset still count between good teams: #150 upsetting #20 late scores far above both.
     upset = {"home_rank": 150, "away_rank": 20, "home_lev": 1, "away_lev": 8, "home_tourn": 0.05, "away_tourn": 0.9, "pregame_wp": 0.2, "pregame_margin": -10, "modeled": True}
     assert live(upset, 60, 52, 0.875) > 25
+
+
+def test_a_statbroadcast_link_is_labeled_from_the_start_and_an_unseen_feed_after_give_up_says_no_live_stats():
+    sb = json.dumps(dict(GAME, link="https://stats.statbroadcast.com/broadcast/?id=688484"))
+    assert run(f"statsLabel({sb},{{}})") == "stats on StatBroadcast"
+    assert run(f"statsLabel({sb},{{seen:true,live:true}})") is None
+    sidearm = json.dumps(dict(GAME, link="https://hollinssports.com/sidearmstats/wbball/summary"))
+    assert run(f"statsLabel({sidearm},{{}})") is None
+    assert run(f"statsLabel({sidearm},{{noStats:true}})") == "no live stats"
+    assert run(f"statsLabel({json.dumps(dict(GAME, feed=None))},{{}})") == "no live stats"
+    assert run(f"statsLabel({json.dumps(dict(GAME, feed=None))},{{snap:{{home:1,away:0}}}})") is None
