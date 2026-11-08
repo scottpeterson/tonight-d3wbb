@@ -12,8 +12,8 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel"]
-CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive"]
+CONSTS = ["KEY", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -464,3 +464,21 @@ def test_a_statbroadcast_link_is_labeled_from_the_start_and_an_unseen_feed_after
     assert run(f"statsLabel({sidearm},{{noStats:true}})") == "no live stats"
     assert run(f"statsLabel({json.dumps(dict(GAME, feed=None))},{{}})") == "no live stats"
     assert run(f"statsLabel({json.dumps(dict(GAME, feed=None))},{{snap:{{home:1,away:0}}}})") is None
+
+
+def test_a_reload_keeps_the_last_live_score_and_a_moved_on_feed_then_means_final_pending():
+    # The browser's own last read is newer than the slate's snapshot, so it wins; the game stays in the Live group.
+    now = "new Date().toISOString()"
+    older = "new Date(Date.now()-30*60000).toISOString()"
+    game = dict(GAME, id="2026-11-08-cms-hsu", snapshot={"home": 20, "away": 18, "status": "05:00 Q2", "at": "OLDER"}, tip="2026-11-08T21:00:00Z")
+    stub = ("globalThis.localStorage={_d:{},getItem(k){return this._d[k]||null},setItem(k,v){this._d[k]=v}};"
+            f"const g={json.dumps(game)};g.snapshot.at={older};"
+            f"rememberLive(g.id,{{home:45,away:59,status:'02:00 Q4',at:{now}}});"
+            "const st=initState(g);"
+            "return [st.score,st.snap.status,groupOf(st),feedMovedOn(g,Object.assign({other:true},st),Date.now())]")
+    assert run(f"(()=>{{{stub}}})()") == [[45, 59], "02:00 Q4", 0, True]
+    # Nothing remembered: the slate's snapshot stands, and a stale one no longer says the feed moved on.
+    stale = dict(game, snapshot={"home": 20, "away": 18, "status": "05:00 Q2", "at": "2026-11-08T10:00:00Z"})
+    assert run(f"(()=>{{globalThis.localStorage={{getItem(){{return null}},setItem(){{}}}};const g={json.dumps(stale)};const st=initState(g);"
+               f"return [st.score,feedMovedOn(g,Object.assign({{other:true}},st),Date.parse('2026-11-08T21:30:00Z'))]}})()") == [[20, 18], False]
+    assert run("newerSnap(null,null)") is None
