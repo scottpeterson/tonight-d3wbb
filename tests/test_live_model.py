@@ -13,7 +13,8 @@ FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "fina
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
          "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "modeled", "dogChance"]
-CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG"]
+CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
+          "QUALITY_GATE"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -371,3 +372,16 @@ def test_a_postponed_game_is_never_checked_and_has_no_interest():
     assert run(f"nextCheck({g},{{interest:50,wp:0.6}},Date.parse('2026-11-14T20:00:00Z'))") is None
     assert run(f"initState({g}).interest") == 0
     assert run(f"interest({json.dumps(GAME)},{{progress:0,wp:0.6}})") > 0
+
+
+def test_a_close_upset_between_mid_table_teams_scores_below_a_close_game_between_good_ones():
+    # 2026-11-07: Albright (#208) over Rutgers-Camden (#86) by one scored 53, level with Immaculata at #4 Smith.
+    albright = dict(GAME, home="Albright", away="Rutgers-Camden", home_rank=208, away_rank=86, home_lev=5, away_lev=5,
+                    home_tourn=0.02, away_tourn=0.1, pregame_wp=0.25, pregame_margin=-7.5)
+    wj = dict(GAME, home="Washington & Jefferson", away="Case Western", home_rank=44, away_rank=40, home_lev=9, away_lev=8.4,
+              home_tourn=0.5, away_tourn=0.4, pregame_wp=0.55, pregame_margin=1.5)
+    assert 30 < final_score(albright, [58, 57]) < 42
+    assert final_score(albright, [58, 57]) < final_score(wj, [65, 59])
+    # The gate leaves a top game nearly where it was.
+    smith = dict(GAME, home_rank=4, away_rank=57, home_tourn=0.9, away_tourn=0.1, home_lev=3, away_lev=0.4, pregame_wp=0.9, pregame_margin=14)
+    assert final_score(smith, [56, 53]) > 50
