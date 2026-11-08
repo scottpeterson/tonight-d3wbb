@@ -1,0 +1,20 @@
+name: Probe URLs
+
+# A diagnostic: fetch URLs from a GitHub runner with the site's user agent and a browser's, and print each
+# status code. Some hosts answer the Mac and refuse the runner (Presto box score pages, 405, 2026-11-07).
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "URLs to fetch, separated by spaces"
+        required: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python tools/probe.py ${{ github.event.inputs.urls }}
