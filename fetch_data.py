@@ -550,6 +550,8 @@ def presto_snapshot(previous=None):
         if rows:
             pages[team] = [row_to_json(r) for r in rows]
 
+    followups = []
+
     def read(url):
         try:
             page = get(url)
@@ -558,6 +560,19 @@ def presto_snapshot(previous=None):
             out["errors"].append(f"{url}: {exc}")
             return
         if box:
+            boxes[url] = {"at": out["fetched_at"], "box": box}
+        else:
+            live = pt3_source(page, url)
+            if live:
+                followups.append((url, live))
+
+    def read_live(url, live):
+        try:
+            box = pt3_box(get(live, as_json=True))
+        except (*FETCH_ERRORS, TypeError, AttributeError) as exc:
+            out["errors"].append(f"{live}: {exc}")
+            return
+        if box["sides"]:
             boxes[url] = {"at": out["fetched_at"], "box": box}
 
     for team in playing:
@@ -569,6 +584,8 @@ def presto_snapshot(previous=None):
         urls.update(u for u in (link, g.get("boxscore"), g.get("link")) if presto_box_date(u))
     for url in sorted(urls, key=lambda u: (presto_box_date(u) != today, u)):
         paced(read, url)
+    for url, live in followups:
+        paced(read_live, url, live)
     for team in order[len(playing):]:
         paced(load, team)
 
@@ -1421,6 +1438,72 @@ def box_result(game, home_score, away_score, sides, lines):
             "top": sorted(top, key=lambda x: -x["gmsc"])}
 
 
+PT3_HASH = re.compile(r"eventIdHashCode\s*=\s*'([^']+)'")
+PT3_ENTRY = re.compile(r"gamedayServiceEntryPointUrl\s*=\s*'([^']+)'")
+PT3_STATS = {"fgm": "fgm", "fga": "fga", "ftm": "ftm", "fta": "fta", "min": "min", "tp": "pts", "oreb": "oreb", "dreb": "dreb",
+             "treb": "reb", "ast": "ast", "stl": "stl", "blk": "blk", "to": "to", "pf": "pf"}
+
+
+def pt3_source(page, url):
+    """The live update URL a new-template Presto box score page loads its numbers from, or None. The page itself
+    holds empty tables and a `conf` block with the event hash (SUNY Delhi, Curry, Eureka, 2026-11-08); the JSON
+    lives on the school's own site at /action/sports/liveupdate?e=<event>&h=<hash>."""
+    h, e = PT3_HASH.search(page or ""), PT3_ENTRY.search(page or "")
+    return absolute(e.group(1) + "h=" + urllib.parse.quote(h.group(1)), url) if h and e else None
+
+
+def pt3_box(data):
+    """{'status', 'complete', 'sides', 'score', 'lines'} like presto_box(), from PrimeTime3 live JSON (the
+    "Basketball LiveStats In-Arena Tool" export: status, venue rules, and team[].linescore, totals, player)."""
+    if isinstance(data.get("data"), str):
+        data = json.loads(data["data"])
+
+    def one(v):
+        return num(v[0] if isinstance(v, list) else v)
+    status = data.get("status") or {}
+    complete = status.get("complete") == "Y"
+    periods = status.get("period") or []
+    period = one(periods[-1]) if periods else 0
+    regulation = one((data.get("venue") or {}).get("rules", {}).get("prds")) or 4
+    if complete:
+        text = "Final" + (" (OT)" if period > regulation else "")
+    elif period:
+        text = f"{status.get('clock') or ''} " + (f"Q{period}" if period <= regulation else f"OT{period - regulation}" if period > regulation + 1 else "OT")
+    else:
+        text = "Pregame"
+    sides, score, lines = {}, {}, {}
+    for t in data.get("team") or []:
+        side = "H" if t.get("vh") == "H" else "V"
+        sides[side] = {"name": t.get("name")}
+        score[side] = one((t.get("linescore") or {}).get("score") or 0)
+        out = []
+        for p in t.get("player") or []:
+            name = (p.get("name") or "").strip()
+            if not name or name.lower() in PRESTO_SKIP or (p.get("uni") or "").upper() == "TM":
+                continue
+            if "," in name:
+                last, _, first = (x.strip() for x in name.partition(","))
+            else:
+                first, _, last = name.partition(" ")
+            st = p.get("stats") or {}
+            out.append({"first": first, "last": last, "abbr": name, **{key: one(st.get(col)) for col, key in PT3_STATS.items()}})
+        lines[side] = out
+    return {"status": text.strip(), "complete": complete, "sides": sides, "score": score, "lines": lines}
+
+
+def presto_page_box(page, url):
+    """The box from a Presto box score page: parsed from the HTML, or, for the new template, read from the live
+    update JSON the page would load (a second request to the same site). None for the XML or an empty page."""
+    if page.lstrip().startswith("<?xml"):
+        return None
+    box = presto_box(page)
+    if box is None:
+        live = pt3_source(page, url)
+        if live:
+            box = pt3_box(get(live, as_json=True))
+    return box
+
+
 def read_presto_page(game, url):
     """A Presto box score page for this game, final or in progress, or None when it shows another day or game."""
     if presto_box_date(url) != date.fromisoformat(game["date"]):
@@ -1432,9 +1515,7 @@ def read_presto_page(game, url):
         if box is None:
             raise
     else:
-        if page.lstrip().startswith("<?xml"):
-            return None
-        box = presto_box(page)
+        box = presto_page_box(page, url)
     return box if box and feed_is_game(game, box["sides"], box["lines"]) else None
 
 

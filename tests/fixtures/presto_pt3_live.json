@@ -1,0 +1,497 @@
+{
+"source": "Basketball LiveStats In-Arena Tool",
+"toolVersion": "2.9.0",
+"version": "1.1.1",
+"generated": "Nov 8, 2026",
+"venue": {
+"gameid": "6652902",
+"visid": "BMO",
+"visname": "Bryn Mawr",
+"homeid": "DEL",
+"homename": "SUNY Delhi",
+"date": "11/08/2026",
+"location": "Floyd L. Maines Arena",
+"start": "06:00 PM",
+"leaguegame": "N",
+"neutralgame": "N",
+"nitegame": "N",
+"postseason": "N",
+"rules": {
+"prds": "4",
+"minutes": "10",
+"minutesot": "5",
+"fouls": "5",
+"qh": "Q"
+}
+},
+"status": {
+"complete": "N",
+"period": [
+"3"
+],
+"clock": "00:31",
+"running": "T"
+},
+"team": [
+{
+"vh": "V",
+"code": "82",
+"id": "BMO",
+"name": "Bryn Mawr",
+"teamId": "zccziu66i3dikv5x",
+"rpi": "82",
+"linescore": {
+"line": [
+"6,9,13"
+],
+"score": [
+"28"
+],
+"lineprd": [
+{
+"prd": "1",
+"score": [
+"6"
+]
+},
+{
+"prd": "2",
+"score": [
+"9"
+]
+},
+{
+"prd": "3",
+"score": [
+"13"
+]
+}
+]
+},
+"totals": {
+"stats": {
+"fgm": "10",
+"fga": [
+"40"
+],
+"fgm3": "2",
+"fga3": "12",
+"ftm": "6",
+"fta": "13",
+"tp": "28",
+"blk": "9",
+"stl": "5",
+"ast": "5",
+"min": "147",
+"oreb": "12",
+"dreb": "15",
+"treb": "27",
+"pf": "14",
+"tf": "0",
+"to": "16",
+"dq": "0",
+"fgpct": "25",
+"fg3pct": "16.7",
+"ftpct": "46.2"
+}
+},
+"player": [
+{
+"uni": "2",
+"code": "2",
+"name": "Vollor, Jenna",
+"checkname": "VOLLOR,JENNA",
+"class": "SO",
+"gp": "1",
+"gs": "1",
+"pos": "C",
+"oncourt": [
+"Y"
+],
+"playerId": "",
+"stats": {
+"fgm": "3",
+"fga": [
+"6"
+],
+"fgm3": "0",
+"fga3": "1",
+"ftm": "1",
+"fta": "1",
+"tp": "7",
+"blk": "3",
+"stl": "0",
+"ast": "0",
+"min": "24",
+"sec": "+",
+"oreb": "2",
+"dreb": "9",
+"treb": "11",
+"pf": "0",
+"tf": "0",
+"to": "0",
+"dq": "0",
+"fgpct": "50",
+"fg3pct": "0",
+"ftpct": "100"
+}
+},
+{
+"uni": "3",
+"code": "3",
+"name": "Vigdor, Evie",
+"checkname": "VIGDOR,EVIE",
+"class": "SO",
+"gp": "0",
+"gs": "0",
+"pos": "G",
+"oncourt": [
+"N"
+],
+"stats": {
+"fgm": "0",
+"fga": [
+"0"
+],
+"fgm3": "0",
+"fga3": "0",
+"ftm": "0",
+"fta": "0",
+"tp": "0",
+"blk": "0",
+"stl": "0",
+"ast": "0",
+"min": "0",
+"oreb": "0",
+"dreb": "0",
+"treb": "0",
+"pf": "0",
+"tf": "0",
+"to": "0",
+"dq": "0",
+"fgpct": "0",
+"fg3pct": "0",
+"ftpct": "0"
+}
+},
+{
+"uni": "5",
+"code": "5",
+"name": "Jiang, Michelle",
+"checkname": "JIANG,MICHELLE",
+"class": "SR",
+"gp": "1",
+"gs": "1",
+"pos": "G",
+"oncourt": [
+"N"
+],
+"playerId": "",
+"stats": {
+"fgm": "0",
+"fga": [
+"3"
+],
+"fgm3": "0",
+"fga3": "1",
+"ftm": "1",
+"fta": "2",
+"tp": "1",
+"blk": "0",
+"stl": "2",
+"ast": "1",
+"min": "15",
+"sec": "-",
+"oreb": "1",
+"dreb": "1",
+"treb": "2",
+"pf": "4",
+"tf": "0",
+"to": "2",
+"dq": "0",
+"fgpct": "0",
+"fg3pct": "0",
+"ftpct": "50"
+}
+},
+{
+"uni": "6",
+"code": "6",
+"name": "Newman, Danielle",
+"checkname": "NEWMAN,DANIELLE",
+"class": "FR",
+"gp": "0",
+"gs": "0",
+"pos": "G",
+"oncourt": [
+"N"
+],
+"stats": {
+"fgm": "0",
+"fga": [
+"0"
+],
+"fgm3": "0",
+"fga3": "0",
+"ftm": "0",
+"fta": "0",
+"tp": "0",
+"blk": "0",
+"stl": "0",
+"ast": "0",
+"min": "0",
+"oreb": "0",
+"dreb": "0",
+"treb": "0",
+"pf": "0",
+"tf": "0",
+"to": "0",
+"dq": "0",
+"fgpct": "0",
+"fg3pct": "0",
+"ftpct": "0"
+}
+}
+]
+},
+{
+"vh": "H",
+"code": "30225",
+"id": "DEL",
+"name": "SUNY Delhi",
+"teamId": "tbdcfwwjc2x2lixu",
+"rpi": "30225",
+"linescore": {
+"line": [
+"12,8,15"
+],
+"score": [
+"35"
+],
+"lineprd": [
+{
+"prd": "1",
+"score": [
+"12"
+]
+},
+{
+"prd": "2",
+"score": [
+"8"
+]
+},
+{
+"prd": "3",
+"score": [
+"15"
+]
+}
+]
+},
+"totals": {
+"stats": {
+"fgm": "14",
+"fga": [
+"40"
+],
+"fgm3": "1",
+"fga3": "5",
+"ftm": "6",
+"fta": "10",
+"tp": "35",
+"blk": "2",
+"stl": "9",
+"ast": "12",
+"min": "147",
+"oreb": "12",
+"dreb": "22",
+"treb": "34",
+"pf": "18",
+"tf": "0",
+"to": "17",
+"dq": "0",
+"fgpct": "35",
+"fg3pct": "20",
+"ftpct": "60"
+}
+},
+"player": [
+{
+"uni": "0",
+"code": "0",
+"name": "Atira Allen",
+"checkname": "ALLEN,ATIRA",
+"class": "FR",
+"gp": "1",
+"gs": "1",
+"pos": "G",
+"oncourt": [
+"N"
+],
+"playerId": "498k0hkc7qxam9br",
+"stats": {
+"fgm": "0",
+"fga": [
+"3"
+],
+"fgm3": "0",
+"fga3": "0",
+"ftm": "1",
+"fta": "2",
+"tp": "1",
+"blk": "0",
+"stl": "2",
+"ast": "0",
+"min": "12",
+"sec": "-",
+"oreb": "0",
+"dreb": "1",
+"treb": "1",
+"pf": "2",
+"tf": "0",
+"to": "2",
+"dq": "0",
+"fgpct": "0",
+"fg3pct": "0",
+"ftpct": "50"
+}
+},
+{
+"uni": "2",
+"code": "2",
+"name": "Sarah Gaetano",
+"checkname": "GAETANO,SARAH",
+"class": "SO",
+"gp": "1",
+"gs": "1",
+"pos": "G",
+"oncourt": [
+"Y"
+],
+"playerId": "qfb8td2jkwq7m3az",
+"stats": {
+"fgm": "1",
+"fga": [
+"4"
+],
+"fgm3": "1",
+"fga3": "3",
+"ftm": "0",
+"fta": "0",
+"tp": "3",
+"blk": "1",
+"stl": "1",
+"ast": "0",
+"min": "23",
+"sec": "-",
+"oreb": "1",
+"dreb": "3",
+"treb": "4",
+"pf": "3",
+"tf": "0",
+"to": "1",
+"dq": "0",
+"fgpct": "25",
+"fg3pct": "33.3",
+"ftpct": "0"
+}
+},
+{
+"uni": "3",
+"code": "3",
+"name": "Eva Adams",
+"checkname": "ADAMS,EVA",
+"class": "FR",
+"gp": "1",
+"gs": "0",
+"oncourt": [
+"N"
+],
+"playerId": "lwojzlkx3naykzeh",
+"stats": {
+"fgm": "0",
+"fga": [
+"0"
+],
+"fgm3": "0",
+"fga3": "0",
+"ftm": "0",
+"fta": "0",
+"tp": "0",
+"blk": "0",
+"stl": "0",
+"ast": "0",
+"min": "2",
+"sec": "+",
+"oreb": "0",
+"dreb": "0",
+"treb": "0",
+"pf": "1",
+"tf": "0",
+"to": "1",
+"dq": "0",
+"fgpct": "0",
+"fg3pct": "0",
+"ftpct": "0"
+}
+},
+{
+"uni": "4",
+"code": "4",
+"name": "Sereena Palau",
+"checkname": "PALAU,SEREENA",
+"class": "JR",
+"gp": "1",
+"gs": "0",
+"pos": "G",
+"oncourt": [
+"Y"
+],
+"playerId": "etjtr3v5cxk076lq",
+"stats": {
+"fgm": "2",
+"fga": [
+"5"
+],
+"fgm3": "0",
+"fga3": "0",
+"ftm": "0",
+"fta": "0",
+"tp": "4",
+"blk": "0",
+"stl": "1",
+"ast": "5",
+"min": "25",
+"sec": "+",
+"oreb": "1",
+"dreb": "2",
+"treb": "3",
+"pf": "1",
+"tf": "0",
+"to": "1",
+"dq": "0",
+"fgpct": "40",
+"fg3pct": "0",
+"ftpct": "0"
+}
+}
+]
+}
+],
+"primetime": {
+"ncaa_code": "WBB"
+},
+"network": {
+"startTime": "2026-11-08 06:00:00.000000 PM",
+"lastUpdated": "2026-11-08 07:27:37.000000 PM",
+"statusCode": "-1",
+"tba": "N",
+"localTime": "1:00 PM EST",
+"localDate": "Sun, Nov. 8, 2026",
+"location": "",
+"eventId": "ppt8tzpj1kv2o45s",
+"sportCode": "2",
+"sportPath": "wbkb"
+}
+}

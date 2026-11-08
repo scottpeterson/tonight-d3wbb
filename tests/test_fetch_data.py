@@ -1132,3 +1132,63 @@ def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_pa
     monkeypatch.setattr(f, "PRESTO_BUDGET", 2)
     seen.clear()
     assert f.presto_snapshot()["requests"] == 2 and len(seen) == 2
+
+
+PT3_PAGE = """<html><script>var conf = new Object(); conf.eventId = 'ppt8tzpj1kv2o45s';
+conf.eventIdHashCode = '71Litwy1GJxIOms5xBRQPMnD8QKvJYUz'; conf.visitor = 'Bryn Mawr'; conf.home = 'SUNY Delhi';
+conf.gamedayServiceEntryPointUrl = '/action/sports/liveupdate?e=ppt8tzpj1kv2o45s&';</script>
+<div class="linescore"><table><tr><th>Time</th></tr></table></div>
+<table><thead><tr><th>#</th><th>Player</th><th>Min</th></tr></thead><tbody></tbody></table></html>"""
+PT3_URL = "https://delhibroncos.com/sports/wbkb/2026-27/boxscores/20261108_ppt8.xml"
+PT3_LIVE = "https://delhibroncos.com/action/sports/liveupdate?e=ppt8tzpj1kv2o45s&h=71Litwy1GJxIOms5xBRQPMnD8QKvJYUz"
+
+
+def pt3_data():
+    return json.loads((FIX / "presto_pt3_live.json").read_text())
+
+
+def test_new_template_presto_page_names_its_live_json_and_the_json_gives_the_box():
+    # Bryn Mawr at SUNY Delhi, 2026-11-08: the page's tables are empty; the numbers come from the school's own
+    # /action/sports/liveupdate JSON. The old template still parses from the HTML.
+    assert f.presto_box(PT3_PAGE) is None
+    assert f.pt3_source(PT3_PAGE, PT3_URL) == PT3_LIVE
+    assert f.pt3_source(presto_page(), PRESTO_URL) is None
+    box = f.pt3_box(pt3_data())
+    assert (box["status"], box["complete"], box["score"]) == ("00:31 Q3", False, {"V": 28, "H": 35})
+    assert (box["sides"]["V"]["name"], box["sides"]["H"]["name"]) == ("Bryn Mawr", "SUNY Delhi")
+    jenna = box["lines"]["V"][0]
+    assert (jenna["first"], jenna["last"], jenna["pts"], jenna["reb"], jenna["fgm"], jenna["fga"], jenna["min"]) == ("Jenna", "Vollor", 7, 11, 3, 6, 24)
+    assert [p["last"] for p in box["lines"]["H"]][:2] == ["Allen", "Gaetano"] and all(p["last"] != "TEAM" for p in box["lines"]["H"])
+    done = pt3_data()
+    done["status"] = {"complete": "Y", "period": ["5"], "clock": "00:00", "running": "F"}
+    assert (f.pt3_box(done)["status"], f.pt3_box(done)["complete"]) == ("Final (OT)", True)
+
+
+def test_presto_snapshot_reads_the_live_json_as_its_own_paced_request(monkeypatch, tmp_path):
+    seen = []
+
+    def served(url, *a, **k):
+        seen.append(url)
+        if url == PT3_LIVE:
+            return pt3_data()
+        if "/boxscores/" in url:
+            return PT3_PAGE
+        return (FIX / "presto_willamette_2025.html").read_text()
+    monkeypatch.setattr(f, "get", served)
+    monkeypatch.setattr(f.time, "sleep", lambda s: None)
+    delhi = {"team": "SUNY Delhi", "type": "Presto", "schedule": "https://delhibroncos.com/sports/wbkb/2026-27/schedule", "tz": "America/New_York"}
+    monkeypatch.setattr(f, "load_schools", lambda: {"SUNY Delhi": delhi})
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "PRESTO_CACHE", tmp_path / "presto_cache.json")
+    monkeypatch.setattr(f, "EXTRA", tmp_path / "none.json")
+    monkeypatch.setattr(f, "_presto_cache", None)
+    monkeypatch.setattr(f, "TODAY", "2026-11-08")
+    games = [{"id": "a", "date": "2026-11-08", "home": "SUNY Delhi", "away": "Bryn Mawr", "neutral": False, "link": PT3_URL}]
+    (tmp_path / "2026-11-08.json").write_text(json.dumps({"date": "2026-11-08", "games": games}))
+    out = f.presto_snapshot()
+    assert seen[1:] == [PT3_URL, PT3_LIVE] and out["requests"] == 3 and out["errors"] == []
+    cache = json.loads((tmp_path / "presto_cache.json").read_text())
+    assert cache["boxes"][PT3_URL]["box"]["score"] == {"V": 28, "H": 35} and cache["boxes"][PT3_URL]["box"]["complete"] is False
+    # The runner's page reader takes the same path when it can reach the page.
+    game = {"home": "SUNY Delhi", "away": "Bryn Mawr", "date": "2026-11-08", "newcomers_home": [], "newcomers_away": []}
+    assert f.read_presto_page(game, PT3_URL)["score"] == {"V": 28, "H": 35}
