@@ -1,9 +1,9 @@
 {
- "fetched_at": "2026-11-08T17:11:15+00:00",
+ "fetched_at": "2026-11-08T17:32:00+00:00",
  "errors": [
-  "Austin schedule: HTTP Error 403: Forbidden",
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Thomas at Mt. Holyoke box score: HTTP Error 405: Not Allowed",
+  "Regis at Fitchburg St. box score: HTTP Error 405: Not Allowed",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found"
  ],
  "stale": {},
