@@ -306,7 +306,7 @@ def sections():
 HOW = f"""<dl class="terms">
 <dt>This page</dt><dd>{esc(SITE["intro"])}</dd>
 <dt>Reading a card</dt><dd>The left column shows the interest score and its bar. A number before a team is its season efficiency rank among Division III teams, and a filled badge marks the top 25. The rating starts at the preseason projection and moves in equal steps to the team's box-score rating over its first eight games. The line under the teams shows the status, the favorite's win chance, and the leverage (Lev). Before tipoff the win chance comes from the efficiency margin line. During the game the line counts as one game of evidence and the score so far as the part of a game played, so a heavy favorite that leads by one after a quarter sits near 97%, not 99%.<br>Click a star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</dd>
-<dt>Order</dt><dd>Games group as live, not started, and final. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
+<dt>Order</dt><dd>Games group as live, not started, and final. A game whose score comes from a box score page read during the game counts as live for two hours after that read. The Sort buttons set the order inside each group. Interest puts the highest score first, Tipoff the earliest game, Closest the smallest gap in win chance, and Leverage the most at stake.</dd>
 <dt>Which games</dt><dd>Every game between two teams that count for the NCAA Power Index. Exhibitions, games against Division I, II, NAIA, and two-year opponents, and games against second-year provisional members or earlier do not appear. A game appears only when a schedule page lists it. Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win chance and no leverage until the next NPI update.</dd>
 <dt>Interest</dt><dd>A score from 0 to 100.<ul><li>The season efficiency ranks of both teams. The better team counts more. A rank near the top counts far more than one in the middle. The gap between 13th and 39th counts about four times the gap between 213th and 239th.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The season efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>The upset and closeness parts count in full between top teams. Between teams ranked near 400, they count about a third as much. A one-point upset in the middle of the table therefore sits below a six-point game between two top-50 teams. Tournament chances lower a finished game's score by at most half.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the season efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
@@ -646,7 +646,7 @@ function initState(g){
   const fin=slateFinal||(seenFinal&&seenFinal.score);
   if(fin){st.final=true;st.score=fin;const lead=fin[0]-fin[1];st.wp=lead>0?1:lead<0?0:0.5;st.progress=1;}
   // A score the fetcher read from a box score page during the game, for a game the browser cannot follow.
-  else if(g.snapshot){st.snap=g.snapshot;st.score=[g.snapshot.home,g.snapshot.away];}
+  else if(g.snapshot)snapState(g,st,g.snapshot);
   st.interest=interest(g,st);
   return st;
 }
@@ -727,7 +727,7 @@ async function refreshSlate(){
     if(x.final){
       Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[]});
       const st=initState(g);st.nextAt=null;g.st=st;
-    }else if(x.snapshot&&!g.st.live){g.st.snap=x.snapshot;g.st.score=[x.snapshot.home,x.snapshot.away];}
+    }else if(x.snapshot&&!g.st.live){snapState(g,g.st,x.snapshot);g.st.interest=interest(g,g.st);}
     if(x.feed&&!g.st.nextAt&&!g.st.final&&!g.off)g.st.nextAt=Date.now();
   });
   renderNewcomers();render();
@@ -771,7 +771,17 @@ function tags(g,st){
   if(!g.division&&Math.max(g.home_tourn,g.away_tourn)<0.005)out.push(['quiet','\u{1F4A4}','no tournament stakes']);
   return out.map(t=>'<span class="tag '+t[0]+'">'+(t[1]?t[1]+'\u00a0':'')+esc(t[2])+'</span>').join('');
 }
-function groupOf(st){return st.live?0:(st.final||st.ended)?2:1;}
+// A score the fetcher read from a Presto box score page counts as live while it is fresh (SNAP_LIVE_MS): those
+// games sat under Not started with a score on the card (Bryn Mawr at SUNY Delhi, 2026-11-08).
+const SNAP_LIVE_MS=2*3600000;
+function snapLive(st,now){return !!st.snap&&!st.final&&!st.ended&&(now||Date.now())-Date.parse(st.snap.at)<SNAP_LIVE_MS;}
+// Take a snapshot into the state: the score, and the win chance from the clock when the status reads like "04:55 Q4".
+function snapState(g,st,snap){
+  st.snap=snap;st.score=[snap.home,snap.away];
+  const m=/^(\d+:\d+)\s+(?:Q(\d+)|OT(\d*))$/.exec(snap.status||'');
+  if(m){st.progress=progressOf(m[2]?+m[2]:4+(+m[3]||1),clockToSec(m[1]),4);if(modeled(g))st.wp=winProb(g,snap.home-snap.away,st.progress);}
+}
+function groupOf(st){return st.live||snapLive(st)?0:(st.final||st.ended)?2:1;}
 function leverage(g){return Math.abs(g.home_lev)+Math.abs(g.away_lev);}
 function line(g,side,i){
   const st=g.st,other=st.score?st.score[1-i]:0,mine=st.score?st.score[i]:0,won=st.final&&st.score&&mine>other,ahead=st.score&&mine>other;
@@ -786,7 +796,7 @@ function card(g){
   else if(st.final)state=esc(st.status||'Final');
   else if(st.ended)state='Final pending';
   else if(st.live)state='\u{1F534} '+esc(st.status);
-  else if(st.snap)state=esc(st.snap.status)+' \u00b7 '+ago(Date.parse(st.snap.at));
+  else if(st.snap)state=(snapLive(st)?'\u{1F534} ':'')+esc(st.snap.status)+' \u00b7 '+ago(Date.parse(st.snap.at));
   else state=g.tip?fmtTime(g.tip):'Time TBA';
   const teams=line(g,'away',1)+line(g,'home',0);
   const wc=winCell(g,st),lev=leverage(g),side=['<span class="state">'+state+'</span>'],meta=[];
@@ -795,7 +805,7 @@ function card(g){
   const w=tags(g,st);if(w)meta.push(w);
   if((!g.feed||st.noStats)&&!st.final&&!st.ended&&!st.snap&&!g.off)meta.push('<span class="tag quiet">no live stats</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
-  return '<article class="gc '+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
+  return '<article class="gc '+(st.live||snapLive(st)?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+
     (g.link?'<a class="teams" href="'+esc(g.link)+'" target="_blank" rel="noopener">'+teams+'</a>':'<div class="teams">'+teams+'</div>')+
     '<div class="side">'+side.join('')+'</div><button type="button" class="star" aria-pressed="'+starred+'" aria-label="'+(starred?'Remove this game from My Watchlist':'Add this game to My Watchlist')+'" title="'+(starred?'Remove from My Watchlist':'Add to My Watchlist')+'">'+(starred?'\u2605':'\u2606')+'</button>'+

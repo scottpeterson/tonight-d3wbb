@@ -12,9 +12,9 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
-          "QUALITY_GATE", "SCORE_DECIDED"]
+          "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -423,3 +423,21 @@ def test_probe_feeds_add_the_pages_other_feeds_after_the_hosts_courts():
                    ["https://sidearmstats.com/cnu/wbball3/game.json", "http://www.sidearmstats.com/cnu/wbball"],
                    ["https://sidearmstats.com/susquehanna/wbball/game.json", "https://suriverhawks.com/sidearmstats/wbball/summary"]]
     assert run("probeFeeds({feed:null,alt_feeds:[{feed:{type:'sidearm',url:'https://sidearmstats.com/x/wbball/game.json'},link:null}],link:'l'}).map(p=>p.link)") == ["l"]
+
+
+def test_a_fresh_presto_snapshot_puts_the_game_in_the_live_group_with_a_clock_based_win_chance():
+    # Bryn Mawr at SUNY Delhi, 2026-11-08: the card carried "45-41, 04:55 Q4" from the box score page but sat under Not started.
+    at = "2026-11-08T19:47:00+00:00"
+    now = "Date.parse('2026-11-08T20:00:00Z')"
+    snap = json.dumps({"home": 45, "away": 41, "status": "04:55 Q4", "at": at})
+    assert run(f"snapLive({{snap:{snap}}},{now})") is True
+    assert run("groupOf({snap:{home:45,away:41,status:'04:55 Q4',at:new Date().toISOString()}})") == 0
+    assert run("groupOf({snap:{home:45,away:41,status:'04:55 Q4',at:new Date(Date.now()-3*3600000).toISOString()}})") == 1
+    assert run(f"snapLive({{snap:{snap}}},{now}+3*3600000)") is False
+    assert run(f"snapLive({{snap:{snap},final:true}},{now})") is False
+    st = run(f"(()=>{{const st={{wp:0.6}};snapState({json.dumps(GAME)},st,{snap});return st;}})()")
+    assert st["score"] == [45, 41] and st["progress"] == pytest.approx((3 * 600 + (600 - 295)) / 2400)
+    assert 0.8 < st["wp"] < 0.99
+    # An older status text keeps the pregame chance.
+    st = run(f"(()=>{{const st={{wp:0.6}};snapState({json.dumps(GAME)},st,{json.dumps({'home': 45, 'away': 41, 'status': '3rd Quarter', 'at': at})});return st;}})()")
+    assert st["wp"] == 0.6 and st["score"] == [45, 41]
