@@ -1,8 +1,14 @@
 {
- "fetched_at": "2026-11-08T17:52:44+00:00",
+ "fetched_at": "2026-11-08T18:14:45+00:00",
  "errors": [
+  "SUNY Delhi schedule: HTTP Error 405: Not Allowed",
+  "Suffolk schedule: HTTP Error 405: Not Allowed",
+  "Mt. Holyoke schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Penn St. Behrend schedule: HTTP Error 405: Not Allowed",
   "Thomas at Mt. Holyoke box score: HTTP Error 405: Not Allowed",
+  "Bryn Mawr at SUNY Delhi box score: HTTP Error 405: Not Allowed",
+  "Regis schedule: HTTP Error 405: Not Allowed",
   "Regis at Fitchburg St. box score: HTTP Error 405: Not Allowed",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found"
  ],
