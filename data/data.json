@@ -1,15 +1,15 @@
 {
- "fetched_at": "2026-11-08T21:05:52+00:00",
+ "fetched_at": "2026-11-08T21:14:43+00:00",
  "errors": [
   "Austin schedule: HTTP Error 403: Forbidden",
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "Suffolk schedule: WAF challenge from gosuffolkrams.com",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Wentworth schedule: WAF challenge from wentworthathletics.com",
   "Westfield St. schedule: WAF challenge from westfieldstateowls.com",
   "Willamette schedule: WAF challenge from wubearcats.com",
   "Wittenberg schedule: WAF challenge from wittenbergtigers.com",
   "Worcester St. schedule: WAF challenge from wsulancers.com",
+  "McMurry at Trinity (TX) feed: HTTP Error 404: Not Found",
   "Regis at Fitchburg St. box score: WAF challenge from fitchburgfalcons.com",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found"
  ],
@@ -124,6 +124,7 @@
   "St. John Fisher at Christopher Newport 2026-11-08: both schedule pages list other opponents, left out",
   "Smith at Hartford 2026-11-08: both schedule pages list other opponents, left out",
   "St. Lawrence at Immaculata 2026-11-08: both schedule pages list other opponents, left out",
+  "MIT at King's 2026-11-08: both schedule pages list other opponents, left out",
   "Penn St. Behrend at Nazareth 2026-11-08: both schedule pages list other opponents, left out",
   "Loras at St. Benedict 2026-11-08: the pages list it on 2026-11-07, where the list has it too, left out"
  ]
