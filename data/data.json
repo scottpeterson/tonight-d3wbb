@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-08T14:28:22+00:00",
+ "fetched_at": "2026-11-08T17:00:24+00:00",
  "errors": [
   "Austin schedule: HTTP Error 403: Forbidden",
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
@@ -118,7 +118,6 @@
   "Smith at Hartford 2026-11-08: both schedule pages list other opponents, left out",
   "St. Lawrence at Immaculata 2026-11-08: both schedule pages list other opponents, left out",
   "Penn St. Behrend at Nazareth 2026-11-08: both schedule pages list other opponents, left out",
-  "Loras at St. Benedict 2026-11-08: the pages list it on 2026-11-07, where the list has it too, left out",
-  "Mt. St. Vincent at Pratt 2026-11-09: the pages list it on 2026-11-10, where the list has it too, left out"
+  "Loras at St. Benedict 2026-11-08: the pages list it on 2026-11-07, where the list has it too, left out"
  ]
 }
