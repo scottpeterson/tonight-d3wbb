@@ -304,7 +304,7 @@ HOW = f"""<dl class="terms">
 <dt>Interest</dt><dd>A score from 0 to 100. Four things raise it:<ul><li>The season efficiency ranks of both teams. The better team counts more, and a rank near the top counts far more than one in the middle: the gap between 13th and 39th counts about four times the gap between 213th and 239th.</li><li>The leverage of the game.</li><li>How close the game is. Late in the game, this counts more.</li><li>How far an underdog is past its pregame chance.</li></ul>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.<br>A finished game gets its own score from four things:<ul><li>The season efficiency ranks of both teams (30%).</li><li>How far the underdog beat the pregame spread (30%). A win counts in full, and a closer loss than expected counts 60%.</li><li>How close the final score is (25%). Overtime counts as the closest finish.</li><li>The leverage of the game (15%).</li></ul>The upset and closeness parts count in full between top teams and about a third as much between teams ranked near 400, so a one-point upset in the middle of the table sits below a six-point game between two top-50 teams. Tournament chances lower a finished game's score by at most half.</dd>
 <dt>Win chance</dt><dd>Before tipoff: the season efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
-<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
+<dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds and every other feed the schedule pages gave. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: a team the model gave 35% or less before tipoff that won, or whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag. Postponed or Canceled replaces the tipoff time when a schedule page says so. Final pending marks a game whose host's feed has moved on to its next game before a box score is posted; the score follows once a schedule page links the box score. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that season efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO. The lists rank players by adjusted game score: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</dd>
 </dl>"""
@@ -397,6 +397,13 @@ function siblingFeeds(f){
   if(!m)return [];
   const folders=[m[2]];for(let n=2;n<=SIBLING_FEEDS+1;n++)folders.push(m[2]+n);
   return folders.filter(x=>x!==m[2]+m[3]).map(x=>({type:'sidearm',url:m[1]+x+'/game.json'}));
+}
+// Feeds to try when the main feed has not shown the game after tipoff: the host's other courts, then the other
+// feeds the schedule pages gave (a school's own idle feed sat first for Christopher Newport at Susquehanna, 2026-11-07).
+function probeFeeds(g){
+  const out=siblingFeeds(g.feed).map(f=>({feed:f,link:siblingLink(g.link,f)}));
+  (g.alt_feeds||[]).forEach(a=>{if(a.feed&&a.feed.url!==(g.feed||{}).url&&!out.some(o=>o.feed.url===a.feed.url))out.push({feed:a.feed,link:a.link||g.link});});
+  return out;
 }
 function siblingLink(link,f){const m=/\/([a-z]+?\d*)\/game\.json$/.exec(f.url);return link&&m?link.replace(/\/sidearmstats\/[a-z]+?\d*\//,'/sidearmstats/'+m[1]+'/'):link;}
 // No game ends within 45 minutes of tipoff, so a final before that (in the slate, in this browser's memory, or on a
@@ -641,9 +648,9 @@ async function check(g){
   // A feed that has never shown this game, after tipoff: the host's other courts, once every RETRY_MS.
   if(!s&&!st.seen&&tipMs(g)&&Date.now()>=tipMs(g)&&!(st.probed&&Date.now()-st.probed<RETRY_MS)){
     st.probed=Date.now();
-    for(const f of siblingFeeds(g.feed)){
-      let t=null;try{t=await readFeed(Object.assign({},g,{feed:f}),!st.final);}catch(e){}
-      if(t){g.link=siblingLink(g.link,f);g.feed=f;s=t;break;}
+    for(const p of probeFeeds(g)){
+      let t=null;try{t=await readFeed(Object.assign({},g,{feed:p.feed}),!st.final);}catch(e){}
+      if(t){g.link=p.link;g.feed=p.feed;s=t;break;}
     }
     st.other=other;
   }
@@ -690,7 +697,7 @@ async function refreshSlate(){
   games.forEach(g=>{
     const x=byId.get(g.id);if(!x||g.st.final)return;
     // A feed this page has seen the game on stays, even when the slate still names the host's other court.
-    ['feed','link'].forEach(k=>{if(x[k]&&!g.st.seen)g[k]=x[k];});
+    ['feed','link','alt_feeds'].forEach(k=>{if(x[k]&&!g.st.seen)g[k]=x[k];});
     ['boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
     if(x.off&&!g.off){g.off=x.off;g.st=initState(g);g.st.nextAt=null;}
     if(x.final){

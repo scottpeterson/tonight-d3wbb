@@ -1002,3 +1002,72 @@ def test_a_game_the_pages_date_differently_moves_or_goes():
     # A row more than three days off is another game.
     far = {"La Verne": [f.row(date(2026, 11, 20), None, True, False, "Pacific University", {}, "", "", "http://www.goboxers.com/")]}
     assert f.rescheduled(game, nov7, far, resolve) is None
+
+
+def host_schools():
+    return {t: {"team": t, "type": "Sidearm", "schedule": f"https://{site}/sports/womens-basketball/schedule", "tz": "America/New_York"}
+            for t, site in [("Christopher Newport", "www.cnusports.com"), ("SUNY Cobleskill", "fightingtigers.cobleskill.edu"),
+                            ("Susquehanna", "suriverhawks.com")]}
+
+
+def host_pages(cnu_link="http://www.sidearmstats.com/cnu/wbball", host_row=True):
+    day = date(2026, 11, 7)
+    base = {"day": day, "time": (20, 0, "America/New_York"), "exhibition": False, "result": None, "score": None, "status": ""}
+    pages = {"Christopher Newport": [{**base, "opponent": "SUNY Cobleskill", "neutral": True, "home": False, "links": {"live_stats": cnu_link}}],
+             "SUNY Cobleskill": [{**base, "opponent": "Christopher Newport", "neutral": True, "home": False,
+                                  "links": {"live_stats": "https://suriverhawks.com/sidearmstats/wbball/summary"}}],
+             "Susquehanna": [{**base, "opponent": "St. John Fisher", "neutral": False, "home": True,
+                              "links": {"live_stats": "https://suriverhawks.com/sidearmstats/wbball/summary"}}]}
+    if host_row:
+        pages["Susquehanna"].append({**base, "opponent": "SUNY Cobleskill vs. Christopher Newport", "neutral": True, "home": False,
+                                     "links": {"live_stats": "https://suriverhawks.com/sidearmstats/wbball/summary"}})
+    return pages
+
+
+def feeds_by_client(monkeypatch):
+    f._feed_cache.clear()
+    clients = {"cnusports": "cnu", "cobleskill": "cobleskill", "suriverhawks": "susquehanna"}
+    monkeypatch.setattr(f, "get", lambda url, **k: 'var client_shortname = "' + next(v for k, v in clients.items() if k in url) + '";')
+
+
+def test_a_host_listing_of_a_vs_b_gives_the_neutral_game_its_feed(monkeypatch):
+    # Christopher Newport vs SUNY Cobleskill at Susquehanna, 2026-11-07: CNU's page linked CNU's own idle feed, Cobleskill's
+    # page and Susquehanna's "SUNY Cobleskill vs. Christopher Newport" row linked the host's feed.
+    feeds_by_client(monkeypatch)
+    schools, pages = host_schools(), host_pages()
+    hosted = f.host_listings(date(2026, 11, 7), pages, schools)
+    assert list(hosted) == [frozenset({"Christopher Newport", "SUNY Cobleskill"})]
+    assert f.host_listings(date(2026, 11, 8), pages, schools) == {}
+    game = {"date": "2026-11-07", "home": "Christopher Newport", "away": "SUNY Cobleskill", "neutral": True}
+    built = f.build_slate(date(2026, 11, 7), [game], schools, pages, {}, {}, {}, hosted=hosted)["games"][0]
+    assert built["feed"] == {"type": "sidearm", "url": "https://sidearmstats.com/susquehanna/wbball/game.json"}
+    assert built["link"] == "https://suriverhawks.com/sidearmstats/wbball/summary"
+    assert [a["feed"]["url"] for a in built["alt_feeds"]] == ["https://sidearmstats.com/cnu/wbball/game.json"]
+    # Without the host's row, the away page's link to a site that is neither team's own still wins for a neutral game.
+    built = f.build_slate(date(2026, 11, 7), [game], schools, pages, {}, {}, {})["games"][0]
+    assert built["feed"]["url"] == "https://sidearmstats.com/susquehanna/wbball/game.json"
+    # A home game keeps the home page's link first and carries the rest as alternatives.
+    built = f.build_slate(date(2026, 11, 7), [dict(game, neutral=False)], schools, pages, {}, {}, {})["games"][0]
+    assert built["feed"]["url"] == "https://sidearmstats.com/cnu/wbball/game.json"
+    assert [a["feed"]["url"] for a in built["alt_feeds"]] == ["https://sidearmstats.com/susquehanna/wbball/game.json"]
+
+
+def test_the_finals_pass_tries_the_alternative_feeds(monkeypatch):
+    game = {"home": "Christopher Newport", "away": "SUNY Cobleskill", "date": "2026-11-07", "link": "http://www.sidearmstats.com/cnu/wbball",
+            "feed": {"type": "sidearm", "url": "https://sidearmstats.com/cnu/wbball/game.json"},
+            "alt_feeds": [{"feed": {"type": "sidearm", "url": "https://sidearmstats.com/susquehanna/wbball/game.json"},
+                           "link": "https://suriverhawks.com/sidearmstats/wbball/summary"}]}
+    live = {"Game": {"HasStarted": True, "Date": "11/7/2026", "HomeTeam": {"Name": "SUNY Cobleskill"}, "VisitingTeam": {"Name": "Christopher Newport"}}}
+    seen = []
+
+    def get(url, **k):
+        seen.append(url)
+        if "susquehanna" in url:
+            return live
+        raise f.FETCH_ERRORS[0]("404")
+    monkeypatch.setattr(f, "get", get)
+    found = f.find_sibling(game, date(2026, 11, 7))
+    assert found == game["alt_feeds"][0]["feed"]
+    assert seen[:2] == ["https://sidearmstats.com/cnu/wbball2/game.json", "https://sidearmstats.com/cnu/wbball3/game.json"]
+    f.adopt_feed(game, found)
+    assert (game["feed"], game["link"]) == (found, "https://suriverhawks.com/sidearmstats/wbball/summary")

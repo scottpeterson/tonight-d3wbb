@@ -708,6 +708,29 @@ def place_games(games, days, pages, resolve, notes):
     return by_day
 
 
+HOST_ROW = re.compile(r"^(.*\S)\s+(?:vs\.?|v\.)\s+(\S.*)$", re.I)
+
+
+def host_listings(day, pages, schools):
+    """{frozenset((A, B)): row} for the rows a host's page lists as "A vs. B" on `day`, with both names resolving
+    to one D3 school each. The host's live stats link is the feed for that game (Susquehanna listed "SUNY
+    Cobleskill vs. Christopher Newport" with its own feed, 2026-11-07, while CNU's page linked CNU's idle feed)."""
+    keys, out = d3_keys(schools), {}
+    for rows in pages.values():
+        for r in rows:
+            m = HOST_ROW.match(r["opponent"] or "") if r["day"] == day else None
+            if not m:
+                continue
+            teams = set()
+            for part in m.groups():
+                hits = {keys[k] for k in name_keys(opponent_name(part)) if k in keys}
+                if len(hits) == 1:
+                    teams |= hits
+            if len(teams) == 2:
+                out.setdefault(frozenset(teams), r)
+    return out
+
+
 def contradicted(g, day, pages, resolve):
     """True when each team's schedule page lists other D3 opponents on `day`, none of them the partner, and one of
     those opponents' pages names the team back. The Stat Lab's list carries a tournament's projected second-day
@@ -826,8 +849,13 @@ def sidearm_sides(g):
 
 
 def find_sibling(game, day):
-    """The host's other feed that shows this game today, or None. Reads each sibling's game.json (about 4 KB)."""
-    for feed in sibling_feeds(game.get("feed")):
+    """The host's other feed, or an alternative feed the pages gave, that shows this game today, or None. Reads
+    each candidate's game.json (about 4 KB)."""
+    seen = []
+    for feed in sibling_feeds(game.get("feed")) + [a["feed"] for a in game.get("alt_feeds") or []]:
+        if feed in seen or feed.get("type") != "sidearm" or feed == game.get("feed"):
+            continue
+        seen.append(feed)
         try:
             g = get(feed["url"], as_json=True)["Game"]
         except (*FETCH_ERRORS, TypeError, AttributeError):
@@ -838,7 +866,8 @@ def find_sibling(game, day):
 
 
 def adopt_feed(game, feed):
-    game["link"] = sibling_link(game.get("link"), feed)
+    alt = next((a for a in game.get("alt_feeds") or [] if a["feed"] == feed), None)
+    game["link"] = alt["link"] if alt and alt.get("link") else sibling_link(game.get("link"), feed)
     game["feed"] = feed
 
 
@@ -1478,9 +1507,9 @@ def result_score(r, page_is_home):
 
 
 def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None, hub=(), espn=(), others=frozenset(),
-                names=None, rosters=None):
+                names=None, rosters=None, hosted=None):
     prev = {g["id"]: g for g in (previous or {}).get("games", [])}
-    names, rosters = names or {}, rosters or {}
+    names, rosters, hosted = names or {}, rosters or {}, hosted or {}
     keys = d3_keys(schools)
     out = []
     for g in games:
@@ -1503,14 +1532,25 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
                 tip, tbd = later, False
         if not tip and hosts:
             tip, tbd = tip_time(hosts[0], day)
-        # Feed order: the home page's live stats link, the hub's link when the home school posted the listing, the
-        # home school's own Sidearm feed, the away side's links, then ESPN. An away school's link can point at its
-        # own stat page, which shows the host's game only some of the time.
+        # Feed order: a third school's listing of the game ("A vs. B" on the host's page), then, for a neutral game,
+        # either page's link to a site that is neither team's own; then the home page's live stats link, the hub's
+        # link when the home school posted the listing, the home school's own Sidearm feed, the away side's links,
+        # then ESPN. A school's link can point at its own idle feed (Christopher Newport's did while it played at
+        # Susquehanna, 2026-11-07), so every other feed found is kept as an alternative to try after tipoff.
         home_link = (home_row or {}).get("links", {}).get("live_stats")
         away_link = (away_row or {}).get("links", {}).get("live_stats")
         hub_link = (listed or {}).get("livestats")
         hub_home = (listed or {}).get("listing_home", True)
-        feed, link = live_feed(home_link), home_link
+        host_link = hosted.get(frozenset((g["home"], g["away"])), {}).get("links", {}).get("live_stats")
+        feed, link = live_feed(host_link), host_link
+        if not feed and g["neutral"]:
+            own = [house_feed(schools.get(t)) for t in (g["home"], g["away"])]
+            for u in (home_link, away_link):
+                if live_feed(u) and live_feed(u) not in own:
+                    feed, link = live_feed(u), u
+                    break
+        if not feed:
+            feed, link = live_feed(home_link), home_link
         if not feed and hub_link and hub_home:
             feed, link = live_feed(hub_link), link or hub_link
         if not feed and not g["neutral"]:
@@ -1526,6 +1566,15 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             feed = espn_feed(espn_game["id"])
             link = link or f'https://www.espn.com/womens-college-basketball/game/_/gameId/{espn_game["id"]}'
         link = (links or {}).get(gid) or link or away_link
+        alternatives = []
+        for u in (host_link, home_link, hub_link, away_link):
+            other = live_feed(u)
+            if other and other != feed and other not in [a["feed"] for a in alternatives]:
+                alternatives.append({"feed": other, "link": u})
+        if not g["neutral"]:
+            house = house_feed(schools.get(g["home"]))
+            if house and house != feed and house not in [a["feed"] for a in alternatives]:
+                alternatives.append({"feed": house, "link": None})
         video = (home_row or {}).get("links", {}).get("video") or (away_row or {}).get("links", {}).get("video")
         old = prev.get(gid, {})
         off = off_status(home_row) or off_status(away_row)
@@ -1543,7 +1592,7 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "modeled": g.get("modeled", True) and g.get("pregame_margin") is not None, "off": off,
             "home_lev": g.get("home_lev") or 0, "away_lev": g.get("away_lev") or 0,
             "home_tourn": round(tourn.get(g["home"], 0.0), 4), "away_tourn": round(tourn.get(g["away"], 0.0), 4),
-            "feed": feed or old.get("feed"), "link": link or old.get("link"),
+            "feed": feed or old.get("feed"), "link": link or old.get("link"), "alt_feeds": alternatives,
             "video": video or old.get("video"),
             "final": final, "newcomer_games": old.get("newcomer_games", []),
             "boxscore": next((r["links"]["boxscore"] for r in (home_row, away_row) if r and r["links"].get("boxscore")), None) or old.get("boxscore"),
@@ -1744,7 +1793,7 @@ def collect(previous):
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(added)
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, known + added, schools, pages, tourn, newcomers, read_json(path),
-                            extra.get("links"), hub, (), upper_sites(members), names, rosters)
+                            extra.get("links"), hub, (), upper_sites(members), names, rosters, host_listings(d, pages, schools))
         for g in slate["games"]:
             g["home_def"], g["away_def"] = defense.get(g["home"]), defense.get(g["away"])
         path.write_text(json.dumps(slate, separators=(",", ":")))

@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "modeled", "dogChance", "feedMovedOn", "groupOf"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE"]
 
@@ -397,3 +397,15 @@ def test_a_hosts_feed_on_its_next_game_ends_ours():
     assert run(f"feedMovedOn({g},{{other:false,seen:true,live:true}},{tip}+3*3600000)") is False
     assert run("groupOf({ended:true})") == 2 and run("groupOf({})") == 1 and run("groupOf({live:true})") == 0
     assert run(f"nextCheck({g},{{ended:true,interest:20,wp:0.6}},{tip}+2*3600000)") is None
+
+
+def test_probe_feeds_add_the_pages_other_feeds_after_the_hosts_courts():
+    g = {"feed": {"type": "sidearm", "url": "https://sidearmstats.com/cnu/wbball/game.json"}, "link": "http://www.sidearmstats.com/cnu/wbball",
+         "alt_feeds": [{"feed": {"type": "sidearm", "url": "https://sidearmstats.com/susquehanna/wbball/game.json"},
+                        "link": "https://suriverhawks.com/sidearmstats/wbball/summary"},
+                       {"feed": {"type": "sidearm", "url": "https://sidearmstats.com/cnu/wbball/game.json"}, "link": None}]}
+    out = run(f"probeFeeds({json.dumps(g)}).map(p=>[p.feed.url,p.link])")
+    assert out == [["https://sidearmstats.com/cnu/wbball2/game.json", "http://www.sidearmstats.com/cnu/wbball"],
+                   ["https://sidearmstats.com/cnu/wbball3/game.json", "http://www.sidearmstats.com/cnu/wbball"],
+                   ["https://sidearmstats.com/susquehanna/wbball/game.json", "https://suriverhawks.com/sidearmstats/wbball/summary"]]
+    assert run("probeFeeds({feed:null,alt_feeds:[{feed:{type:'sidearm',url:'https://sidearmstats.com/x/wbball/game.json'},link:null}],link:'l'}).map(p=>p.link)") == ["l"]
