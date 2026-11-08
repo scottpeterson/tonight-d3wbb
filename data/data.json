@@ -1,15 +1,16 @@
 {
- "fetched_at": "2026-11-08T05:49:21+00:00",
+ "fetched_at": "2026-11-08T07:09:38+00:00",
  "errors": [
+  "Austin schedule: HTTP Error 403: Forbidden",
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Regis at Fitchburg St. box score: HTTP Error 405: Not Allowed",
   "Centenary (LA) at University of Louisiana at Monroe feed: HTTP Error 404: Not Found"
  ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
-  "2026-11-07": 91,
-  "2026-11-08": 38,
+  "2026-11-07": 90,
+  "2026-11-08": 41,
   "2026-11-09": 18,
   "2026-11-10": 28,
   "2026-11-11": 68,
@@ -113,7 +114,10 @@
   "2026-10-27": 1
  },
  "notes": [
-  "Pacific at La Verne 2026-11-07: the pages list it on 2026-11-08, where the list has it too, left out",
-  "Loras at St. Benedict 2026-11-08: the pages list it on 2026-11-07, where the list has it too, left out"
+  "Smith at Hartford 2026-11-08: both schedule pages list other opponents, left out",
+  "St. Lawrence at Immaculata 2026-11-08: both schedule pages list other opponents, left out",
+  "Penn St. Behrend at Nazareth 2026-11-08: both schedule pages list other opponents, left out",
+  "Loras at St. Benedict 2026-11-08: the pages list it on 2026-11-07, where the list has it too, left out",
+  "Mt. St. Vincent at Pratt 2026-11-09: the pages list it on 2026-11-10, where the list has it too, left out"
  ]
 }
