@@ -47,6 +47,7 @@ import math
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -65,7 +66,9 @@ OUT = DATA / "data.json"
 EXTRA = DATA / "extra_games.json"
 # The Mac's copy of what Presto sites refuse the runner; tools/dispatch_finals.sh runs `fetch_data.py --presto` to write it.
 PRESTO_CACHE = DATA / "presto_cache.json"
-PRESTO_CACHE_LIVE = timedelta(hours=2)  # a cached in-progress box score older than this is no snapshot
+PRESTO_CACHE_LIVE = timedelta(hours=2)
+PRESTO_PACE = 10  # seconds between Presto requests: about six a minute from one address trip the WAF challenge
+PRESTO_BUDGET = 45  # Presto requests per Mac run, so a run ends inside the dispatcher's 20-minute cycle  # a cached in-progress box score older than this is no snapshot
 MEMBERS = DATA / "ncaa_members.csv"
 SITE = json.loads((BASE / "site.json").read_text())
 # The bare domain: ESPN answers 403 to this user agent when it names www.tonightind3wbb.com.
@@ -96,13 +99,25 @@ def now():
     return datetime.now(timezone.utc)
 
 
+WAF_CHALLENGE = re.compile(rb"awswaf|challenge\.js|gokuProps", re.I)
+
+
+def waf_challenged(resp, body):
+    """True when AWS WAF answered with its JavaScript challenge instead of the page (Presto's CloudFront, after
+    about six requests a minute from one address): status 202, an x-amzn-waf-action header, or a short page that
+    loads the challenge script."""
+    return resp.status == 202 or bool(resp.headers.get("x-amzn-waf-action")) or (len(body) < 5000 and bool(WAF_CHALLENGE.search(body)))
+
+
 def get(url, as_json=False, timeout=30):
-    """GET a URL with a browser-like user agent. Raises on HTTP and network errors."""
+    """GET a URL with a browser-like user agent. Raises on HTTP and network errors, and on a WAF challenge page."""
     req = urllib.request.Request(url, headers=UA)
     for attempt in (1, 2):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = resp.read()
+                if waf_challenged(resp, body):
+                    raise http.client.HTTPException(f"WAF challenge from {site_of(url)}")
             break
         except (TimeoutError, urllib.error.URLError) as exc:
             # One retry for a timeout; HTTP errors (404, 500) are answers, not hiccups.
@@ -494,59 +509,71 @@ def cached_box(url):
 
 
 def presto_snapshot(previous=None):
-    """The Mac's run (`fetch_data.py --presto`): read every Presto school's schedule page and the Presto box score
-    page of every game in the finals window still without one, and write data/presto_cache.json for the runner,
-    which Presto's CloudFront refuses. A page that fails this run keeps its last copy."""
+    """The Mac's run (`fetch_data.py --presto`): read Presto pages one at a time, PRESTO_PACE seconds apart, and
+    write data/presto_cache.json for the runner, which Presto's CloudFront refuses. Order: the schedule pages of
+    Presto schools with a game in the finals window, the box score page of every such game still without one, then
+    the other Presto schools, up to PRESTO_BUDGET requests. A page that fails or comes back empty keeps its last
+    copy. Twelve parallel reads tripped the WAF challenge on every box score page (2026-11-08)."""
     out = {"fetched_at": now().isoformat(timespec="seconds"), "errors": []}
     schools = load_schools()
     extra = read_json(EXTRA, {"schools": {}})
     for name, school in extra.get("schools", {}).items():
         schools.setdefault(name, {"team": name, "extra": True, **school})
     old = presto_cache()
-    presto = [s for s in schools.values() if s["type"] == "Presto"]
-
-    def load(school):
-        try:
-            return school["team"], [row_to_json(r) for r in schedule_rows(school, fallback=False)], None
-        except FETCH_ERRORS as exc:
-            return school["team"], old.get("pages", {}).get(school["team"]), f'{school["team"]} schedule: {exc}'
-
-    pages = {}
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        for team, rows, err in pool.map(load, presto):
-            if rows:
-                pages[team] = rows
-            if err:
-                out["errors"].append(err)
+    presto = {s["team"]: s for s in schools.values() if s["type"] == "Presto"}
 
     today = date.fromisoformat(TODAY) if TODAY else datetime.now(EASTERN).date()
-    urls = set()
-    for d in (today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)):
-        for g in (read_json(SLATES / f"{d.isoformat()}.json") or {}).get("games", []):
-            if g.get("box_read") or g.get("off"):
-                continue
-            rows = {t: [row_from_json(r) for r in pages.get(t, [])] for t in (g["home"], g["away"])}
-            link, _ = box_link(g, rows)
-            urls.update(u for u in (link, g.get("boxscore"), g.get("link")) if presto_box_date(u))
+    window = [today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)]
+    games = [g for d in window for g in (read_json(SLATES / f"{d.isoformat()}.json") or {}).get("games", [])
+             if not g.get("box_read") and not g.get("off")]
+    playing = [t for t in dict.fromkeys(t for g in games for t in (g["home"], g["away"])) if t in presto]
+    order = playing + [t for t in presto if t not in playing]
+
+    pages = dict(old.get("pages", {}))
+    boxes = dict(old.get("boxes", {}))
+    budget = [PRESTO_BUDGET]
+
+    def paced(fn, *args):
+        if budget[0] <= 0:
+            return
+        if budget[0] < PRESTO_BUDGET:
+            time.sleep(PRESTO_PACE)
+        budget[0] -= 1
+        fn(*args)
+
+    def load(team):
+        try:
+            rows = schedule_rows(presto[team], fallback=False)
+        except FETCH_ERRORS as exc:
+            out["errors"].append(f"{team} schedule: {exc}")
+            return
+        if rows:
+            pages[team] = [row_to_json(r) for r in rows]
 
     def read(url):
         try:
             page = get(url)
-            return url, None if page.lstrip().startswith("<?xml") else presto_box(page), None
+            box = None if page.lstrip().startswith("<?xml") else presto_box(page)
         except FETCH_ERRORS as exc:
-            return url, None, f"{url}: {exc}"
+            out["errors"].append(f"{url}: {exc}")
+            return
+        if box:
+            boxes[url] = {"at": out["fetched_at"], "box": box}
 
-    boxes = {}
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        for url, box, err in pool.map(read, sorted(urls)):
-            if box:
-                boxes[url] = {"at": out["fetched_at"], "box": box}
-            elif url in old.get("boxes", {}):
-                boxes[url] = old["boxes"][url]
-            if err:
-                out["errors"].append(err)
+    for team in playing:
+        paced(load, team)
+    urls = set()
+    for g in games:
+        rows = {t: [row_from_json(r) for r in pages.get(t, [])] for t in (g["home"], g["away"])}
+        link, _ = box_link(g, rows)
+        urls.update(u for u in (link, g.get("boxscore"), g.get("link")) if presto_box_date(u))
+    for url in sorted(urls, key=lambda u: (presto_box_date(u) != today, u)):
+        paced(read, url)
+    for team in order[len(playing):]:
+        paced(load, team)
+
     PRESTO_CACHE.write_text(json.dumps({"fetched_at": out["fetched_at"], "pages": pages, "boxes": boxes}, separators=(",", ":")))
-    out["pages"], out["boxes"] = len(pages), len(boxes)
+    out["pages"], out["boxes"], out["requests"] = len(pages), len(boxes), PRESTO_BUDGET - budget[0]
     return out
 
 
@@ -1806,7 +1833,7 @@ def main():
     DATA.mkdir(exist_ok=True)
     if "--presto" in sys.argv[1:]:
         out = presto_snapshot()
-        print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {PRESTO_CACHE.relative_to(BASE)}: {out['pages']} schedule pages, {out['boxes']} box scores")
+        print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {PRESTO_CACHE.relative_to(BASE)}: {out['pages']} schedule pages, {out['boxes']} box scores, {out['requests']} requests")
     else:
         previous = read_json(OUT, {})
         out = finals_only(previous) if "--finals" in sys.argv[1:] else collect(previous)

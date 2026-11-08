@@ -179,7 +179,9 @@ def test_checks_stop_when_a_feed_never_shows_the_game():
     g = json.dumps(dict(GAME, home_rank=350, away_rank=360, home_lev=0, away_lev=0))
     tip = "Date.parse('2026-11-14T19:00:00Z')"
     # Before the feed shows the game, the wait ends by 45 minutes after tipoff.
-    assert run(f"(nextCheck({g},{{interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") == 45
+    # Unseen after tipoff: every 5 minutes until 45 minutes, whatever the interest (crews start feeds late).
+    assert run(f"(nextCheck({g},{{interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") == 15
+    assert run(f"(nextCheck({g},{{interest:0,wp:0.5}},{tip}+2520000)-{tip})/60000") == 45
     assert run(f"(nextCheck({g},{{seen:true,live:true,interest:0,wp:0.5}},{tip}+600000)-{tip})/60000") > 45
     # After that, a look every 10 minutes until 4 hours past tipoff: a tournament feed shows the earlier game first.
     assert run(f"(nextCheck({g},{{noStats:true,interest:0,wp:0.5}},{tip}+3600000)-{tip})/60000") == 70

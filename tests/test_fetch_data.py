@@ -1071,3 +1071,64 @@ def test_the_finals_pass_tries_the_alternative_feeds(monkeypatch):
     assert seen[:2] == ["https://sidearmstats.com/cnu/wbball2/game.json", "https://sidearmstats.com/cnu/wbball3/game.json"]
     f.adopt_feed(game, found)
     assert (game["feed"], game["link"]) == (found, "https://suriverhawks.com/sidearmstats/wbball/summary")
+
+
+def test_get_treats_a_waf_challenge_as_a_fetch_error(monkeypatch):
+    # Presto's CloudFront answers a JavaScript challenge after about six requests a minute (2026-11-08): status 202
+    # with x-amzn-waf-action, or a 200 with a short page that loads challenge.js. Either must not pass as the page.
+    import contextlib
+
+    class Resp:
+        def __init__(self, status, headers, body):
+            self.status, self.headers, self._body = status, headers, body
+
+        def read(self):
+            return self._body
+
+    answers = iter([Resp(202, {"x-amzn-waf-action": "challenge"}, b""),
+                    Resp(200, {}, b"<html><script src='https://x.token.awswaf.com/challenge.js'></script></html>"),
+                    Resp(200, {}, b"<html>" + b"x" * 6000 + b"</html>")])
+    monkeypatch.setattr(f.urllib.request, "urlopen", lambda req, timeout=30: contextlib.nullcontext(next(answers)))
+    with pytest.raises(f.http.client.HTTPException, match="WAF challenge from delhibroncos.com"):
+        f.get("https://delhibroncos.com/sports/wbkb/2026-27/boxscores/20261108_ppt8.xml")
+    with pytest.raises(f.http.client.HTTPException):
+        f.get("https://delhibroncos.com/sports/wbkb/2026-27/schedule")
+    assert len(f.get("https://delhibroncos.com/sports/wbkb/2026-27/schedule")) == 6013
+
+
+def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_path):
+    # Schedule pages of schools with games first, then their box scores, then the rest; a failed or empty read keeps
+    # the last copy; PRESTO_BUDGET caps the run.
+    schedule = (FIX / "presto_willamette_2025.html").read_text()
+    seen, sleeps = [], []
+
+    def served(url, *a, **k):
+        seen.append(url)
+        if "idle" in url:
+            raise f.http.client.HTTPException("WAF challenge from idle")
+        if "/boxscores/" in url:
+            return presto_page()
+        return schedule
+    monkeypatch.setattr(f, "get", served)
+    monkeypatch.setattr(f.time, "sleep", lambda s: sleeps.append(s))
+    idle = {"team": "Idle", "type": "Presto", "schedule": "https://idle.example/sports/wbkb/2026-27/schedule", "tz": "America/New_York"}
+    other = {"team": "Other", "type": "Presto", "schedule": "https://other.example/sports/wbkb/2026-27/schedule", "tz": "America/New_York"}
+    monkeypatch.setattr(f, "load_schools", lambda: {"Lasell": PRESTO_SCHOOL, "Idle": idle, "Other": other})
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "PRESTO_CACHE", tmp_path / "presto_cache.json")
+    monkeypatch.setattr(f, "EXTRA", tmp_path / "none.json")
+    monkeypatch.setattr(f, "_presto_cache", None)
+    monkeypatch.setattr(f, "TODAY", "2026-11-06")
+    (tmp_path / "presto_cache.json").write_text(json.dumps({"fetched_at": "x", "pages": {"Idle": [{"old": True}]}, "boxes": {}}))
+    games = [{"id": "a", "date": "2026-11-06", "home": "Lasell", "away": "Emerson", "neutral": False, "link": PRESTO_URL}]
+    (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
+    out = f.presto_snapshot()
+    assert [u.split("/")[2] for u in seen] == ["laserpride.lasell.edu", "laserpride.lasell.edu", "idle.example", "other.example"]
+    assert "/boxscores/" in seen[1] and sleeps == [f.PRESTO_PACE] * 3 and out["requests"] == 4
+    cache = json.loads((tmp_path / "presto_cache.json").read_text())
+    assert set(cache["pages"]) == {"Lasell", "Idle", "Other"} and cache["pages"]["Idle"] == [{"old": True}]
+    assert list(cache["boxes"]) == [PRESTO_URL] and out["errors"] == ["Idle schedule: WAF challenge from idle"]
+    # The budget stops the run.
+    monkeypatch.setattr(f, "PRESTO_BUDGET", 2)
+    seen.clear()
+    assert f.presto_snapshot()["requests"] == 2 and len(seen) == 2
