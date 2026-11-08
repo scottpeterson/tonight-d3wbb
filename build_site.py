@@ -305,7 +305,7 @@ HOW = f"""<dl class="terms">
 <dt>Win chance</dt><dd>Before tipoff: the season efficiency margins plus 3 points for the home team. During the game: the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</dd>
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score. A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check. A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds. If a game's feed still does not show it 45 minutes after tipoff, the page stops checking and the game shows "no live stats".</dd>
-<dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: a team the model gave 35% or less before tipoff that won, or whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag. Postponed or Canceled replaces the tipoff time when a schedule page says so. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
+<dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset: a team the model gave 35% or less before tipoff that won, or whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag. Postponed or Canceled replaces the tipoff time when a schedule page says so. Final pending marks a game whose host's feed has moved on to its next game before a box score is posted; the score follows once a schedule page links the box score. Gray marks a game with nothing left to decide. A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
 <dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that season efficiency rank or better. The choice applies to both lists, and this browser remembers it. Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO. The lists rank players by adjusted game score: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</dd>
 </dl>"""
 
@@ -403,7 +403,7 @@ function siblingLink(link,f){const m=/\/([a-z]+?\d*)\/game\.json$/.exec(f.url);r
 // feed showing the host's earlier game) is not this game's.
 function canBeFinal(g){const t=tipMs(g);return t?Date.now()>=t+FINAL_EARLIEST_MS:g.date<=todayET();}
 function nextCheck(g,st,now){
-  if(st.final||!g.feed||g.off)return null;
+  if(st.final||st.ended||!g.feed||g.off)return null;
   // A feed that has not shown this game by GIVE_UP_MS gets a look every RETRY_MS until LAST_LOOK_MS: a tournament
   // host's feed shows the earlier game first, and some crews start late.
   if(st.noStats){const tip=tipMs(g);return tip&&now<tip+LAST_LOOK_MS?now+RETRY_MS:null;}
@@ -533,10 +533,13 @@ async function readFeed(g,full){
     s=espnState(await r.json());if(!s)return null;
   }else if(f.type==='sidearm'){
     const j=await r.json(),G=j.Game;
-    if(!G||!G.HasStarted)return null;
+    if(!G)return null;
     // Stat crews sometimes leave the feed's date unset or stale (1/1/0001). Then the feed counts when one of its teams
     // is one of ours and the game is not over, or when this page already read it live.
     const ours=overlap(G.HomeTeam.Name,g.home)+overlap(G.HomeTeam.Name,g.away)+overlap(G.VisitingTeam.Name,g.home)+overlap(G.VisitingTeam.Name,g.away)>0;
+    // A host's feed set up for its next game today (Susquehanna's doubleheader, 2026-11-07) says ours is over.
+    if(G.Date===mdy(g.date)&&!ours)g.st.other=true;
+    if(!G.HasStarted)return null;
     if(G.Date!==mdy(g.date)&&!(ours&&(!G.IsComplete||g.st.live)))return null;
     const regulation=num((G.Rules||{}).PeriodMinutes)>=20?2:4,period=num(G.Period),clock=num(G.ClockSeconds);
     // Some crews never set IsComplete (Butler, 2026-10-28). The clock at 0:00 in the last period with no tie is a final.
@@ -555,7 +558,7 @@ async function readFeed(g,full){
     s={home:sc.H||0,away:sc.V||0,sides,complete,period,regulation,
        progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:prestoLines(x)};
   }
-  if(f.type!=='espn'&&!feedIsGame(g,s))return null;
+  if(f.type!=='espn'&&!feedIsGame(g,s)){g.st.other=true;return null;}
   // The stat crew's home side can differ from the schedule's, and so can its labels; flip when the evidence says so.
   if(orientFit(g,s,true)>orientFit(g,s,false)){[s.home,s.away]=[s.away,s.home];if(s.lines)s.lines={H:s.lines.V||[],V:s.lines.H||[]};}
   return s;
@@ -627,10 +630,14 @@ function remember(id,score,status){
 }
 // Every box read feeds both top 15 lists.
 function readBox(g,s,when){addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);}
+// The host's feed has moved on to another game today: ours is over when this page saw it live, or once its
+// expected end has passed. The box score follows through the slate.
+function feedMovedOn(g,st,now){const tip=tipMs(g);return !!st.other&&((st.seen&&st.live)||(!!tip&&now>=tip+GAME_MS));}
 async function check(g){
-  const st=g.st;let s=null;
+  const st=g.st;let s=null;st.other=false;
   // Every check of an unfinished game reads the full box, so both top 15 lists move with the score.
   try{s=await readFeed(g,!st.final);}catch(e){s=null;}
+  const other=st.other;
   // A feed that has never shown this game, after tipoff: the host's other courts, once every RETRY_MS.
   if(!s&&!st.seen&&tipMs(g)&&Date.now()>=tipMs(g)&&!(st.probed&&Date.now()-st.probed<RETRY_MS)){
     st.probed=Date.now();
@@ -638,12 +645,14 @@ async function check(g){
       let t=null;try{t=await readFeed(Object.assign({},g,{feed:f}),!st.final);}catch(e){}
       if(t){g.link=siblingLink(g.link,f);g.feed=f;s=t;break;}
     }
+    st.other=other;
   }
   if(s&&s.complete&&!canBeFinal(g))s=null;
   const now=Date.now();
-  if(!s&&!st.seen&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
+  if(!s&&feedMovedOn(g,st,now)){st.ended=true;st.live=false;st.noStats=false;st.status='Final pending';}
+  if(!s&&!st.seen&&!st.ended&&tipMs(g)&&now>=tipMs(g)+GIVE_UP_MS){st.noStats=true;st.nextAt=null;}
   if(s){
-    st.noStats=false;st.snap=null;
+    st.noStats=false;st.snap=null;st.ended=false;
     st.seen=true;st.live=!s.complete;st.score=[s.home,s.away];st.progress=s.progress;
     const lead=s.home-s.away;
     st.wp=s.complete?(lead>0?1:lead<0?0:0.5):winProb(g,lead,s.progress);
@@ -730,7 +739,7 @@ function tags(g,st){
   if(!g.division&&Math.max(g.home_tourn,g.away_tourn)<0.005)out.push(['quiet','\u{1F4A4}','no tournament stakes']);
   return out.map(t=>'<span class="tag '+t[0]+'">'+(t[1]?t[1]+'\u00a0':'')+esc(t[2])+'</span>').join('');
 }
-function groupOf(st){return st.live?0:st.final?2:1;}
+function groupOf(st){return st.live?0:(st.final||st.ended)?2:1;}
 function leverage(g){return Math.abs(g.home_lev)+Math.abs(g.away_lev);}
 function line(g,side,i){
   const st=g.st,other=st.score?st.score[1-i]:0,mine=st.score?st.score[i]:0,won=st.final&&st.score&&mine>other,ahead=st.score&&mine>other;
@@ -743,6 +752,7 @@ function card(g){
   let state;
   if(g.off)state=esc(g.off);
   else if(st.final)state=esc(st.status||'Final');
+  else if(st.ended)state='Final pending';
   else if(st.live)state='\u{1F534} '+esc(st.status);
   else if(st.snap)state=esc(st.snap.status)+' \u00b7 '+ago(Date.parse(st.snap.at));
   else state=g.tip?fmtTime(g.tip):'Time TBA';
@@ -751,7 +761,7 @@ function card(g){
   if(wc!=='-'){const m=/^(.*) (\S+%)$/.exec(wc);side.push('<span class="wc" title="'+wc+'"><span class="who">'+m[1]+'</span><span class="pct">'+m[2]+'</span></span>');};
   if(!g.division&&lev>0)side.push('<span class="lv" title="Leverage">'+(lev>=15?'⚡ ':'')+'Lev '+lev.toFixed(1)+'</span>');
   const w=tags(g,st);if(w)meta.push(w);
-  if((!g.feed||st.noStats)&&!st.final&&!st.snap&&!g.off)meta.push('<span class="tag quiet">no live stats</span>');
+  if((!g.feed||st.noStats)&&!st.final&&!st.ended&&!st.snap&&!g.off)meta.push('<span class="tag quiet">no live stats</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
   return '<article class="gc '+(st.live?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+

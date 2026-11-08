@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "modeled", "dogChance"]
+         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "modeled", "dogChance", "feedMovedOn", "groupOf"]
 CONSTS = ["GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE"]
 
@@ -385,3 +385,15 @@ def test_a_close_upset_between_mid_table_teams_scores_below_a_close_game_between
     # The gate leaves a top game nearly where it was.
     smith = dict(GAME, home_rank=4, away_rank=57, home_tourn=0.9, away_tourn=0.1, home_lev=3, away_lev=0.4, pregame_wp=0.9, pregame_margin=14)
     assert final_score(smith, [56, 53]) > 50
+
+
+def test_a_hosts_feed_on_its_next_game_ends_ours():
+    # St. John Fisher at Susquehanna, 2026-11-07: the host's one feed showed the 8 PM game, and the card sat under
+    # Not started with "no live stats". Seen live, the switch ends the game at once; unseen, at the expected end.
+    g, tip = json.dumps(GAME), "Date.parse('2026-11-14T19:00:00Z')"
+    assert run(f"feedMovedOn({g},{{other:true,seen:true,live:true}},{tip}+600000)") is True
+    assert run(f"feedMovedOn({g},{{other:true}},{tip}+3600000)") is False
+    assert run(f"feedMovedOn({g},{{other:true}},{tip}+2*3600000)") is True
+    assert run(f"feedMovedOn({g},{{other:false,seen:true,live:true}},{tip}+3*3600000)") is False
+    assert run("groupOf({ended:true})") == 2 and run("groupOf({})") == 1 and run("groupOf({live:true})") == 0
+    assert run(f"nextCheck({g},{{ended:true,interest:20,wp:0.6}},{tip}+2*3600000)") is None
