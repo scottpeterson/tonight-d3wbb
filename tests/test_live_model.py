@@ -9,7 +9,7 @@ import pytest
 
 from build_site import LIVE_JS
 
-FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
+FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
          "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState"]
@@ -441,3 +441,15 @@ def test_a_fresh_presto_snapshot_puts_the_game_in_the_live_group_with_a_clock_ba
     # An older status text keeps the pregame chance.
     st = run(f"(()=>{{const st={{wp:0.6}};snapState({json.dumps(GAME)},st,{json.dumps({'home': 45, 'away': 41, 'status': '3rd Quarter', 'at': at})});return st;}})()")
     assert st["wp"] == 0.6 and st["score"] == [45, 41]
+
+
+def test_a_game_between_two_low_ranked_teams_scores_below_a_decided_game_between_ranked_teams():
+    # #327 Curry led #254 Elmira 49-35 in the third quarter (an upset in progress, 2026-11-08) and scored 9, while
+    # #104 Carroll at #119 UW-Eau Claire, decided in the fourth, scored 1. The upset term alone carried it.
+    curry = {"home_rank": 327, "away_rank": 254, "home_lev": 0.2, "away_lev": 0, "home_tourn": 0, "away_tourn": 0.011, "pregame_wp": 0.392, "pregame_margin": -3.1, "modeled": True}
+    uwec = {"home_rank": 119, "away_rank": 104, "home_lev": 2.4, "away_lev": 0, "home_tourn": 0.089, "away_tourn": 0.002, "pregame_wp": 0.576, "pregame_margin": 2.1, "modeled": True}
+    live = lambda g, h, a, p: run(f"(g=>interest(g,{{progress:{p},wp:winProb(g,{h - a},{p}),live:true,score:[{h},{a}]}}))({json.dumps(g)})")
+    assert live(curry, 49, 35, 0.6) < live(uwec, 67, 51, 0.93) < 2
+    # A close game and an upset still count between good teams: #150 upsetting #20 late scores far above both.
+    upset = {"home_rank": 150, "away_rank": 20, "home_lev": 1, "away_lev": 8, "home_tourn": 0.05, "away_tourn": 0.9, "pregame_wp": 0.2, "pregame_margin": -10, "modeled": True}
+    assert live(upset, 60, 52, 0.875) > 25
