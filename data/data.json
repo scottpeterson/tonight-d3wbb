@@ -1,7 +1,11 @@
 {
- "fetched_at": "2026-11-09T06:05:01+00:00",
+ "fetched_at": "2026-11-09T07:13:27+00:00",
  "errors": [
-  "Regis at Fitchburg St. box score: HTTP Error 405: Not Allowed"
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Wittenberg schedule: WAF challenge from wittenbergtigers.com",
+  "Worcester St. schedule: WAF challenge from wsulancers.com",
+  "Regis at Fitchburg St. box score: WAF challenge from fitchburgfalcons.com"
  ],
  "stale": {},
  "dates": {
@@ -110,12 +114,5 @@
   "2027-02-27": 4,
   "2026-10-27": 1
  },
- "notes": [
-  "St. John Fisher at Christopher Newport 2026-11-08: both schedule pages list other opponents, left out",
-  "Smith at Hartford 2026-11-08: both schedule pages list other opponents, left out",
-  "St. Lawrence at Immaculata 2026-11-08: both schedule pages list other opponents, left out",
-  "MIT at King's 2026-11-08: both schedule pages list other opponents, left out",
-  "Penn St. Behrend at Nazareth 2026-11-08: both schedule pages list other opponents, left out",
-  "Loras at St. Benedict 2026-11-08: the pages list it on 2026-11-07, where the list has it too, left out"
- ]
+ "notes": []
 }
