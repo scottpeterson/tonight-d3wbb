@@ -1,11 +1,6 @@
 {
- "fetched_at": "2026-11-10T18:38:31+00:00",
- "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Wittenberg schedule: WAF challenge from wittenbergtigers.com",
-  "Worcester St. schedule: WAF challenge from wsulancers.com"
- ],
+ "fetched_at": "2026-11-10T20:55:32+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
