@@ -395,9 +395,9 @@ def sections():
                 f'<div class="seg" role="group" aria-labelledby="lbl-cut-{list_id}">{buttons}</div></div>')
     newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best adjusted game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
-                       'Lines arrive when a game ends, or during play when its feed carries box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
+                       'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 15 game scores", '<p class="small">The 15 best adjusted game scores on this night by any player, in every game with a live stats feed. '
-                      'Lines arrive when a game ends, or during play when its feed carries box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
+                      'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
