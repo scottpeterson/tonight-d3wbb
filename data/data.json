@@ -1,6 +1,9 @@
 {
- "fetched_at": "2026-11-11T00:06:20+00:00",
- "errors": [],
+ "fetched_at": "2026-11-11T00:34:40+00:00",
+ "errors": [
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Penn St. Altoona at Juniata feed: not well-formed (invalid token): line 1, column 0"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
