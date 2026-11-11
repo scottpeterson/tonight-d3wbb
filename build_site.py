@@ -332,7 +332,7 @@ def season_lines():
                     factor = (g.get("away_def") if x["team"] == g["home"] else g.get("home_def")) or 1
                     item = dict(x, adj=round(x["gmsc"] * factor, 1), date=slate["date"], game=g)
                     offer(key, item)
-                    if key == "nc" and x.get("reason") == "Freshman":
+                    if key == "nc" and x.get("reason") in ("Freshman", "First-year"):
                         offer("fr", item)
     rosters = roster_classes()
     for lst in lists.values():
@@ -367,10 +367,10 @@ def season_sections():
     return "\n".join((
         twisty("Top 10 game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by any player, from every recorded box score.' + tail
                + nc_table(season["top"], "No box score has been recorded yet."), count=len(season["top"]), open_=False, id_="s-top"),
-        twisty("Top 10 newcomer game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
+        twisty("Top 10 newcomer game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by first-years, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
                + nc_table(season["nc"], "No newcomer line has been recorded yet."), count=len(season["nc"]), open_=False, id_="s-nc"),
-        twisty("Top 10 freshman game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by freshmen.' + tail
-               + nc_table(season["fr"], "No freshman line has been recorded yet."), count=len(season["fr"]), open_=False, id_="s-fr")))
+        twisty("Top 10 first-year game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by first-years.' + tail
+               + nc_table(season["fr"], "No first-year line has been recorded yet."), count=len(season["fr"]), open_=False, id_="s-fr")))
 
 
 def sections():
@@ -393,7 +393,7 @@ def sections():
                           for n, label in ((0, "All teams"), (200, "Top 200"), (100, "Top 100")))
         return (f'<div class="sortbar ctl"><span class="seglabel caption" id="lbl-cut-{list_id}">Teams</span>'
                 f'<div class="seg" role="group" aria-labelledby="lbl-cut-{list_id}">{buttons}</div></div>')
-    newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best adjusted game scores on this night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes. '
+    newcomers = twisty("Top 15 newcomer games", '<p class="small">The 15 best adjusted game scores on this night by first-years, transfers, and players with no 2025-26 minutes or under 30 minutes. '
                        'Game score adds points, rebounds, assists, steals, and blocks, and takes away missed shots, turnovers, and fouls. '
                        'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 15 game scores", '<p class="small">The 15 best adjusted game scores on this night by any player, in every game with a live stats feed. '
@@ -415,9 +415,9 @@ HOW = f"""<dl class="terms">
 <dt>Reading a card</dt><dd>
 <p>The left column shows the interest score and its bar.</p>
 <p>A number before a team is its season efficiency rank among Division III teams. A filled badge marks the top 25. The rating starts at the preseason projection and moves in equal steps to the team's box-score rating over its first eight games.</p>
-<p>The line under the teams shows the status, the favorite's win chance, and the leverage (Lev).</p>
+<p>The line under the teams shows the status, the favorite's win probability, and the leverage (Lev).</p>
 <ul>
-<li><b>Before tipoff</b>, the win chance comes from the efficiency margin line.</li>
+<li><b>Before tipoff</b>, the win probability comes from the efficiency margin line.</li>
 <li><b>During the game</b>, the line counts as one game of evidence and the score so far as the part of a game played. A heavy favorite that leads by one after a quarter sits near 97% rather than the 99% the line alone gives.</li>
 </ul>
 <p><span class="sym" aria-hidden="true">★</span>Click the star to add a game to My Watchlist at the top of the page. The game also stays in its usual group, starred in both places. This browser remembers your stars.</p>
@@ -428,7 +428,7 @@ HOW = f"""<dl class="terms">
 <ul>
 <li><b>Interest</b> puts the highest score first.</li>
 <li><b>Tipoff</b> puts the earliest game first.</li>
-<li><b>Closest</b> puts the smallest gap in win chance first.</li>
+<li><b>Closest</b> puts the smallest gap in win probability first.</li>
 <li><b>Leverage</b> puts the most at stake first.</li>
 </ul>
 </dd>
@@ -440,7 +440,7 @@ HOW = f"""<dl class="terms">
 <li>Games against Division I, II, NAIA, and two-year opponents.</li>
 <li>Games against second-year provisional members or earlier.</li>
 </ul>
-<p>Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win chance and no leverage until the next NPI update.</p>
+<p>Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win probability and no leverage until the next NPI update.</p>
 </dd>
 <dt>Interest</dt><dd>
 <p>A score from 0 to 100, from four parts:</p>
@@ -461,7 +461,7 @@ HOW = f"""<dl class="terms">
 <p>The upset and closeness parts count in full between top teams. Between teams ranked near 400, they count about a third as much. A one-point upset in the middle of the table therefore sits below a six-point game between two top-50 teams.</p>
 <p>Tournament chances lower a finished game's score by at most half.</p>
 </dd>
-<dt>Win chance</dt><dd>
+<dt>Win probability</dt><dd>
 <ul>
 <li><b>Before tipoff:</b> the season efficiency margins plus 3 points for the home team.</li>
 <li><b>During the game:</b> the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</li>
@@ -474,7 +474,7 @@ HOW = f"""<dl class="terms">
 <ul>
 <li><b>Interest</b> sets the base wait: 1 minute at interest 100, 60 minutes at interest 0.</li>
 <li><b>Margin</b> stretches it. The wait grows with the leader's margin. A tie keeps the wait as it is.</li>
-<li><b>Decided</b> games stretch it past the end of the game, so the next check reads the final score. A game is decided when the model's win chance, from the pregame line and the score, passes 98%. The score and clock alone must also put the comeback chance under 20%. A 30-point lead at the half does it.</li>
+<li><b>Decided</b> games stretch it past the end of the game, so the next check reads the final score. A game is decided when the model's win probability, from the pregame line and the score, passes 98%. The score and clock alone must also put the comeback chance under 20%. A 30-point lead at the half does it.</li>
 <li><b>No tournament chance</b> for either team: about two checks for the whole game.</li>
 </ul>
 <p>Finding the feed:</p>
@@ -488,7 +488,7 @@ HOW = f"""<dl class="terms">
 <ul>
 <li><b>Red:</b> a game in progress. The dot and the clock are red. Nothing else on the page is red.</li>
 <li><b>Green:</b> the winner of a finished game.</li>
-<li><b>Amber:</b> an upset. The team won after the model gave it 35% or less before tipoff. During play, its win chance is more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag.</li>
+<li><b>Amber:</b> an upset. The team won after the model gave it 35% or less before tipoff. During play, its win probability is more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag.</li>
 <li><b>Gray:</b> a game with nothing left to decide.</li>
 </ul>
 </dd>
@@ -521,7 +521,7 @@ HOW = f"""<dl class="terms">
 <p>The lists rank players by <b>adjusted game score</b>: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</p>
 </dd>
 <dt>Season top 10 lists</dt><dd>
-<p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by freshmen. They come from every recorded box score.</p>
+<p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by first-years. They come from every recorded box score.</p>
 <p>They update at each rebuild. Rebuilds run a few times a day, plus every 20 minutes on game nights. A game still going joins after its final is recorded.</p>
 </dd>
 </dl>"""
@@ -554,7 +554,7 @@ function scoreWp(lead,progress){
   if(left<=0)return lead>0?1:lead<0?0:0.5;
   return phi(lead/(SD*Math.sqrt(left)));
 }
-// Live win chance. The pregame line is a prior on the true margin worth one game of evidence (LINE_SD), and the
+// Live win probability. The pregame line is a prior on the true margin worth one game of evidence (LINE_SD), and the
 // score so far is `progress` of a game of evidence, so a quarter played at even terms pulls a 35-point line toward
 // the scoreboard (#2 NYU led Haverford by one after a quarter, 2026-11-08: 99.8% as a certain line, 97% here).
 const LINE_SD=SD;
@@ -1028,7 +1028,7 @@ function tags(g,st){
 // games sat under Not started with a score on the card (Bryn Mawr at SUNY Delhi, 2026-11-08).
 const SNAP_LIVE_MS=2*3600000;
 function snapLive(st,now){return !!st.snap&&!st.final&&!st.ended&&(now||Date.now())-Date.parse(st.snap.at)<SNAP_LIVE_MS;}
-// Take a snapshot into the state: the score, and the win chance from the clock when the status reads like "04:55 Q4".
+// Take a snapshot into the state: the score, and the win probability from the clock when the status reads like "04:55 Q4".
 function snapState(g,st,snap){
   st.snap=snap;st.score=[snap.home,snap.away];
   const m=/^(\d+:\d+)\s+(?:Q(\d+)|OT(\d*))$/.exec(snap.status||'');

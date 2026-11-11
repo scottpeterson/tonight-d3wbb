@@ -1,4 +1,4 @@
-"""The browser model in build_site.LIVE_JS (win chance, interest, wait, clock, newcomers), run in Node."""
+"""The browser model in build_site.LIVE_JS (win probability, interest, wait, clock, newcomers), run in Node."""
 import json
 import re
 import shutil
@@ -282,7 +282,7 @@ STORE = ("(()=>{const m={};globalThis.KEY='t';globalThis.localStorage={getItem:k
 
 
 def test_two_top_25_teams_with_high_leverage_outrank_a_closer_mid_table_game():
-    # 2026-11-07: Concordia (MN) at Wartburg (22 at 13, leverage 23.21 and 4.43, home win chance 0.68) ranked below
+    # 2026-11-07: Concordia (MN) at Wartburg (22 at 13, leverage 23.21 and 4.43, home win probability 0.68) ranked below
     # RIT at Rochester (39 at 54, leverage 10.31 and 12.93, 0.55) while quality was linear in rank.
     wartburg = dict(GAME, home="Wartburg", away="Concordia (MN)", home_rank=13, away_rank=22, pregame_wp=0.68,
                     home_lev=4.43, away_lev=23.21, home_tourn=0.97, away_tourn=0.515)
