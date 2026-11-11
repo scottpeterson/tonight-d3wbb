@@ -249,6 +249,16 @@ def team_rosters():
     return out
 
 
+def team_classes():
+    """{team: [{'name', 'class'}]} from data/rosters.csv: the class year the page shows beside a box line."""
+    path, out = DATA / "rosters.csv", {}
+    if path.exists():
+        with open(path, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                out.setdefault(r["team"], []).append({"name": r["player"], "class": r.get("class") or ""})
+    return out
+
+
 def load_schools():
     with open(DATA / "schools.csv", newline="") as f:
         return {r["team"]: r for r in csv.DictReader(f)}
@@ -1367,6 +1377,12 @@ def match_newcomer(line, roster):
     return hit[0] if len(hit) == 1 else None
 
 
+def line_class(line, roster):
+    """The class year of the roster player a box line belongs to, or '' when no one fits."""
+    who = match_newcomer(line, roster)
+    return (who or {}).get("class") or ""
+
+
 def feed_date_matches(feed_date, day):
     return feed_date == f"{day.month}/{day.day}/{day.year}"
 
@@ -1435,16 +1451,19 @@ def box_result(game, home_score, away_score, sides, lines):
         home_score, away_score = away_score, home_score
         lines = {"H": lines.get("V", []), "V": lines.get("H", [])}
     found = []
+    classes = {"H": game.get("home_classes") or [], "V": game.get("away_classes") or []}
     for side, team, roster in (("H", game["home"], game["newcomers_home"]), ("V", game["away"], game["newcomers_away"])):
         for line in lines.get(side, []):
             who = match_newcomer(line, roster)
             if who and played(line):
                 found.append({"team": team, "name": who["name"], "reason": who["reason"], "gmsc": round(game_score(line), 1),
+                              "class": who.get("class") or line_class(line, classes[side]),
                               "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}})
     # The page can filter the list by team rank, so each team keeps its own 15 best: one team can fill the list alone.
     top = []
     for side, team in (("H", game["home"]), ("V", game["away"])):
         mine = [{"team": team, "name": line_name(line), "reason": "", "gmsc": round(game_score(line), 1),
+                 "class": line_class(line, classes[side]),
                  "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}}
                 for line in lines.get(side, []) if played(line)]
         top += sorted(mine, key=lambda x: -x["gmsc"])[:TOP_N]
@@ -1629,9 +1648,9 @@ def result_score(r, page_is_home):
 
 
 def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None, hub=(), espn=(), others=frozenset(),
-                names=None, rosters=None, hosted=None):
+                names=None, rosters=None, hosted=None, classes=None):
     prev = {g["id"]: g for g in (previous or {}).get("games", [])}
-    names, rosters, hosted = names or {}, rosters or {}, hosted or {}
+    names, rosters, hosted, classes = names or {}, rosters or {}, hosted or {}, classes or {}
     keys = d3_keys(schools)
     out = []
     for g in games:
@@ -1723,6 +1742,8 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             # Every name sources use and the full roster, so a feed showing another game can be told apart.
             "home_names": names.get(g["home"], [g["home"]]), "away_names": names.get(g["away"], [g["away"]]),
             "home_roster": rosters.get(g["home"], []), "away_roster": rosters.get(g["away"], []),
+            # Each roster with its class year, for the class beside a box line.
+            "home_classes": classes.get(g["home"], []), "away_classes": classes.get(g["away"], []),
         }
         if off or (entry["final"] and not final_can_exist(entry)):
             drop_final(entry)
@@ -1853,7 +1874,7 @@ def collect(previous):
         out["dates"] = previous.get("dates", {})
         return out
     extra = read_json(EXTRA, {"schools": {}, "games": []})
-    names, rosters = team_names(), team_rosters()
+    names, rosters, classes = team_names(), team_rosters(), team_classes()
     for name, school in extra.get("schools", {}).items():
         schools.setdefault(name, {"team": name, "extra": True, **school})
     for g in extra.get("games", []):
@@ -1915,7 +1936,7 @@ def collect(previous):
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(added)
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, known + added, schools, pages, tourn, newcomers, read_json(path),
-                            extra.get("links"), hub, (), upper_sites(members), names, rosters, host_listings(d, pages, schools))
+                            extra.get("links"), hub, (), upper_sites(members), names, rosters, host_listings(d, pages, schools), classes)
         for g in slate["games"]:
             g["home_def"], g["away_def"] = defense.get(g["home"]), defense.get(g["away"])
         path.write_text(json.dumps(slate, separators=(",", ":")))

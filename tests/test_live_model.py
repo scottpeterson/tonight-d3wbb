@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive"]
+         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf"]
 CONSTS = ["KEY", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS"]
 
@@ -482,3 +482,13 @@ def test_a_reload_keeps_the_last_live_score_and_a_moved_on_feed_then_means_final
     assert run(f"(()=>{{globalThis.localStorage={{getItem(){{return null}},setItem(){{}}}};const g={json.dumps(stale)};const st=initState(g);"
                f"return [st.score,feedMovedOn(g,Object.assign({{other:true}},st),Date.parse('2026-11-08T21:30:00Z'))]}})()") == [[20, 18], False]
     assert run("newerSnap(null,null)") is None
+
+
+def test_live_lines_carry_the_class_year_from_the_slate_roster():
+    g = {"home": "Smith", "away": "Amherst", "home_classes": [{"name": "Zoe Park", "class": "FR"}], "away_classes": [],
+         "newcomers_home": [{"name": "Zoe Park", "reason": "Freshman", "class": "FR"}], "newcomers_away": []}
+    line = {"first": "", "last": "", "abbr": "Z. PARK", "min": 20, "pts": 12, "fgm": 5, "fga": 9, "ftm": 2, "fta": 2, "oreb": 1, "dreb": 3, "reb": 4, "ast": 1, "to": 1, "stl": 1, "blk": 0, "pf": 2}
+    other = dict(line, abbr="A. LEE")
+    s = {"lines": {"H": [line, other], "V": []}}
+    assert run(f"topLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Z. Park", "FR"], ["A. Lee", ""]]
+    assert run(f"newcomerLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Zoe Park", "FR"]]

@@ -9,8 +9,10 @@ The page embeds the default night's slate and fetches other nights from
 docs/slates/. LIVE_JS reads each game's live stats feed in the browser at a
 pace set by the game's interest score (see PLAN.md and README.md).
 """
+import csv
 import html
 import json
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -142,11 +144,11 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:600}.tag.close{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
 #how{scroll-margin-top:64px}dl.terms{max-width:900px}
 .nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:var(--fs-caption);color:var(--muted);font-weight:400}
-.nc td.m{display:none}
+.nc td.m{display:none}.nc .cls{display:none}
 @media (max-width:640px){.nc thead{display:none}.nc,.nc tbody{display:block}
 .nc tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"p g" "t g" "m m" "gm gm";column-gap:var(--s3);row-gap:2px;padding:var(--s2) var(--s3);border-top:1px solid var(--line)}
 .nc tr:first-child{border-top:0}.nc td,.nc td.gm{padding:0;border:0;white-space:normal;min-width:0;text-align:left}
-.nc td.n{display:none}.nc td.p{grid-area:p}.nc td.t{grid-area:t;color:var(--muted);font-size:var(--fs-sm)}
+.nc .cls{display:inline}.nc td.n{display:none}.nc td.p{grid-area:p}.nc td.t{grid-area:t;color:var(--muted);font-size:var(--fs-sm)}
 .nc td.m{display:block;grid-area:m;font-variant-numeric:tabular-nums;padding-top:2px}
 .nc td.gs{grid-area:g;align-self:center;text-align:right;font-size:var(--fs-h2);font-weight:600;font-variant-numeric:tabular-nums}
 .nc td.gs::after{content:"adjusted game score";display:block;font-size:var(--fs-caption);font-weight:400;color:var(--muted);letter-spacing:.02em}
@@ -189,13 +191,15 @@ function tick(){const now=Date.now();document.querySelectorAll('[data-until]').f
 tick();setInterval(tick,60000);
 // Sortable tables: click a header to sort by that column; click again to reverse.
 function cellKey(td){const raw=td.dataset.sort!==undefined?td.dataset.sort:td.textContent.trim();const n=parseFloat(raw.replace(/[,%#$]/g,''));return isNaN(n)||!/^[-+#$]?[\d.,]+%?$/.test(raw.replace(/\s/g,''))?raw.toLowerCase():n;}
-document.querySelectorAll('table.sortable').forEach(t=>{
+function bindSort(t){
+  if(t.dataset.sortBound)return;t.dataset.sortBound='1';
   const ths=[...t.querySelectorAll('thead th')],body=t.tBodies[0];if(!body)return;
   ths.forEach((th,i)=>{const go=()=>{const dir=th.getAttribute('aria-sort')==='ascending'?'descending':'ascending';ths.forEach(h=>h.setAttribute('aria-sort','none'));th.setAttribute('aria-sort',dir);
     const rows=[...body.rows];rows.sort((a,b)=>{const x=cellKey(a.cells[i]),y=cellKey(b.cells[i]);const r=typeof x==='number'&&typeof y==='number'?x-y:typeof x==='number'?-1:typeof y==='number'?1:String(x).localeCompare(String(y));return dir==='ascending'?r:-r;});
     rows.forEach(r=>body.appendChild(r));};
     th.addEventListener('click',go);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});});
-});
+}
+window.bindSort=bindSort;document.querySelectorAll('table.sortable').forEach(bindSort);
 // Expand all / collapse all for the twisties.
 window.setAll=function(open){document.querySelectorAll('details.group').forEach(d=>{d.open=open});};
 })();
@@ -266,6 +270,102 @@ def load_slate(day):
     return json.loads(path.read_text()) if path.exists() else None
 
 
+SEASON_N = 10
+NC_HEADERS = ["Player", "Team", "Class", "Points", "Rebounds", "Assists", "Steals plus blocks", "Field goals", "Game score", "Adjusted game score", "Game"]
+
+
+def letters(name):
+    return re.sub(r"[^a-z]", "", str(name or "").lower())
+
+
+def roster_classes():
+    """{(team, letters of the name): class} from data/rosters.csv, for lines stored before the slates carried a class."""
+    path, out = BASE / "data" / "rosters.csv", {}
+    if path.exists():
+        with open(path, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                out[(r["team"], letters(r["player"]))] = r.get("class") or ""
+    return out
+
+
+def player_class(team, name, classes):
+    """A stored line's class year: the roster player with that full name, else the one player with the same first
+    initial and last name (feeds abbreviate to 'F. Last'), else ''."""
+    hit = classes.get((team, letters(name)))
+    if hit is not None:
+        return hit
+    parts = str(name or "").split()
+    if not parts:
+        return ""
+    initial, last = letters(parts[0])[:1], letters(parts[-1])
+    fits = [c for (t, n), c in classes.items() if t == team and n[:1] == initial and n.endswith(last)]
+    return fits[0] if len(fits) == 1 else ""
+
+
+def season_lines():
+    """The SEASON_N best stored box lines of the season by adjusted game score, three ways: every player ("top"),
+    newcomers ("nc"), and freshmen ("fr"). Reads only the lines each slate already stores (at most 15 per team per
+    game) and keeps a running cut at the tenth score, so a line below it costs one comparison."""
+    lists = {"top": [], "nc": [], "fr": []}
+
+    def offer(key, x):
+        lst = lists[key]
+        if len(lst) >= SEASON_N and x["adj"] <= lst[-1]["adj"]:
+            return
+        lst.append(x)
+        lst.sort(key=lambda y: (-y["adj"], -y["gmsc"]))
+        del lst[SEASON_N:]
+
+    for path in sorted(SLATES.glob("*.json")):
+        slate = json.loads(path.read_text())
+        for g in slate.get("games", []):
+            for key, lines in (("top", g.get("top_lines") or []), ("nc", g.get("newcomer_games") or [])):
+                for x in lines:
+                    # The opponent's defense factor, as the page applies it: a home player's line meets the away defense.
+                    factor = (g.get("away_def") if x["team"] == g["home"] else g.get("home_def")) or 1
+                    item = dict(x, adj=round(x["gmsc"] * factor, 1), date=slate["date"], game=g)
+                    offer(key, item)
+                    if key == "nc" and x.get("reason") == "Freshman":
+                        offer("fr", item)
+    classes = roster_classes()
+    for lst in lists.values():
+        for x in lst:
+            if not x.get("class"):
+                x["class"] = player_class(x["team"], x["name"], classes)
+    return lists
+
+
+def line_row(x):
+    """One row of a season list, in the shape LIVE_JS draws for the nightly lists (td.m is the phone layout's one-line stats)."""
+    l, g, cls = x["line"], x["game"], x.get("class") or ""
+    when = datetime.fromisoformat(x["date"]).strftime("%b %-d")
+    reason = f'<span class="reason">{esc(x["reason"])}</span>' if x.get("reason") else ""
+    stats = f'{l["pts"]} PTS · {l["reb"]} REB · {l["ast"]} AST · {l["stl"] + l["blk"]} STL+BLK · {l["fgm"]}-{l["fga"]} FG · {x["gmsc"]:.1f} game score'
+    return (f'<tr><td class="lead p">{esc(x["name"])}{reason}</td><td class="lead t">{esc(x["team"])}{f"<span class={chr(34)}cls{chr(34)}> · {esc(cls)}</span>" if cls else ""}</td>'
+            f'<td class="n">{esc(cls)}</td><td class="n">{l["pts"]}</td><td class="n">{l["reb"]}</td><td class="n">{l["ast"]}</td><td class="n">{l["stl"] + l["blk"]}</td>'
+            f'<td class="n">{l["fgm"]}-{l["fga"]}</td><td class="m">{stats}</td><td class="n">{x["gmsc"]:.1f}</td><td class="gs">{x["adj"]:.1f}</td>'
+            f'<td class="lead gm">{esc(g["away"])} at {esc(g["home"])}<span class="reason">{esc(when)}</span></td></tr>')
+
+
+def nc_table(rows, empty):
+    if not rows:
+        return f'<p class="empty">{esc(empty)}</p>'
+    th = "".join(f'<th{" class=lead" if i in (0, 1, len(NC_HEADERS) - 1) else ""} role=button tabindex=0 aria-sort=none>{h}</th>' for i, h in enumerate(NC_HEADERS))
+    return f'<div class="tablewrap"><table class="nc sortable"><thead><tr>{th}</tr></thead><tbody>{"".join(line_row(x) for x in rows)}</tbody></table></div>'
+
+
+def season_sections():
+    season = season_lines()
+    tail = ' Ranked by adjusted game score. The list updates at each rebuild, so a game still going joins after its final is recorded.</p>'
+    return "\n".join((
+        twisty("Top 10 game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by any player, from every recorded box score.' + tail
+               + nc_table(season["top"], "No box score has been recorded yet."), count=len(season["top"]), open_=False, id_="s-top"),
+        twisty("Top 10 newcomer game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by freshmen, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
+               + nc_table(season["nc"], "No newcomer line has been recorded yet."), count=len(season["nc"]), open_=False, id_="s-nc"),
+        twisty("Top 10 freshman game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by freshmen.' + tail
+               + nc_table(season["fr"], "No freshman line has been recorded yet."), count=len(season["fr"]), open_=False, id_="s-fr")))
+
+
 def sections():
     dates = sorted(DATA.get("dates", {}))
     night = default_night(dates)
@@ -300,7 +400,7 @@ def sections():
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("How it works", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
-    return f'{toolbar}\n{newcomers}\n{topgames}\n{board}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
+    return f'{toolbar}\n{newcomers}\n{topgames}\n{board}\n{season_sections()}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
 
 
 HOW = f"""<dl class="terms">
@@ -313,7 +413,9 @@ HOW = f"""<dl class="terms">
 <dt>Leverage</dt><dd>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</dd>
 <dt>How often a game is checked</dt><dd>The page reads each game's live stats feed itself. The wait between checks runs from 1 minute at interest 100 to 60 minutes at interest 0. The wait then grows with the leader's margin. A tie keeps the wait as it is. A game is "decided" when the model's win chance, from the pregame line and the score, passes 98% and the score and clock alone put the comeback chance under 20%. A 30-point lead at the half stretches it past the end of the game, so the next check reads the final score.<br>A game between two teams with no tournament chance gets about two checks. Hover over a card to see its last and next check.<br>A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds and every other feed the schedule pages gave. A feed that has not shown its game yet gets a look every 5 minutes for 45 minutes after tipoff, whatever the game's interest. If it still does not show the game, the page stops checking and the game shows "no live stats". A game whose stats link goes to StatBroadcast, which the page cannot read, shows "stats on StatBroadcast" from the start; the team names link to that page.</dd>
 <dt>Colors and symbols</dt><dd>Red means live: a red dot and a red clock mark a game in progress, and nothing else on the page is red. Green marks the winner of a finished game. Amber marks an upset. It marks a team that won after the model gave it 35% or less before tipoff. It also marks a team whose win chance is now more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag.<br>Postponed or Canceled replaces the tipoff time when a schedule page says so. Final pending marks a game whose host's feed has moved on to its next game before a box score is posted; the last score the page read stays on the card. The page remembers the last live score it read for each game, so a reload keeps it. The score follows once a schedule page links the box score. Gray marks a game with nothing left to decide.<br>A lock icon means the trailing team has under a 2% chance. A sleep icon means neither team has a tournament chance. A fire icon marks a live game where the trailing team still has better than a 30% chance. A lightning bolt marks leverage of 15 or more. A Watch link opens the video stream when the schedule page lists one.</dd>
-<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that season efficiency rank or better. The choice applies to both lists, and this browser remembers it.<br>Game score = PTS + 0.4 FGM - 0.7 FGA - 0.4 (FTA - FTM) + 0.7 OREB + 0.3 DREB + STL + 0.7 AST + 0.7 BLK - 0.4 PF - TO. The lists rank players by adjusted game score: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</dd>
+<dt>Top 15 lists</dt><dd>Each score check reads the game's full box score, so the lists move with the games. Top 200 and Top 100 show only players whose team has that season efficiency rank or better. The choice applies to both lists. This browser remembers it. Class is the player's class year on this season's roster.</dd>
+<dt>Game score</dt><dd>Game score adds PTS, 0.4 FGM, 0.7 OREB, 0.3 DREB, STL, 0.7 AST, and 0.7 BLK. It subtracts 0.7 FGA, 0.4 missed free throws (FTA minus FTM), 0.4 PF, and TO. The lists rank players by adjusted game score: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</dd>
+<dt>Season top 10 lists</dt><dd>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by freshmen. They come from every recorded box score. They update at each rebuild. Rebuilds run a few times a day, plus every 20 minutes on game nights. A game still going joins after its final is recorded.</dd>
 </dl>"""
 
 LIVE_JS = r"""
@@ -622,8 +724,8 @@ function lineName(l){
 // The best TOP_N lines of each team in one game. The rank filter can hide one team, so each team keeps its own.
 function topLines(g,s,when){
   const out=[];
-  [['H',g.home],['V',g.away]].forEach(([side,team])=>{
-    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l)}));
+  [['H',g.home,g.home_classes],['V',g.away,g.away_classes]].forEach(([side,team,classes])=>{
+    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l),class:classOf(l,classes)}));
     out.push(...mine.sort((a,b)=>b.gmsc-a.gmsc).slice(0,TOP_N));
   });
   return out.sort((a,b)=>b.gmsc-a.gmsc);
@@ -639,11 +741,13 @@ function matchNewcomer(l,roster){
   const hits=roster.filter(p=>norm(p.name.split(' ').slice(-1)[0])===norm(last)&&norm(p.name)[0]===initial.toLowerCase());
   return hits.length===1?hits[0]:null;
 }
+// The class year of the roster player a box line belongs to, or '' when no one fits.
+function classOf(l,roster){const who=matchNewcomer(l,roster||[]);return (who&&who.class)||'';}
 function newcomerLines(g,s,when){
   const out=[];
-  [['H',g.home,g.newcomers_home],['V',g.away,g.newcomers_away]].forEach(([side,team,roster])=>{
+  [['H',g.home,g.newcomers_home,g.home_classes],['V',g.away,g.newcomers_away,g.away_classes]].forEach(([side,team,roster,classes])=>{
     ((s.lines||{})[side]||[]).forEach(l=>{const who=matchNewcomer(l,roster||[]);if(who&&played(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
-      line:boxLine(l)});});
+      line:boxLine(l),class:who.class||classOf(l,classes)});});
   });
   return out;
 }
@@ -890,6 +994,8 @@ function renderNext(){
 }
 // The opponent's defense factor (D3 average adjusted defense / the opponent's). An opponent outside Division III counts as average.
 function defFactor(x){const g=x.game,f=x.team===g.home?g.away_def:x.team===g.away?g.home_def:null;return f||1;}
+// The same columns as the season lists build_site.py renders (NC_HEADERS); a test keeps the two in step.
+const NC_HEAD='<thead><tr>'+['Player','Team','Class','Points','Rebounds','Assists','Steals plus blocks','Field goals','Game score','Adjusted game score','Game'].map((h,i)=>'<th'+(i<2||i===10?' class="lead"':'')+' role="button" tabindex="0" aria-sort="none">'+h+'</th>').join('')+'</tr></thead>';
 function renderLines(id,box,list,empty){
   if(rankCut){list=list.filter(x=>lineRank(x)<=rankCut);if(list.length===0)empty='No player from a top '+rankCut+' team has a line on this night yet.';}
   list.forEach(x=>{x.adj=Math.round(x.gmsc*defFactor(x)*10)/10;});
@@ -898,11 +1004,12 @@ function renderLines(id,box,list,empty){
   if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
   const rows=list.map(x=>{const l=x.line,g=x.game;
     // td.m repeats the five stat cells as one line; the phone layout shows it in their place.
-    return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+'</td>'+
+    return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td>'+
       '<td class="n">'+l.pts+'</td><td class="n">'+l.reb+'</td><td class="n">'+l.ast+'</td><td class="n">'+(l.stl+l.blk)+'</td><td class="n">'+l.fgm+'-'+l.fga+'</td>'+
-      '<td class="m">'+l.pts+' PTS · '+l.reb+' REB · '+l.ast+' AST · '+(l.stl+l.blk)+' STL+BLK · '+l.fgm+'-'+l.fga+' FG · '+x.gmsc.toFixed(1)+' game score</td>'+
+      `<td class="m">${l.pts} PTS · ${l.reb} REB · ${l.ast} AST · ${l.stl+l.blk} STL+BLK · ${l.fgm}-${l.fga} FG · ${x.gmsc.toFixed(1)} game score</td>`+
       '<td class="n">'+x.gmsc.toFixed(1)+'</td><td class="gs">'+x.adj.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
-  $(box).innerHTML='<div class="tablewrap"><table class="nc"><thead><tr><th class="lead">Player</th><th class="lead">Team</th><th>Points</th><th>Rebounds</th><th>Assists</th><th>Steals plus blocks</th><th>Field goals</th><th>Game score</th><th>Adjusted game score</th><th class="lead">Game</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  $(box).innerHTML='<div class="tablewrap"><table class="nc sortable">'+NC_HEAD+'<tbody>'+rows+'</tbody></table></div>';
+  if(window.bindSort)$(box).querySelectorAll('table.sortable').forEach(window.bindSort);
 }
 function renderNewcomers(){
   document.querySelectorAll('.cut').forEach(b=>b.classList.toggle('active',+b.dataset.cut===rankCut));

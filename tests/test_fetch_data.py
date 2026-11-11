@@ -275,6 +275,18 @@ def test_read_final_records_score_and_newcomer(monkeypatch):
     assert top[0]["gmsc"] >= 17.7 and {x["team"] for x in top} <= {"NYU", "Brandeis"}
 
 
+def test_read_final_stores_each_line_s_class_year(monkeypatch):
+    full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
+    monkeypatch.setattr(f, "get", lambda *a, **k: full)
+    out = f.read_final(nyu_game(home_classes=[{"name": "Brooke Batchelor", "class": "FR"}]))
+    assert out["newcomers"][0]["class"] == "FR"
+    by_name = {x["name"]: x["class"] for x in out["top"]}
+    assert by_name["Brooke Batchelor"] == "FR" and set(by_name.values()) == {"FR", ""}
+    # A newcomer list entry that carries its own class (the Stat Lab's) needs no roster lookup.
+    out = f.read_final(nyu_game(newcomers_home=[{"name": "Brooke Batchelor", "reason": "Freshman", "class": "FR"}]))
+    assert out["newcomers"][0]["class"] == "FR"
+
+
 def test_read_final_records_the_top_list_with_no_newcomers(monkeypatch):
     full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
     monkeypatch.setattr(f, "get", lambda *a, **k: full)
