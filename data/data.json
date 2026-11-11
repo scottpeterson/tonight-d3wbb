@@ -1,14 +1,9 @@
 {
- "fetched_at": "2026-11-11T01:12:26+00:00",
+ "fetched_at": "2026-11-11T01:31:22+00:00",
  "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Wittenberg schedule: HTTP Error 405: Not Allowed",
-  "Worcester St. schedule: HTTP Error 405: Not Allowed",
-  "St. John Fisher at Alfred St. feed: HTTP Error 500: Internal Server Error",
   "Penn St. Altoona at Juniata feed: not well-formed (invalid token): line 1, column 0",
-  "Bridgewater (VA) at Stevenson feed: IncompleteRead(48801 bytes read, 144604 more expected)",
-  "Roger Williams at Wheaton (MA) feed: Remote end closed connection without response"
+  "Bridgewater (VA) at Stevenson feed: IncompleteRead(16034 bytes read, 212535 more expected)"
  ],
  "stale": {},
  "dates": {
