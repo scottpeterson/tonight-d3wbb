@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from player_names import match_player, name_line
+
 BASE = Path(__file__).resolve().parent
 SITE = json.loads((BASE / "site.json").read_text())
 DATA = json.loads((BASE / "data" / "data.json").read_text())
@@ -273,53 +275,37 @@ SEASON_N = 10
 NC_HEADERS = ["Player", "Team", "Class", "Points", "Rebounds", "Assists", "Steals plus blocks", "Field goals", "Game score", "Adjusted game score", "Game"]
 
 
-def letters(name):
-    return re.sub(r"[^a-z]", "", str(name or "").lower())
-
-
 def roster_classes(rows=None):
-    """Indexes of data/rosters.csv for class lookups: "full" {(team, letters of the name): class}, "abbr"
-    {(team, first initial, letters of the last name): [classes]}, and "teams" {team: [{'name', 'class'}]}."""
+    """{team: [{'name', 'class'}]} from data/rosters.csv: the canonical names and class years."""
     if rows is None:
         path, rows = BASE / "data" / "rosters.csv", []
         if path.exists():
             with open(path, newline="", encoding="utf-8") as f:
                 rows = [(r["team"], r["player"], r.get("class") or "") for r in csv.DictReader(f)]
-    out = {"full": {}, "abbr": {}, "teams": {}}
+    out = {}
     for team, name, cls in rows:
-        parts = name.split()
-        if not parts:
-            continue
-        out["full"][(team, letters(name))] = cls
-        out["abbr"].setdefault((team, letters(parts[0])[:1], letters(parts[-1])), []).append(cls)
-        out["teams"].setdefault(team, []).append({"name": name, "class": cls})
+        out.setdefault(team, []).append({"name": name, "class": cls})
     return out
 
 
-def player_class(team, name, classes):
-    """A stored line's class year: the roster player with that full name, else the one player with the same first
-    initial and last name (feeds abbreviate to 'F. Last'), else ''."""
-    hit = classes["full"].get((team, letters(name)))
-    if hit is not None:
-        return hit
-    parts = str(name or "").split()
-    if not parts:
-        return ""
-    fits = classes["abbr"].get((team, letters(parts[0])[:1], letters(parts[-1])), [])
-    return fits[0] if len(fits) == 1 else ""
+def roster_player(team, name, rosters):
+    """(name, class) for a stored line: the roster player's when one fits (the roster name is canonical), else the
+    stored spelling with no class."""
+    who = match_player(name_line(name), rosters.get(team, []))
+    return (who["name"], who.get("class") or "") if who else (name, "")
 
 
-def fill_classes(slate, classes):
-    """Give every stored line in a slate its class year, and every game its rosters with classes, when the
-    fetcher stored them without (slates built before 2026-11-11). The page reads the class from the line."""
+def fill_classes(slate, rosters):
+    """Give every stored line in a slate its roster name and class year, and every game its rosters with classes,
+    when the fetcher stored them without (slates built before 2026-11-11). The page reads both from the line."""
     for g in slate.get("games", []):
         for key in ("home", "away"):
             if not g.get(f"{key}_classes"):
-                g[f"{key}_classes"] = classes["teams"].get(g[key], [])
+                g[f"{key}_classes"] = rosters.get(g[key], [])
         for lines in (g.get("top_lines") or [], g.get("newcomer_games") or []):
             for x in lines:
                 if not x.get("class"):
-                    x["class"] = player_class(x["team"], x["name"], classes)
+                    x["name"], x["class"] = roster_player(x["team"], x["name"], rosters)
     return slate
 
 
@@ -348,11 +334,11 @@ def season_lines():
                     offer(key, item)
                     if key == "nc" and x.get("reason") == "Freshman":
                         offer("fr", item)
-    classes = roster_classes()
+    rosters = roster_classes()
     for lst in lists.values():
         for x in lst:
             if not x.get("class"):
-                x["class"] = player_class(x["team"], x["name"], classes)
+                x["name"], x["class"] = roster_player(x["team"], x["name"], rosters)
     return lists
 
 
@@ -746,7 +732,8 @@ function lineName(l){
 function topLines(g,s,when){
   const out=[];
   [['H',g.home,g.home_classes],['V',g.away,g.away_classes]].forEach(([side,team,classes])=>{
-    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l),class:classOf(l,classes)}));
+    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>{const who=matchNewcomer(l,classes||[]);
+      return {team,name:who?who.name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l),class:(who&&who.class)||''};});
     out.push(...mine.sort((a,b)=>b.gmsc-a.gmsc).slice(0,TOP_N));
   });
   return out.sort((a,b)=>b.gmsc-a.gmsc);
@@ -754,8 +741,22 @@ function topLines(g,s,when){
 // A line's team rank, for the rank filter. A team with no rank (Division I or II) is outside every cut.
 function lineRank(x){return (x.team===x.game.home?x.game.home_rank:x.team===x.game.away?x.game.away_rank:null)||Infinity;}
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
+const words=n=>String(n||'').split(/\s+/).map(norm).filter(Boolean);
+// A box line's name words when the feed gives a first name; [] for an initial ("F. Last"), which goes by initial and last name.
+function lineWords(l){
+  if(l.first&&l.last)return words(l.first+' '+l.last);
+  const a=String(l.abbr||'');
+  if(a.includes(',')){const i=a.indexOf(','),found=words(a.slice(i+1)).concat(words(a.slice(0,i)));return found.length&&found[0].length>1?found:[];}
+  const found=words(a);return found.length&&found[0].length>1?found:[];
+}
+// The roster player a box line belongs to (player_names.py has the same steps): the roster name is canonical.
 function matchNewcomer(l,roster){
-  if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
+  const w=lineWords(l);
+  if(w.length){
+    const full=w.join('');let hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;
+    const key=w.slice().sort().join(' ');let hits=roster.filter(p=>words(p.name).sort().join(' ')===key);if(hits.length===1)return hits[0];
+    if(w.length>=2){const mine=new Set(w);hits=roster.filter(p=>{const t=words(p.name);return t.length>=2&&(t.every(x=>mine.has(x))||w.every(x=>t.includes(x)));});if(hits.length===1)return hits[0];}
+  }
   let m=/^\s*([A-Za-z])[a-z]*\.?\s+(.+)$/.exec(l.abbr),initial,last;
   if(l.abbr.includes(',')){const k=/^\s*(.+?),\s*([A-Za-z])/.exec(l.abbr);if(!k)return null;last=k[1];initial=k[2];}
   else if(m){initial=m[1];last=m[2];}else return null;
@@ -1099,10 +1100,10 @@ tick();timer=setInterval(tick,5000);
 
 def copy_slates():
     """Publish each slate with every line's class year filled in (fill_classes)."""
-    dest, classes = OUT.parent / "slates", roster_classes()
+    dest, rosters = OUT.parent / "slates", roster_classes()
     dest.mkdir(parents=True, exist_ok=True)
     for path in SLATES.glob("*.json"):
-        slate = fill_classes(json.loads(path.read_text()), classes)
+        slate = fill_classes(json.loads(path.read_text()), rosters)
         (dest / path.name).write_text(json.dumps(slate, separators=(",", ":")) + "\n")
 
 

@@ -423,7 +423,8 @@ function lineName(l){
 function topLines(g,s,when){
   const out=[];
   [['H',g.home,g.home_classes],['V',g.away,g.away_classes]].forEach(([side,team,classes])=>{
-    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>({team,name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l),class:classOf(l,classes)}));
+    const mine=((s.lines||{})[side]||[]).filter(played).map(l=>{const who=matchNewcomer(l,classes||[]);
+      return {team,name:who?who.name:lineName(l),reason:'',gmsc:Math.round(gameScore(l)*10)/10,when,line:boxLine(l),class:(who&&who.class)||''};});
     out.push(...mine.sort((a,b)=>b.gmsc-a.gmsc).slice(0,TOP_N));
   });
   return out.sort((a,b)=>b.gmsc-a.gmsc);
@@ -431,8 +432,22 @@ function topLines(g,s,when){
 // A line's team rank, for the rank filter. A team with no rank (Division I or II) is outside every cut.
 function lineRank(x){return (x.team===x.game.home?x.game.home_rank:x.team===x.game.away?x.game.away_rank:null)||Infinity;}
 const norm=n=>String(n||'').toLowerCase().replace(/[^a-z]/g,'');
+const words=n=>String(n||'').split(/\s+/).map(norm).filter(Boolean);
+// A box line's name words when the feed gives a first name; [] for an initial ("F. Last"), which goes by initial and last name.
+function lineWords(l){
+  if(l.first&&l.last)return words(l.first+' '+l.last);
+  const a=String(l.abbr||'');
+  if(a.includes(',')){const i=a.indexOf(','),found=words(a.slice(i+1)).concat(words(a.slice(0,i)));return found.length&&found[0].length>1?found:[];}
+  const found=words(a);return found.length&&found[0].length>1?found:[];
+}
+// The roster player a box line belongs to (player_names.py has the same steps): the roster name is canonical.
 function matchNewcomer(l,roster){
-  if(l.first&&l.last){const full=norm(l.first+l.last),hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;}
+  const w=lineWords(l);
+  if(w.length){
+    const full=w.join('');let hit=roster.find(p=>norm(p.name)===full);if(hit)return hit;
+    const key=w.slice().sort().join(' ');let hits=roster.filter(p=>words(p.name).sort().join(' ')===key);if(hits.length===1)return hits[0];
+    if(w.length>=2){const mine=new Set(w);hits=roster.filter(p=>{const t=words(p.name);return t.length>=2&&(t.every(x=>mine.has(x))||w.every(x=>t.includes(x)));});if(hits.length===1)return hits[0];}
+  }
   let m=/^\s*([A-Za-z])[a-z]*\.?\s+(.+)$/.exec(l.abbr),initial,last;
   if(l.abbr.includes(',')){const k=/^\s*(.+?),\s*([A-Za-z])/.exec(l.abbr);if(!k)return null;last=k[1];initial=k[2];}
   else if(m){initial=m[1];last=m[2];}else return null;
@@ -771,7 +786,7 @@ document.addEventListener('tzchange',render);
 go(defaultNight());
 tick();timer=setInterval(tick,5000);
 })();
-</script><footer>Built 2026-11-11 2:08 PM Eastern. Data fetched 2026-11-11 2:08 PM Eastern. This page is not affiliated with any organization it describes.</footer></main><script>
+</script><footer>Built 2026-11-11 2:10 PM Eastern. Data fetched 2026-11-11 2:08 PM Eastern. This page is not affiliated with any organization it describes.</footer></main><script>
 (function(){
 const root=document.documentElement,KEY='tonight-d3wbb';
 // Theme: the viewer's choice wins; otherwise follow the device. Dark Reader is locked out in <head>.

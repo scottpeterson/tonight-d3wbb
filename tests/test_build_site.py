@@ -34,25 +34,31 @@ def write_slates(tmp_path):
 def test_season_lists_rank_by_adjusted_score_keep_ten_and_fill_in_the_class(tmp_path, monkeypatch):
     write_slates(tmp_path)
     monkeypatch.setattr(b, "SLATES", tmp_path)
-    index = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR"), ("Smith", "Cara Perry", "SO")])
-    monkeypatch.setattr(b, "roster_classes", lambda rows=None: index)
+    rosters = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR"), ("Smith", "Cara Perry", "SO")])
+    monkeypatch.setattr(b, "roster_classes", lambda rows=None: rosters)
     s = b.season_lines()
     # A line meets the opponent's defense: Ava's 30 at home against Smith (0.8) is 24.0, her 26 at Smith (1.2) is 31.2,
     # and the freshman's 24 at Hope (1.0) ties the 24.0, where the raw score breaks the tie.
-    assert [(x["name"], x["adj"], x["date"]) for x in s["top"][:3]] == [("Ava Jones", 31.2, "2026-11-07"), ("Ava Jones", 24.0, "2026-11-06"), ("B. Lee", 24.0, "2026-11-06")]
+    assert [(x["name"], x["adj"], x["date"]) for x in s["top"][:3]] == [("Ava Jones", 31.2, "2026-11-07"), ("Ava Jones", 24.0, "2026-11-06"), ("Bianca Lee", 24.0, "2026-11-06")]
     assert len(s["top"]) == b.SEASON_N and s["top"][-1]["adj"] >= 17.0
     # Class: a full-name roster match, then first initial plus last name, and a stored class wins over the lookup.
     assert [x["class"] for x in s["top"][:3]] == ["SR", "SR", "FR"]
-    assert [(x["name"], x["class"]) for x in s["nc"]] == [("B. Lee", "FR"), ("Cara Park", "JR")]
-    assert [x["name"] for x in s["fr"]] == ["B. Lee"]
+    # The roster name is canonical: "B. Lee" shows as Bianca Lee. A stored class keeps its stored name.
+    assert [(x["name"], x["class"]) for x in s["nc"]] == [("Bianca Lee", "FR"), ("Cara Park", "JR")]
+    assert [x["name"] for x in s["fr"]] == ["Bianca Lee"]
 
 
-def test_player_class_guesses_only_when_one_player_fits():
-    classes = b.roster_classes([("Hope", "Amy Lee", "JR"), ("Hope", "Ann Lee", "SO"), ("Hope", "Zoe Park", "FR")])
-    assert b.player_class("Hope", "Z. Park", classes) == "FR"
-    assert b.player_class("Hope", "A. Lee", classes) == ""
-    assert b.player_class("Hope", "Amy Lee", classes) == "JR"
-    assert b.player_class("Smith", "Zoe Park", classes) == ""
+def test_roster_player_maps_a_stored_name_to_the_roster_only_when_one_player_fits():
+    rosters = b.roster_classes([("Hope", "Amy Lee", "JR"), ("Hope", "Ann Lee", "SO"), ("Hope", "Zoe Park", "FR"),
+                                ("Hope", "Judith Vila", "SR"), ("Hope", "Sierra Jean", "FR")])
+    assert b.roster_player("Hope", "Z. Park", rosters) == ("Zoe Park", "FR")
+    assert b.roster_player("Hope", "A. Lee", rosters) == ("A. Lee", "")
+    assert b.roster_player("Hope", "Amy Lee", rosters) == ("Amy Lee", "JR")
+    # A box score spelling maps to the roster name: extra word, swapped order.
+    assert b.roster_player("Hope", "Judith Vila Marti", rosters) == ("Judith Vila", "SR")
+    assert b.roster_player("Hope", "Jean Sierra", rosters) == ("Sierra Jean", "FR")
+    # A name the roster lacks stands as written.
+    assert b.roster_player("Smith", "Zoe Park", rosters) == ("Zoe Park", "")
 
 
 def test_season_table_matches_the_nightly_columns_and_sorts():
@@ -70,12 +76,12 @@ def test_published_slates_carry_the_class_on_old_lines_and_the_rosters(tmp_path,
     write_slates(tmp_path)
     monkeypatch.setattr(b, "SLATES", tmp_path)
     monkeypatch.setattr(b, "OUT", tmp_path / "docs" / "index.html")
-    index = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR")])
-    monkeypatch.setattr(b, "roster_classes", lambda rows=None: index)
+    rosters = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR")])
+    monkeypatch.setattr(b, "roster_classes", lambda rows=None: rosters)
     b.copy_slates()
     out = json.loads((tmp_path / "docs" / "slates" / "2026-11-06.json").read_text())
     g = out["games"][0]
-    assert [x["class"] for x in g["top_lines"]] == ["SR", "FR"]
+    assert [(x["name"], x["class"]) for x in g["top_lines"]] == [("Ava Jones", "SR"), ("Bianca Lee", "FR")]
     assert [x["class"] for x in g["newcomer_games"]] == ["FR", "JR"]  # the stored JR stays
     assert g["home_classes"] == [{"name": "Ava Jones", "class": "SR"}] and g["away_classes"] == [{"name": "Bianca Lee", "class": "FR"}]
     assert b.load_slate("2026-11-06")["games"][0]["top_lines"][0]["class"] == "SR"

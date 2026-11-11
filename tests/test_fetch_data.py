@@ -239,6 +239,15 @@ def test_match_newcomer():
     assert f.match_newcomer(dict(LINE, abbr="A. LEE"), ROSTER) is None
     assert f.match_newcomer(dict(LINE, first="Amy", last="Lee", abbr="A. LEE"), ROSTER)["name"] == "Amy Lee"
     assert f.match_newcomer(dict(LINE, first="Zoe", last="Park", abbr="Z. PARK"), ROSTER) is None
+    # The roster name is canonical: a box score spelling with an extra word or the words swapped maps to it.
+    roster = ROSTER + [{"name": "Judith Vila", "reason": ""}, {"name": "Sierra Jean", "reason": ""}, {"name": "MJ van der Horst", "reason": ""}]
+    assert f.match_newcomer(dict(LINE, first="Judith", last="Vila Marti", abbr="J. VILA MARTI"), roster)["name"] == "Judith Vila"
+    assert f.match_newcomer(dict(LINE, abbr="Vila Marti, Judith"), roster)["name"] == "Judith Vila"
+    assert f.match_newcomer(dict(LINE, first="Jean", last="Sierra", abbr="J. SIERRA"), roster)["name"] == "Sierra Jean"
+    assert f.match_newcomer(dict(LINE, first="Mj", last="van der Horst", abbr="M. VAN DER HORST"), roster)["name"] == "MJ van der Horst"
+    # Two roster players share the words: no guess. A name the roster lacks: None, and the feed's spelling stands.
+    assert f.match_newcomer(dict(LINE, first="Lee", last="Ann Amy", abbr="L. ANN AMY"), ROSTER) is None
+    assert f.roster_player(dict(LINE, first="Nia", last="Brown", abbr="N. BROWN"), ROSTER) == ("Nia Brown", "")
 
 
 def test_presto_lines_skip_team_rows():
@@ -278,10 +287,12 @@ def test_read_final_records_score_and_newcomer(monkeypatch):
 def test_read_final_stores_each_line_s_class_year(monkeypatch):
     full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
     monkeypatch.setattr(f, "get", lambda *a, **k: full)
-    out = f.read_final(nyu_game(home_classes=[{"name": "Brooke Batchelor", "class": "FR"}]))
+    out = f.read_final(nyu_game(home_classes=[{"name": "Brooke Batchelor", "class": "FR"}, {"name": "Ella Fay Smith", "class": "SO"}]))
     assert out["newcomers"][0]["class"] == "FR"
     by_name = {x["name"]: x["class"] for x in out["top"]}
     assert by_name["Brooke Batchelor"] == "FR" and set(by_name.values()) == {"FR", ""}
+    # The top list carries the roster's spelling for a matched player and the feed's for the rest.
+    assert "Brooke Batchelor" in by_name and "Ella Fay Smith" not in by_name
     # A newcomer list entry that carries its own class (the Stat Lab's) needs no roster lookup.
     out = f.read_final(nyu_game(newcomers_home=[{"name": "Brooke Batchelor", "reason": "Freshman", "class": "FR"}]))
     assert out["newcomers"][0]["class"] == "FR"

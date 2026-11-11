@@ -59,6 +59,8 @@ from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 
+from player_names import match_player
+
 BASE = Path(__file__).resolve().parent
 DATA = BASE / "data"
 SLATES = DATA / "slates"
@@ -1361,26 +1363,20 @@ def norm(name):
 
 
 def match_newcomer(line, roster):
-    """The roster newcomer this box line belongs to. Full first and last name when the feed has them;
-    otherwise first initial plus last name, and only when exactly one newcomer fits."""
-    if line["first"] and line["last"]:
-        full = norm(line["first"] + line["last"])
-        hit = [p for p in roster if norm(p["name"]) == full]
-        if hit:
-            return hit[0]
-    m = re.match(r"\s*([A-Za-z])[a-z]*\.?\s+(.+)$", line["abbr"]) or re.match(r"\s*(.+?),\s*([A-Za-z])", line["abbr"])
-    if not m:
-        return None
-    initial, last = (m.group(1), m.group(2)) if "," not in line["abbr"] else (m.group(2), m.group(1))
-    last_n = norm(last)
-    hit = [p for p in roster if norm(p["name"].split(" ")[-1]) == last_n and norm(p["name"])[:1] == initial.lower()]
-    return hit[0] if len(hit) == 1 else None
+    """The roster player a box line belongs to, or None (player_names.match_player: the roster name is canonical)."""
+    return match_player(line, roster)
 
 
 def line_class(line, roster):
     """The class year of the roster player a box line belongs to, or '' when no one fits."""
     who = match_newcomer(line, roster)
     return (who or {}).get("class") or ""
+
+
+def roster_player(line, roster):
+    """(name, class) for a box line: the roster player's when one fits, else the feed's spelling with no class."""
+    who = match_newcomer(line, roster)
+    return (who["name"], who.get("class") or "") if who else (line_name(line), "")
 
 
 def feed_date_matches(feed_date, day):
@@ -1462,10 +1458,9 @@ def box_result(game, home_score, away_score, sides, lines):
     # The page can filter the list by team rank, so each team keeps its own 15 best: one team can fill the list alone.
     top = []
     for side, team in (("H", game["home"]), ("V", game["away"])):
-        mine = [{"team": team, "name": line_name(line), "reason": "", "gmsc": round(game_score(line), 1),
-                 "class": line_class(line, classes[side]),
+        mine = [{"team": team, "name": who[0], "reason": "", "gmsc": round(game_score(line), 1), "class": who[1],
                  "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}}
-                for line in lines.get(side, []) if played(line)]
+                for line in lines.get(side, []) if played(line) for who in (roster_player(line, classes[side]),)]
         top += sorted(mine, key=lambda x: -x["gmsc"])[:TOP_N]
     return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"]),
             "top": sorted(top, key=lambda x: -x["gmsc"])}

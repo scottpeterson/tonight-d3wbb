@@ -12,8 +12,8 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
-         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf"]
-CONSTS = ["KEY", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
+         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords"]
+CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -490,5 +490,11 @@ def test_live_lines_carry_the_class_year_from_the_slate_roster():
     line = {"first": "", "last": "", "abbr": "Z. PARK", "min": 20, "pts": 12, "fgm": 5, "fga": 9, "ftm": 2, "fta": 2, "oreb": 1, "dreb": 3, "reb": 4, "ast": 1, "to": 1, "stl": 1, "blk": 0, "pf": 2}
     other = dict(line, abbr="A. LEE")
     s = {"lines": {"H": [line, other], "V": []}}
-    assert run(f"topLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Z. Park", "FR"], ["A. Lee", ""]]
+    # The roster name is canonical: the matched line shows "Zoe Park", the unmatched one keeps the feed's spelling.
+    assert run(f"topLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Zoe Park", "FR"], ["A. Lee", ""]]
+    roster = json.dumps([{"name": "Judith Vila", "class": "SR"}, {"name": "Sierra Jean", "class": "FR"}, {"name": "Amy Lee", "class": "JR"}, {"name": "Ann Lee", "class": "SO"}])
+    assert run(f"matchNewcomer({{first:'Judith',last:'Vila Marti',abbr:'J. VILA MARTI'}},{roster}).name") == "Judith Vila"
+    assert run(f"matchNewcomer({{first:'',last:'',abbr:'Vila Marti, Judith'}},{roster}).name") == "Judith Vila"
+    assert run(f"matchNewcomer({{first:'Jean',last:'Sierra',abbr:'J. SIERRA'}},{roster}).name") == "Sierra Jean"
+    assert run(f"matchNewcomer({{first:'',last:'',abbr:'A. LEE'}},{roster})") is None
     assert run(f"newcomerLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Zoe Park", "FR"]]
