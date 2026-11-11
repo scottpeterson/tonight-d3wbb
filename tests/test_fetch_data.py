@@ -895,6 +895,26 @@ def test_a_projected_pairing_both_pages_contradict_is_left_out():
     assert not f.contradicted({"home": "Marywood", "away": "Hope"}, day, pages, resolve)
 
 
+def test_a_game_neither_schedule_page_lists_is_left_out():
+    # Massey carried Buena Vista at North Central (MN) on 2026-11-10; both pages showed Nov 7 and Nov 14 only.
+    day, other = date(2026, 11, 10), date(2026, 11, 14)
+    pages = {"Buena Vista": [f.row(other, None, False, False, "Carleton College", {}, "", "")],
+             "North Central (MN)": [f.row(other, None, True, False, "Trinity Bible College", {}, "", "")]}
+    g = {"date": "2026-11-10", "home": "North Central (MN)", "away": "Buena Vista"}
+    assert f.unlisted(g, day, pages)
+    notes = []
+    resolve = f.opponent_resolver({}, MEMBERS)
+    assert f.place_games([g], [day], pages, resolve, notes) == {day: []}
+    assert notes == ["Buena Vista at North Central (MN) 2026-11-10: neither schedule page lists a game that day, left out"]
+    # A page that failed to load keeps the game, and so does a row that day with a TBA opponent.
+    assert not f.unlisted(g, day, {**pages, "Buena Vista": []})
+    tba = {**pages, "Buena Vista": pages["Buena Vista"] + [f.row(day, None, False, True, "TBA", {}, "", "")]}
+    assert not f.unlisted(g, day, tba)
+    # An exhibition row that day is no listing.
+    exhib = {**pages, "Buena Vista": pages["Buena Vista"] + [f.row(day, None, True, False, "Alumni", {}, "", "Exhibition")]}
+    assert f.unlisted(g, day, exhib)
+
+
 # ---------------------------------------------------------------- the Mac's Presto cache
 
 PRESTO_SCHOOL = {"team": "Lasell", "type": "Presto", "schedule": "https://laserpride.lasell.edu/sports/wbkb/2025-26/schedule", "tz": "America/New_York"}

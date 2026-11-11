@@ -726,10 +726,21 @@ def rescheduled(g, day, pages, resolve):
     return found.pop() if len(found) == 1 else None
 
 
+def unlisted(g, day, pages):
+    """True when both teams' schedule pages were read and neither lists a game on `day`. Massey carried Buena Vista
+    at North Central (MN) on 2026-11-10 and neither page had a row that day. A page that failed to load has no
+    rows and keeps the game, and a row with a TBA opponent counts as a listing."""
+    for team in (g["home"], g["away"]):
+        rows = pages.get(team) or []
+        if not rows or any(r["day"] == day and not r["exhibition"] for r in rows):
+            return False
+    return True
+
+
 def place_games(games, days, pages, resolve, notes):
     """The Stat Lab's games for `days`, by day, after the schedule pages have their say: a projected pairing both
-    pages contradict is left out, and a game the pages date differently moves to their day (or goes, when the
-    list already has the pair there)."""
+    pages contradict is left out, so is one neither page lists at all, and a game the pages date differently
+    moves to their day (or goes, when the list already has the pair there)."""
     by_day = {d: [] for d in days}
     listed = {(g["date"], frozenset((g["home"], g["away"]))) for g in games}
     for g in games:
@@ -738,6 +749,9 @@ def place_games(games, days, pages, resolve, notes):
             continue
         if contradicted(g, d, pages, resolve):
             notes.append(f'{g["away"]} at {g["home"]} {d.isoformat()}: both schedule pages list other opponents, left out')
+            continue
+        if unlisted(g, d, pages):
+            notes.append(f'{g["away"]} at {g["home"]} {d.isoformat()}: neither schedule page lists a game that day, left out')
             continue
         moved = rescheduled(g, d, pages, resolve)
         if moved and (moved.isoformat(), frozenset((g["home"], g["away"]))) in listed:
