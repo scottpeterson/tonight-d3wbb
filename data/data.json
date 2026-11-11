@@ -1,6 +1,9 @@
 {
- "fetched_at": "2026-11-11T05:52:09+00:00",
- "errors": [],
+ "fetched_at": "2026-11-11T07:20:40+00:00",
+ "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
@@ -108,7 +111,5 @@
   "2027-02-27": 4,
   "2026-10-27": 1
  },
- "notes": [
-  "Buena Vista at North Central (MN) 2026-11-10: neither schedule page lists a game that day, left out"
- ]
+ "notes": []
 }
