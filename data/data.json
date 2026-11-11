@@ -1,6 +1,10 @@
 {
- "fetched_at": "2026-11-11T02:19:54+00:00",
+ "fetched_at": "2026-11-11T02:20:44+00:00",
  "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Wittenberg schedule: WAF challenge from wittenbergtigers.com",
+  "Worcester St. schedule: WAF challenge from wsulancers.com",
   "Penn St. Altoona at Juniata feed: not well-formed (invalid token): line 1, column 0"
  ],
  "stale": {},
@@ -110,5 +114,7 @@
   "2027-02-27": 4,
   "2026-10-27": 1
  },
- "notes": []
+ "notes": [
+  "Buena Vista at North Central (MN) 2026-11-10: neither schedule page lists a game that day, left out"
+ ]
 }
