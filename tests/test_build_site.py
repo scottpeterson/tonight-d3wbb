@@ -34,7 +34,8 @@ def write_slates(tmp_path):
 def test_season_lists_rank_by_adjusted_score_keep_ten_and_fill_in_the_class(tmp_path, monkeypatch):
     write_slates(tmp_path)
     monkeypatch.setattr(b, "SLATES", tmp_path)
-    monkeypatch.setattr(b, "roster_classes", lambda: {("Hope", "avajones"): "SR", ("Smith", "biancalee"): "FR", ("Smith", "caraperry"): "SO"})
+    index = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR"), ("Smith", "Cara Perry", "SO")])
+    monkeypatch.setattr(b, "roster_classes", lambda rows=None: index)
     s = b.season_lines()
     # A line meets the opponent's defense: Ava's 30 at home against Smith (0.8) is 24.0, her 26 at Smith (1.2) is 31.2,
     # and the freshman's 24 at Hope (1.0) ties the 24.0, where the raw score breaks the tie.
@@ -47,7 +48,7 @@ def test_season_lists_rank_by_adjusted_score_keep_ten_and_fill_in_the_class(tmp_
 
 
 def test_player_class_guesses_only_when_one_player_fits():
-    classes = {("Hope", "amylee"): "JR", ("Hope", "annlee"): "SO", ("Hope", "zoepark"): "FR"}
+    classes = b.roster_classes([("Hope", "Amy Lee", "JR"), ("Hope", "Ann Lee", "SO"), ("Hope", "Zoe Park", "FR")])
     assert b.player_class("Hope", "Z. Park", classes) == "FR"
     assert b.player_class("Hope", "A. Lee", classes) == ""
     assert b.player_class("Hope", "Amy Lee", classes) == "JR"
@@ -63,3 +64,18 @@ def test_season_table_matches_the_nightly_columns_and_sorts():
     # LIVE_JS draws the nightly lists with the same column list.
     js = re.search(r"const NC_HEAD='<thead><tr>'\+\[(.*?)\]\.map", b.LIVE_JS).group(1)
     assert [h.strip("'") for h in js.split(",")] == b.NC_HEADERS
+
+
+def test_published_slates_carry_the_class_on_old_lines_and_the_rosters(tmp_path, monkeypatch):
+    write_slates(tmp_path)
+    monkeypatch.setattr(b, "SLATES", tmp_path)
+    monkeypatch.setattr(b, "OUT", tmp_path / "docs" / "index.html")
+    index = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR")])
+    monkeypatch.setattr(b, "roster_classes", lambda rows=None: index)
+    b.copy_slates()
+    out = json.loads((tmp_path / "docs" / "slates" / "2026-11-06.json").read_text())
+    g = out["games"][0]
+    assert [x["class"] for x in g["top_lines"]] == ["SR", "FR"]
+    assert [x["class"] for x in g["newcomer_games"]] == ["FR", "JR"]  # the stored JR stays
+    assert g["home_classes"] == [{"name": "Ava Jones", "class": "SR"}] and g["away_classes"] == [{"name": "Bianca Lee", "class": "FR"}]
+    assert b.load_slate("2026-11-06")["games"][0]["top_lines"][0]["class"] == "SR"

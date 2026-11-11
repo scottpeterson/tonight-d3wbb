@@ -13,7 +13,6 @@ import csv
 import html
 import json
 import re
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -267,7 +266,7 @@ def default_night(dates):
 
 def load_slate(day):
     path = SLATES / f"{day}.json"
-    return json.loads(path.read_text()) if path.exists() else None
+    return fill_classes(json.loads(path.read_text()), roster_classes()) if path.exists() else None
 
 
 SEASON_N = 10
@@ -278,28 +277,50 @@ def letters(name):
     return re.sub(r"[^a-z]", "", str(name or "").lower())
 
 
-def roster_classes():
-    """{(team, letters of the name): class} from data/rosters.csv, for lines stored before the slates carried a class."""
-    path, out = BASE / "data" / "rosters.csv", {}
-    if path.exists():
-        with open(path, newline="", encoding="utf-8") as f:
-            for r in csv.DictReader(f):
-                out[(r["team"], letters(r["player"]))] = r.get("class") or ""
+def roster_classes(rows=None):
+    """Indexes of data/rosters.csv for class lookups: "full" {(team, letters of the name): class}, "abbr"
+    {(team, first initial, letters of the last name): [classes]}, and "teams" {team: [{'name', 'class'}]}."""
+    if rows is None:
+        path, rows = BASE / "data" / "rosters.csv", []
+        if path.exists():
+            with open(path, newline="", encoding="utf-8") as f:
+                rows = [(r["team"], r["player"], r.get("class") or "") for r in csv.DictReader(f)]
+    out = {"full": {}, "abbr": {}, "teams": {}}
+    for team, name, cls in rows:
+        parts = name.split()
+        if not parts:
+            continue
+        out["full"][(team, letters(name))] = cls
+        out["abbr"].setdefault((team, letters(parts[0])[:1], letters(parts[-1])), []).append(cls)
+        out["teams"].setdefault(team, []).append({"name": name, "class": cls})
     return out
 
 
 def player_class(team, name, classes):
     """A stored line's class year: the roster player with that full name, else the one player with the same first
     initial and last name (feeds abbreviate to 'F. Last'), else ''."""
-    hit = classes.get((team, letters(name)))
+    hit = classes["full"].get((team, letters(name)))
     if hit is not None:
         return hit
     parts = str(name or "").split()
     if not parts:
         return ""
-    initial, last = letters(parts[0])[:1], letters(parts[-1])
-    fits = [c for (t, n), c in classes.items() if t == team and n[:1] == initial and n.endswith(last)]
+    fits = classes["abbr"].get((team, letters(parts[0])[:1], letters(parts[-1])), [])
     return fits[0] if len(fits) == 1 else ""
+
+
+def fill_classes(slate, classes):
+    """Give every stored line in a slate its class year, and every game its rosters with classes, when the
+    fetcher stored them without (slates built before 2026-11-11). The page reads the class from the line."""
+    for g in slate.get("games", []):
+        for key in ("home", "away"):
+            if not g.get(f"{key}_classes"):
+                g[f"{key}_classes"] = classes["teams"].get(g[key], [])
+        for lines in (g.get("top_lines") or [], g.get("newcomer_games") or []):
+            for x in lines:
+                if not x.get("class"):
+                    x["class"] = player_class(x["team"], x["name"], classes)
+    return slate
 
 
 def season_lines():
@@ -1077,10 +1098,12 @@ tick();timer=setInterval(tick,5000);
 
 
 def copy_slates():
-    dest = OUT.parent / "slates"
+    """Publish each slate with every line's class year filled in (fill_classes)."""
+    dest, classes = OUT.parent / "slates", roster_classes()
     dest.mkdir(parents=True, exist_ok=True)
     for path in SLATES.glob("*.json"):
-        shutil.copy(path, dest / path.name)
+        slate = fill_classes(json.loads(path.read_text()), classes)
+        (dest / path.name).write_text(json.dumps(slate, separators=(",", ":")) + "\n")
 
 
 def main():
