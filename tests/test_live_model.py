@@ -14,7 +14,7 @@ FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "sta
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
          "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords"]
 CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
-          "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS"]
+          "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -24,7 +24,9 @@ def source(name):
     m = re.search(r"^(?:async )?function " + name + r"\(", LIVE_JS, re.M) or re.search(r"^const (?:[A-Z_]+=[^,;]+,)*" + name + r"\b", LIVE_JS, re.M)
     assert m, name
     if LIVE_JS[m.start():].startswith("const"):
-        return LIVE_JS[m.start():LIVE_JS.index("\n", m.start())]  # const statements here fit on one line
+        line = LIVE_JS[m.start():LIVE_JS.index("\n", m.start())]
+        if not line.rstrip().endswith("{"):
+            return line  # a const statement on one line; SORTS opens a brace and closes it below
     depth, i = 0, LIVE_JS.index("{", m.start())
     while True:
         depth += {"{": 1, "}": -1}.get(LIVE_JS[i], 0)
@@ -498,3 +500,11 @@ def test_live_lines_carry_the_class_year_from_the_slate_roster():
     assert run(f"matchNewcomer({{first:'Jean',last:'Sierra',abbr:'J. SIERRA'}},{roster}).name") == "Sierra Jean"
     assert run(f"matchNewcomer({{first:'',last:'',abbr:'A. LEE'}},{roster})") is None
     assert run(f"newcomerLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Zoe Park", "FR"]]
+
+
+def test_progress_sort_puts_the_game_furthest_along_first_then_the_earliest_tipoff():
+    games = [{"st": {"progress": 0.25}, "tip": "2026-11-12T00:00:00Z"}, {"st": {"progress": 0.9}, "tip": "2026-11-12T01:00:00Z"},
+             {"st": {}, "tip": "2026-11-12T00:30:00Z"}, {"st": {}, "tip": "2026-11-11T23:00:00Z"}, {"st": {}, "tip": None}]
+    assert run(f"{json.dumps(games)}.sort(SORTS.progress).map(g=>g.tip)") == \
+        ["2026-11-12T01:00:00Z", "2026-11-12T00:00:00Z", "2026-11-11T23:00:00Z", "2026-11-12T00:30:00Z", None]
+    assert "closest" not in run("Object.keys(SORTS)")

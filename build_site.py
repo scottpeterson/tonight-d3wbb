@@ -228,7 +228,7 @@ def head():
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="darkreader-lock">
-<meta name="ste-allow" content="leverage,NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III,PTS,REB,AST,STL,BLK,FG,FGM,FGA,FTM,FTA,OREB,DREB,PF,TO">
+<meta name="ste-allow" content="leverage,SUNY,NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III,PTS,REB,AST,STL,BLK,FG,FGM,FGA,FTM,FTA,OREB,DREB,PF,TO">
 <meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15181d" media="(prefers-color-scheme: dark)">
 <title>{esc(SITE["title"])}</title>
@@ -407,7 +407,7 @@ def sections():
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
-            '<button type="button" class="sorter" data-sort="closest">Closest</button><button type="button" class="sorter" data-sort="leverage">Game Leverage</button></div></div>')
+            '<button type="button" class="sorter" data-sort="progress">Progress</button><button type="button" class="sorter" data-sort="leverage">Game Leverage</button></div></div>')
     groups = "".join(twisty(title, '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
                      for key, title in (("mine", "My Watchlist"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
@@ -434,7 +434,7 @@ HOW = f"""<dl class="terms">
 <ul>
 <li><b>Interest</b> puts the highest score first.</li>
 <li><b>Tipoff</b> puts the earliest game first.</li>
-<li><b>Closest</b> puts the smallest gap in win probability first.</li>
+<li><b>Progress</b> puts the game furthest along first, then the earliest tipoff.</li>
 <li><b>Game Leverage</b> puts the most at stake first.</li>
 </ul>
 </dd>
@@ -453,7 +453,7 @@ HOW = f"""<dl class="terms">
 <ul>
 <li><b>Team quality.</b> The season efficiency ranks of both teams. The better team counts more, and a rank near the top counts far more than one in the middle. The gap between 13th and 39th counts about four times the gap between 213th and 239th.</li>
 <li><b>Game Leverage.</b> See Game Leverage below.</li>
-<li><b>Closeness.</b> How close the game is. Late in the game, this counts more. It is weighted by the quality of the two teams, so a close game between two teams ranked near 300 adds little.</li>
+<li><b>Closeness.</b> A 50-50 game counts in full and a 90-10 game counts a fifth as much. Late in the game, this counts more. It is weighted by the quality of the two teams, so a close game between two teams ranked near 300 adds little.</li>
 <li><b>Upset.</b> How far an underdog is past its pregame chance, weighted by the quality of the team being upset. An upset of the 20th team is news. An upset of the 254th is not.</li>
 </ul>
 <p>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</p>
@@ -461,7 +461,7 @@ HOW = f"""<dl class="terms">
 <ul>
 <li><b>Team quality (30%).</b> The season efficiency ranks of both teams.</li>
 <li><b>Upset (30%).</b> How far the underdog beat the pregame spread. A win counts in full. A closer loss than expected counts 60%.</li>
-<li><b>Closeness (25%).</b> How close the final score is. Overtime counts as the closest finish.</li>
+<li><b>Closeness (25%).</b> The final margin sets it: a one-point game counts almost in full and a 14-point game a seventh as much. Overtime counts as the closest finish.</li>
 <li><b>Game Leverage (15%).</b> See Game Leverage below.</li>
 </ul>
 <p>The upset and closeness parts count in full between top teams. Between teams ranked near 400, they count about a third as much. A one-point upset in the middle of the table therefore sits below a six-point game between two top-50 teams.</p>
@@ -1076,7 +1076,7 @@ function card(g){
 const SORTS={
   interest:(a,b)=>b.st.interest-a.st.interest,
   tipoff:(a,b)=>(tipMs(a)||Infinity)-(tipMs(b)||Infinity),
-  closest:(a,b)=>Math.min(b.st.wp,1-b.st.wp)-Math.min(a.st.wp,1-a.st.wp),
+  progress:(a,b)=>(b.st.progress||0)-(a.st.progress||0)||(tipMs(a)||Infinity)-(tipMs(b)||Infinity),
   leverage:(a,b)=>(b.division?-1:leverage(b))-(a.division?-1:leverage(a)),
 };
 const plain=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
