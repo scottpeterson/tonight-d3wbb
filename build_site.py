@@ -228,7 +228,7 @@ def head():
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="darkreader-lock">
-<meta name="ste-allow" content="leverage,SUNY,NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III,PTS,REB,AST,STL,BLK,FG,FGM,FGA,FTM,FTA,OREB,DREB,PF,TO">
+<meta name="ste-allow" content="leverage,SUNY,NPI,WBB,D1,D2,D3,OT,NAIA,NCAA,II,III,PTS,REB,AST,STL,BLK,FG,FGM,FGA,FTM,FTA,OREB,DREB,PF,TO,FR,SO,JR,SR,GR,ET">
 <meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15181d" media="(prefers-color-scheme: dark)">
 <title>{esc(SITE["title"])}</title>
@@ -236,7 +236,7 @@ def head():
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 {icon}{tag}<style>{css}</style></head><body><main>
-<div class="top"><h1>{esc(SITE["title"])}</h1>{link("#how", "How it works", "how")}<details class="settings"><summary>Settings</summary></details><div class="settings-panel">{controls()}</div></div>
+<div class="top"><h1>{esc(SITE["title"])}</h1>{link("#how", "Method and definitions", "how")}<details class="settings"><summary>Settings</summary></details><div class="settings-panel">{controls()}</div></div>
 """
 
 
@@ -411,7 +411,7 @@ def sections():
     groups = "".join(twisty(title, '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
                      for key, title in (("mine", "My Watchlist"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
-    how = twisty("How it works", HOW, open_=False, id_="how")
+    how = twisty("Method and definitions", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
     return f'{toolbar}\n{newcomers}\n{topgames}\n{board}\n{season_sections()}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
 
@@ -679,7 +679,7 @@ function nextCheck(g,st,now){
 function teamTokens(n){return new Set(String(n||'').toLowerCase().match(/[a-z]+/g)||[]);}
 function overlap(a,b){const B=teamTokens(b);let n=0;teamTokens(a).forEach(t=>{if(B.has(t)&&!['college','university','of','the','state'].includes(t))n++;});return n;}
 // Orienting a feed to the schedule. Crews sometimes type the team names on the wrong sides (Medgar Evers vs
-// St. Joseph's Long Island, 2026-11-06: the side coded MEDGAR, carrying Medgar Evers' players and score, was named
+// St. Joseph's Long Island, 2026-11-06: the side coded MEDGAR, with Medgar Evers' players and score, was named
 // St. Joseph's Long Island). So the box score's players count most, then the team code, then the typed name.
 function initials(n){return (String(n||'').replace(/['\u2019]/g,'').match(/[A-Za-z]+/g)||[]).map(w=>w[0]).join('').toLowerCase();}
 function codeHit(code,team){
@@ -797,7 +797,7 @@ async function readFeed(g,full){
     // Stat crews sometimes leave the feed's date unset or stale (1/1/0001). Then the feed counts when one of its teams
     // is one of ours and the game is not over, or when this page already read it live.
     const ours=overlap(G.HomeTeam.Name,g.home)+overlap(G.HomeTeam.Name,g.away)+overlap(G.VisitingTeam.Name,g.home)+overlap(G.VisitingTeam.Name,g.away)>0;
-    // A host's feed set up for its next game today (Susquehanna's doubleheader, 2026-11-07) says ours is over.
+    // A host's feed already configured for its next game today (Susquehanna's doubleheader, 2026-11-07) says ours is over.
     if(G.Date===mdy(g.date)&&!ours)g.st.other=true;
     if(!G.HasStarted)return null;
     if(G.Date!==mdy(g.date)&&!(ours&&(!G.IsComplete||g.st.live)))return null;
@@ -1147,8 +1147,8 @@ function renderNewcomers(){
   document.querySelectorAll('.cut').forEach(b=>b.classList.toggle('active',+b.dataset.cut===rankCut));
   const nc=[],top=[];
   games.forEach(g=>{g.st.nc.forEach(x=>nc.push(Object.assign({game:g},x)));g.st.top.forEach(x=>top.push(Object.assign({game:g},x)));});
-  renderLines('nc','#newcomers',nc,'No newcomer line has been read on this night yet.');
-  renderLines('top','#topgames',top,'No box score has been read on this night yet.');
+  renderLines('nc','#newcomers',nc,'Newcomer lines appear here once box scores for this night come in.');
+  renderLines('top','#topgames',top,'The best game scores appear here once box scores for this night come in.');
 }
 
 // ---------- nights
