@@ -342,11 +342,17 @@ def season_lines():
     return lists
 
 
+def reason_text(reason):
+    """The newcomer reason as a reader sees it. The newcomer source says "Freshman"; prose uses "First-year"
+    (TERMINOLOGY.md formats). LIVE_JS has the same mapping in reasonText()."""
+    return "First-year" if reason == "Freshman" else reason
+
+
 def line_row(x):
     """One row of a season list, in the shape LIVE_JS draws for the nightly lists (td.m is the phone layout's one-line stats)."""
     l, g, cls = x["line"], x["game"], x.get("class") or ""
     when = datetime.fromisoformat(x["date"]).strftime("%b %-d")
-    reason = f'<span class="reason">{esc(x["reason"])}</span>' if x.get("reason") else ""
+    reason = f'<span class="reason">{esc(reason_text(x["reason"]))}</span>' if x.get("reason") else ""
     stats = f'{l["pts"]} PTS · {l["reb"]} REB · {l["ast"]} AST · {l["stl"] + l["blk"]} STL+BLK · {l["fgm"]}-{l["fga"]} FG · {x["gmsc"]:.1f} game score'
     return (f'<tr><td class="lead p">{esc(x["name"])}{reason}</td><td class="lead t">{esc(x["team"])}{f"<span class={chr(34)}cls{chr(34)}> · {esc(cls)}</span>" if cls else ""}</td>'
             f'<td class="n">{esc(cls)}</td><td class="n">{l["pts"]}</td><td class="n">{l["reb"]}</td><td class="n">{l["ast"]}</td><td class="n">{l["stl"] + l["blk"]}</td>'
@@ -1006,6 +1012,8 @@ function sideTag(g,side){return g.division&&g[side]!==g.d3?'<span class="dv">D'+
 function logoSlug(n){return String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function logo(n){const f=logoSlug(n);return LOGOS.has(f)?'<img class="lg" src="logos/'+f+'.webp" alt="" width="20" height="20" loading="lazy" decoding="async">':'<span class="lg none" aria-hidden="true">'+esc(String(n||'?')[0])+'</span>';}
 function fmtTime(iso){return '<time datetime="'+esc(iso)+'" data-fmt="short"></time>';}
+// The newcomer source says "Freshman"; prose uses "First-year". reason_text() in build_site.py matches.
+function reasonText(r){return r==='Freshman'?'First-year':r;}
 function ago(ms){const m=Math.max(0,Math.round((Date.now()-ms)/60000));return m<1?'just now':m<60?m+'m ago':Math.floor(m/60)+'h '+(m%60)+'m ago';}
 function inMin(ms){const m=Math.max(0,Math.round((ms-Date.now())/60000));return m<1?'now':m<60?'in '+m+'m':'in '+Math.floor(m/60)+'h '+(m%60)+'m';}
 function winCell(g,st){
@@ -1128,7 +1136,7 @@ function renderLines(id,box,list,empty){
   if(!list.length){$(box).innerHTML='<p class="empty">'+empty+'</p>';return;}
   const rows=list.map(x=>{const l=x.line,g=x.game;
     // td.m repeats the five stat cells as one line; the phone layout shows it in their place.
-    return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(x.reason)+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td>'+
+    return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(reasonText(x.reason))+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td>'+
       '<td class="n">'+l.pts+'</td><td class="n">'+l.reb+'</td><td class="n">'+l.ast+'</td><td class="n">'+(l.stl+l.blk)+'</td><td class="n">'+l.fgm+'-'+l.fga+'</td>'+
       `<td class="m">${l.pts} PTS · ${l.reb} REB · ${l.ast} AST · ${l.stl+l.blk} STL+BLK · ${l.fgm}-${l.fga} FG · ${x.gmsc.toFixed(1)} game score</td>`+
       '<td class="n">'+x.gmsc.toFixed(1)+'</td><td class="gs">'+x.adj.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
