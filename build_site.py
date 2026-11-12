@@ -13,7 +13,7 @@ import csv
 import html
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -25,15 +25,14 @@ DATA = json.loads((BASE / "data" / "data.json").read_text())
 SLATES = BASE / "data" / "slates"
 OUT = BASE / SITE.get("output", "docs/index.html")
 HOME_TZ = ZoneInfo(SITE["timezones"][0]["id"])
-NOW = datetime.now(timezone.utc)
 
 
 def esc(value):
     return html.escape("" if value is None else str(value), quote=True)
 
 
-def stamp(iso, fmt="%Y-%m-%d %-I:%M %p"):
-    """Format an ISO timestamp in the home time zone for footer text."""
+def stamp(iso, fmt="%B %-d, %Y, %-I:%M %p"):
+    """Format an ISO timestamp in the home time zone for footer text: November 12, 2026, 7:14 AM (TERMINOLOGY.md formats)."""
     return datetime.fromisoformat(iso).astimezone(HOME_TZ).strftime(fmt)
 
 
@@ -242,11 +241,12 @@ def head():
 
 
 def footer():
-    built = stamp(NOW.isoformat())
+    # The update line follows the approved format "Updated November 12, 2026, 7:14 AM ET". It reports when the
+    # data was fetched, because that is the age of what the reader sees; the build time adds nothing for a reader.
+    # HOME_TZ is America/New_York (site.json), so the zone is written as ET.
     fetched = stamp(DATA["fetched_at"])
-    zone_name = SITE["timezones"][0]["label"]
     credit = SITE.get("footer_credit", "")
-    return (f'<footer>Built {esc(built)} {esc(zone_name)}. Data fetched {esc(fetched)} {esc(zone_name)}. '
+    return (f'<footer>Updated {esc(fetched)} ET. '
             f'{esc(credit)}</footer></main><script>{JS.replace("SITE_KEY", SITE["slug"])}</script></body></html>')
 
 
@@ -1011,7 +1011,8 @@ function inMin(ms){const m=Math.max(0,Math.round((ms-Date.now())/60000));return 
 function winCell(g,st){
   if(st.final||g.division)return '-';
   const home=st.wp>=0.5,p=home?st.wp:1-st.wp,team=home?g.home:g.away;
-  return esc(team)+' '+(p>0.995?'>99':Math.round(p*100))+'%';
+  // p is at least 0.5 here. A chance that rounds to 100 shows as >99% because the game is not over.
+  return esc(team)+' '+(p>=0.995?'>99':Math.round(p*100))+'%';
 }
 function tags(g,st){
   // Each tag: [class, symbol, words]. Red marks a live game, green a winner, amber an upset, gray a game with nothing left to decide.
