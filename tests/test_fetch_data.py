@@ -198,6 +198,16 @@ def test_refresh_feed_takes_a_link_a_page_added_on_game_day(monkeypatch):
     # A link set by hand in extra_games.json stays.
     pinned = {k: v for k, v in game.items() if k != "feed"}
     assert not f.refresh_feed(pinned, moved, {game["id"]: "http://stats.statbroadcast.com/x"})
+    # A short link the Mac resolved to StatBroadcast replaces the short link, so the card says where the stats are.
+    sb = "https://www.statbroadcast.com/events/statbroadcast.php?gid=ccmm"
+    monkeypatch.setattr(f, "_presto_cache", {"links": {"https://gocobbers.com/links/rsensu": sb}})
+    cobbers = {"Concordia (MN)": [f.row(day, (17, 30, "America/Chicago"), True, False, "Minn.-Morris", {"live_stats": sb}, "", "")]}
+    game = {"id": "x", "date": "2026-11-07", "home": "Concordia (MN)", "away": "Minnesota Morris", "link": "https://gocobbers.com/links/rsensu", "feed": None}
+    assert f.refresh_feed(game, cobbers) and game["link"] == sb and game["feed"] is None
+    assert not f.refresh_feed(game, cobbers)
+    # A StatBroadcast link never replaces a real stats page link.
+    game = {"id": "y", "date": "2026-11-07", "home": "Concordia (MN)", "away": "Minnesota Morris", "link": "https://sidearmstats.com/morris/wbball/", "feed": None}
+    assert not f.refresh_feed(game, cobbers) and game["link"] == "https://sidearmstats.com/morris/wbball/"
 
 
 # ---------------------------------------------------------------- box scores and newcomers

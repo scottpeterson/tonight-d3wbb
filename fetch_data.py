@@ -327,6 +327,7 @@ LINK_KEYS = {"live stats": "live_stats", "live stats live stats": "live_stats", 
 # the Mac's run asks the site where each short link of a game in its window goes and stores the answer in the
 # cache's "links" map; every reader of a link looks the short link up there.
 SHORT_LINK = re.compile(r"^https?://[^/]+/links/[A-Za-z0-9]+/?$")
+STATBROADCAST = re.compile(r"statbroadcast\.com", re.I)
 
 
 def unshorten(url):
@@ -1661,6 +1662,11 @@ def refresh_feed(game, pages, links=None):
             feed = live_feed(url)
             if feed and feed != game.get("feed"):
                 game["feed"], game["link"] = feed, url
+                return True
+            # A short link the Mac resolved to StatBroadcast gives no feed, but the card can say so from tipoff
+            # instead of "no live stats" 45 minutes later (Concordia (MN) vs Minnesota Morris, 2026-11-11).
+            if not feed and not game.get("feed") and STATBROADCAST.search(url) and (not old or SHORT_LINK.match(old)):
+                game["link"] = url
                 return True
     return False
 
