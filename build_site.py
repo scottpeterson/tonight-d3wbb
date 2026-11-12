@@ -407,7 +407,7 @@ def sections():
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
-            '<button type="button" class="sorter" data-sort="closest">Closest</button><button type="button" class="sorter" data-sort="leverage">Leverage</button></div></div>')
+            '<button type="button" class="sorter" data-sort="closest">Closest</button><button type="button" class="sorter" data-sort="leverage">Game Leverage</button></div></div>')
     groups = "".join(twisty(title, '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
                      for key, title in (("mine", "My Watchlist"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
@@ -421,7 +421,7 @@ HOW = f"""<dl class="terms">
 <dt>Reading a card</dt><dd>
 <p>The left column shows the interest score and its bar.</p>
 <p>A number before a team is its season efficiency rank among Division III teams. A filled badge marks the top 25. The rating starts at the preseason projection and moves in equal steps to the team's box-score rating over its first eight games.</p>
-<p>The line under the teams shows the status, the favorite's win probability, and the leverage (Lev).</p>
+<p>The line under the teams shows the status, the favorite's win probability, and the Game Leverage (Lev).</p>
 <ul>
 <li><b>Before tipoff</b>, the win probability comes from the efficiency margin line.</li>
 <li><b>During the game</b>, the line counts as one game of evidence and the score so far as the part of a game played. A heavy favorite that leads by one after a quarter sits near 97% rather than the 99% the line alone gives.</li>
@@ -435,7 +435,7 @@ HOW = f"""<dl class="terms">
 <li><b>Interest</b> puts the highest score first.</li>
 <li><b>Tipoff</b> puts the earliest game first.</li>
 <li><b>Closest</b> puts the smallest gap in win probability first.</li>
-<li><b>Leverage</b> puts the most at stake first.</li>
+<li><b>Game Leverage</b> puts the most at stake first.</li>
 </ul>
 </dd>
 <dt>Which games</dt><dd>
@@ -446,13 +446,13 @@ HOW = f"""<dl class="terms">
 <li>Games against Division I, II, NAIA, and two-year opponents.</li>
 <li>Games against second-year provisional members or earlier.</li>
 </ul>
-<p>Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win probability and no leverage until the next NPI update.</p>
+<p>Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win probability and no Game Leverage until the next NPI update.</p>
 </dd>
 <dt>Interest</dt><dd>
 <p>A score from 0 to 100, from four parts:</p>
 <ul>
 <li><b>Team quality.</b> The season efficiency ranks of both teams. The better team counts more, and a rank near the top counts far more than one in the middle. The gap between 13th and 39th counts about four times the gap between 213th and 239th.</li>
-<li><b>Leverage.</b> The leverage of the game.</li>
+<li><b>Game Leverage.</b> See Game Leverage below.</li>
 <li><b>Closeness.</b> How close the game is. Late in the game, this counts more. It is weighted by the quality of the two teams, so a close game between two teams ranked near 300 adds little.</li>
 <li><b>Upset.</b> How far an underdog is past its pregame chance, weighted by the quality of the team being upset. An upset of the 20th team is news. An upset of the 254th is not.</li>
 </ul>
@@ -462,7 +462,7 @@ HOW = f"""<dl class="terms">
 <li><b>Team quality (30%).</b> The season efficiency ranks of both teams.</li>
 <li><b>Upset (30%).</b> How far the underdog beat the pregame spread. A win counts in full. A closer loss than expected counts 60%.</li>
 <li><b>Closeness (25%).</b> How close the final score is. Overtime counts as the closest finish.</li>
-<li><b>Leverage (15%).</b> The leverage of the game.</li>
+<li><b>Game Leverage (15%).</b> See Game Leverage below.</li>
 </ul>
 <p>The upset and closeness parts count in full between top teams. Between teams ranked near 400, they count about a third as much. A one-point upset in the middle of the table therefore sits below a six-point game between two top-50 teams.</p>
 <p>Tournament chances lower a finished game's score by at most half.</p>
@@ -473,7 +473,7 @@ HOW = f"""<dl class="terms">
 <li><b>During the game:</b> the current lead plus the expected margin for the time left, against a spread that shrinks as the clock runs down.</li>
 </ul>
 </dd>
-<dt>Leverage</dt><dd><p>From the season simulations: how many percentage points each team's tournament chance moves between a win and a loss, added for both teams.</p></dd>
+<dt>Game Leverage</dt><dd><p>A team's leverage is how many percentage points its NCAA Tournament chance moves between a win and a loss, from the season simulations. Game Leverage adds the leverage of both teams.</p></dd>
 <dt>How often a game is checked</dt><dd>
 <p>The page reads each game's live stats feed itself. Hover over a card to see its last and next check.</p>
 <p>The wait between checks:</p>
@@ -505,7 +505,7 @@ HOW = f"""<dl class="terms">
 <li><span class="sym" aria-hidden="true">\U0001F6A8</span>Upset, or an upset alert during play.</li>
 <li><span class="sym" aria-hidden="true">\U0001F512</span>Decided: the trailing team has under a 2% chance.</li>
 <li><span class="sym" aria-hidden="true">\U0001F4A4</span>Neither team has a tournament chance.</li>
-<li><span class="sym" aria-hidden="true">⚡</span>Leverage of 15 or more.</li>
+<li><span class="sym" aria-hidden="true">⚡</span>Game Leverage of 15 or more.</li>
 <li><span class="sym" aria-hidden="true">\U0001F4FA</span>Watch: opens the video stream when the schedule page lists one.</li>
 <li><span class="sym" aria-hidden="true">★</span>On My Watchlist.</li>
 </ul>
@@ -1063,7 +1063,7 @@ function card(g){
   const teams=line(g,'away',1)+line(g,'home',0);
   const wc=winCell(g,st),lev=leverage(g),side=['<span class="state">'+state+'</span>'],meta=[];
   if(wc!=='-'){const m=/^(.*) (\S+%)$/.exec(wc);side.push('<span class="wc" title="'+wc+'"><span class="who">'+m[1]+'</span><span class="pct">'+m[2]+'</span></span>');};
-  if(!g.division&&lev>0)side.push('<span class="lv" title="Leverage">'+(lev>=15?'⚡ ':'')+'Lev '+lev.toFixed(1)+'</span>');
+  if(!g.division&&lev>0)side.push('<span class="lv" title="Game Leverage">'+(lev>=15?'⚡ ':'')+'Lev '+lev.toFixed(1)+'</span>');
   const w=tags(g,st);if(w)meta.push(w);
   const label=statsLabel(g,st);if(label)meta.push('<span class="tag quiet">'+esc(label)+'</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
