@@ -1,7 +1,8 @@
 {
- "fetched_at": "2026-11-12T01:54:10+00:00",
+ "fetched_at": "2026-11-12T02:13:56+00:00",
  "errors": [
-  "Williams at Skidmore feed: HTTP Error 404: Not Found"
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found"
  ],
  "stale": {},
  "dates": {
