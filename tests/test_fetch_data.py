@@ -1235,3 +1235,86 @@ def test_presto_snapshot_reads_the_live_json_as_its_own_paced_request(monkeypatc
     # The runner's page reader takes the same path when it can reach the page.
     game = {"home": "SUNY Delhi", "away": "Bryn Mawr", "date": "2026-11-08", "newcomers_home": [], "newcomers_away": []}
     assert f.read_presto_page(game, PT3_URL)["score"] == {"V": 28, "H": 35}
+
+
+SHORT = "https://gocobbers.com/links/rsensu"
+SHORT_TARGET = "https://gocobbers.com/sports/wbkb/2026-27/boxscores/20261111_ab12.xml"
+
+
+def test_short_target_reads_the_location_of_a_redirect_without_following_it(monkeypatch):
+    class Found:
+        def open(self, req, timeout=None):
+            raise f.urllib.error.HTTPError(req.full_url, 302, "Found", {"Location": "/sports/wbkb/2026-27/boxscores/20261111_ab12.xml"}, None)
+
+    class Page:
+        status, headers = 200, {}
+
+        def open(self, req, timeout=None):
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b"<html><body>stats</body></html>"
+
+    class Challenge(Page):
+        status = 202
+
+    monkeypatch.setattr(f.urllib.request, "build_opener", lambda *h: Found())
+    assert f.short_target(SHORT) == SHORT_TARGET
+    monkeypatch.setattr(f.urllib.request, "build_opener", lambda *h: Page())
+    assert f.short_target(SHORT) is None
+    monkeypatch.setattr(f.urllib.request, "build_opener", lambda *h: Challenge())
+    with pytest.raises(f.http.client.HTTPException):
+        f.short_target(SHORT)
+
+
+def test_live_feed_and_links_read_a_short_link_through_the_cache(monkeypatch):
+    monkeypatch.setattr(f, "_presto_cache", {"links": {SHORT: "https://prestolivestats.com/tgs3oan3uncvzvyq/0l0bfk44c4a4jpst"}})
+    monkeypatch.setattr(f, "_feed_cache", {})
+    assert f.unshorten(SHORT) == "https://prestolivestats.com/tgs3oan3uncvzvyq/0l0bfk44c4a4jpst"
+    assert f.unshorten("https://gocobbers.com/links/other") == "https://gocobbers.com/links/other"
+    assert f.live_feed(SHORT) == {"type": "presto", "url": "https://data.prestolivestats.com/xml/tgs3oan3uncvzvyq/events/0l0bfk44c4a4jpst.xml"}
+    block = f'<a href="{SHORT}">Live Stats</a><a href="/links/zz">Watch</a>'
+    assert f.links_in(block, "https://gocobbers.com/") == {"live_stats": "https://prestolivestats.com/tgs3oan3uncvzvyq/0l0bfk44c4a4jpst",
+                                                            "video": "https://gocobbers.com/links/zz"}
+
+
+def test_presto_snapshot_resolves_the_short_links_of_games_in_the_window_once(monkeypatch, tmp_path):
+    # Concordia (MN) vs Minnesota Morris, 2026-11-11: both schedule pages gave gocobbers.com/links/rsensu, which no
+    # reader could turn into a feed or a box score page.
+    seen = []
+
+    def served(url, *a, **k):
+        seen.append(url)
+        if "/boxscores/" in url:
+            return presto_page()
+        raise AssertionError(url)
+    monkeypatch.setattr(f, "get", served)
+    monkeypatch.setattr(f, "short_target", lambda u: seen.append(u) or SHORT_TARGET)
+    monkeypatch.setattr(f.time, "sleep", lambda s: None)
+    row = f.row(date(2026, 11, 11), (17, 30, "America/Chicago"), True, False, "Minn.-Morris", {"live_stats": SHORT, "video": "https://gocobbers.com/links/s4lrsj"}, "", "")
+    monkeypatch.setattr(f, "presto_rows", lambda url, tz: [row])
+    cobbers = {"team": "Concordia (MN)", "type": "Presto", "schedule": "https://gocobbers.com/sports/wbkb/2025-26/schedule", "tz": "America/Chicago"}
+    monkeypatch.setattr(f, "load_schools", lambda: {"Concordia (MN)": cobbers})
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "PRESTO_CACHE", tmp_path / "presto_cache.json")
+    monkeypatch.setattr(f, "EXTRA", tmp_path / "none.json")
+    monkeypatch.setattr(f, "_presto_cache", None)
+    monkeypatch.setattr(f, "TODAY", "2026-11-11")
+    games = [{"id": "a", "date": "2026-11-11", "home": "Concordia (MN)", "away": "Minnesota Morris", "neutral": False, "link": SHORT}]
+    (tmp_path / "2026-11-11.json").write_text(json.dumps({"date": "2026-11-11", "games": games}))
+    out = f.presto_snapshot()
+    assert seen == [SHORT, SHORT_TARGET] and out["requests"] == 3 and out["errors"] == []
+    cache = json.loads((tmp_path / "presto_cache.json").read_text())
+    assert cache["links"] == {SHORT: SHORT_TARGET} and list(cache["boxes"]) == [SHORT_TARGET]
+    assert cache["pages"]["Concordia (MN)"][0]["links"] == {"live_stats": SHORT_TARGET, "video": "https://gocobbers.com/links/s4lrsj"}
+    # The runner reads the answer through the cache, and the next Mac run does not ask again.
+    monkeypatch.setattr(f, "_presto_cache", None)
+    assert f.unshorten(SHORT) == SHORT_TARGET and f.cached_box(SHORT_TARGET)["complete"] is True
+    seen.clear()
+    assert f.presto_snapshot()["requests"] == 2 and seen == [SHORT_TARGET]

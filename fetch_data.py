@@ -322,12 +322,43 @@ LINK_KEYS = {"live stats": "live_stats", "live stats live stats": "live_stats", 
              "watch (s)": "video"}
 
 
+# A Presto site's "Live Stats" link is often a short link on the school's own site (gocobbers.com/links/rsensu,
+# Concordia (MN) vs Minnesota Morris, 2026-11-11) that redirects to the stats page. Presto refuses the runner, so
+# the Mac's run asks the site where each short link of a game in its window goes and stores the answer in the
+# cache's "links" map; every reader of a link looks the short link up there.
+SHORT_LINK = re.compile(r"^https?://[^/]+/links/[A-Za-z0-9]+/?$")
+
+
+def unshorten(url):
+    """The page a short link redirects to, once the Mac's run has resolved it; otherwise the url itself."""
+    return presto_cache().get("links", {}).get(url, url) if url and SHORT_LINK.match(url) else url
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def short_target(url):
+    """Where a short link redirects: its Location header, made absolute. None when the link answers a page itself."""
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(urllib.request.Request(url, headers=UA), timeout=30) as resp:
+            if waf_challenged(resp, resp.read()):
+                raise http.client.HTTPException(f"WAF challenge from {site_of(url)}")
+            return None
+    except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400 and exc.headers.get("Location"):
+            return absolute(exc.headers["Location"], url)
+        raise
+
+
 def links_in(block, base):
     links = {}
     for href, label in re.findall(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', block, re.S):
         key = LINK_KEYS.get(text(label).lower())
         if key and key not in links:
-            links[key] = absolute(href, base)
+            links[key] = unshorten(absolute(href, base))
     return links
 
 
@@ -589,11 +620,35 @@ def presto_snapshot(previous=None):
 
     for team in playing:
         paced(load, team)
+
+    links = dict(old.get("links", {}))
+
+    def resolve(url):
+        try:
+            target = short_target(url)
+        except FETCH_ERRORS as exc:
+            out["errors"].append(f"{url}: {exc}")
+            return
+        if target:
+            links[url] = target
+
+    def stats_links(g):
+        return [r["links"].get("live_stats") for t in (g["home"], g["away"]) for r in pages.get(t, []) if r.get("day") == g["date"]]
+
+    # Short links of the window's games, one request each, once: the answer stays in the cache.
+    for url in dict.fromkeys(u for g in games for u in stats_links(g) if u and SHORT_LINK.match(u) and u not in links):
+        paced(resolve, url)
+    for rows in pages.values():
+        for r in rows:
+            if "links" in r:
+                r["links"] = {k: links.get(u, u) for k, u in r["links"].items()}
+    old["links"] = links
     urls = set()
     for g in games:
         rows = {t: [row_from_json(r) for r in pages.get(t, [])] for t in (g["home"], g["away"])}
         link, _ = box_link(g, rows)
-        urls.update(u for u in (link, g.get("boxscore"), g.get("link")) if presto_box_date(u))
+        candidates = [link, g.get("boxscore"), g.get("link"), *stats_links(g)]
+        urls.update(u for u in (links.get(c, c) for c in candidates) if presto_box_date(u))
     for url in sorted(urls, key=lambda u: (presto_box_date(u) != today, u)):
         paced(read, url)
     for url, live in followups:
@@ -601,7 +656,7 @@ def presto_snapshot(previous=None):
     for team in order[len(playing):]:
         paced(load, team)
 
-    PRESTO_CACHE.write_text(json.dumps({"fetched_at": out["fetched_at"], "pages": pages, "boxes": boxes}, separators=(",", ":")))
+    PRESTO_CACHE.write_text(json.dumps({"fetched_at": out["fetched_at"], "pages": pages, "boxes": boxes, "links": links}, separators=(",", ":")))
     out["pages"], out["boxes"], out["requests"] = len(pages), len(boxes), PRESTO_BUDGET - budget[0]
     return out
 
@@ -851,6 +906,7 @@ _feed_cache = {}
 
 def live_feed(url):
     """The machine-readable feed behind a live stats link, or None when there is none."""
+    url = unshorten(url)
     if not url:
         return None
     if url in _feed_cache:
