@@ -1328,3 +1328,17 @@ def test_presto_snapshot_resolves_the_short_links_of_games_in_the_window_once(mo
     assert f.unshorten(SHORT) == SHORT_TARGET and f.cached_box(SHORT_TARGET)["complete"] is True
     seen.clear()
     assert f.presto_snapshot()["requests"] == 2 and seen == [SHORT_TARGET]
+
+
+def test_a_mens_stats_folder_on_a_womens_page_means_the_hosts_womens_folder(monkeypatch):
+    # Alvernia's page linked ursinusathletics.com/sidearmstats/mbball for its game at Ursinus, 2026-11-11.
+    f._feed_cache.clear()
+    f._client_cache.clear()
+    monkeypatch.setattr(f, "get", lambda url, *a, **k: 'var client_shortname = "ursinuscollege";')
+    assert f.womens("https://ursinusathletics.com/sidearmstats/mbball/summary") == "https://ursinusathletics.com/sidearmstats/wbball/summary"
+    assert f.womens("https://sidearmstats.com/ursinuscollege/mbball2/game.json") == "https://sidearmstats.com/ursinuscollege/wbball2/game.json"
+    assert f.womens("https://example.edu/mbball/notes") == "https://example.edu/mbball/notes" and f.womens(None) is None
+    assert f.live_feed("https://ursinusathletics.com/sidearmstats/mbball/summary") == \
+        {"type": "sidearm", "url": "https://sidearmstats.com/ursinuscollege/wbball/game.json"}
+    block = '<a href="/sidearmstats/mbball/summary">Live Stats</a>'
+    assert f.links_in(block, "https://ursinusathletics.com/") == {"live_stats": "https://ursinusathletics.com/sidearmstats/wbball/summary"}

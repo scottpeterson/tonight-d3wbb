@@ -335,6 +335,17 @@ def unshorten(url):
     return presto_cache().get("links", {}).get(url, url) if url and SHORT_LINK.match(url) else url
 
 
+# A women's schedule page can link the host's men's stats folder: Alvernia's page sent its game at Ursinus to
+# ursinusathletics.com/sidearmstats/mbball (2026-11-11), the card said "no live stats" while the wbball feed showed
+# the final, and the host's other courts (mbball2, mbball3) never include wbball. This site reads women's
+# basketball, so a men's folder means the same host's women's folder.
+MENS_FOLDER = re.compile(r"(sidearmstats\.com/[^/]+/|/sidearmstats/)mbball(\d*)(?=[/?#]|$)")
+
+
+def womens(url):
+    return MENS_FOLDER.sub(r"\1wbball\2", url) if url else url
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -359,7 +370,7 @@ def links_in(block, base):
     for href, label in re.findall(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', block, re.S):
         key = LINK_KEYS.get(text(label).lower())
         if key and key not in links:
-            links[key] = unshorten(absolute(href, base))
+            links[key] = womens(unshorten(absolute(href, base)))
     return links
 
 
@@ -907,7 +918,7 @@ _feed_cache = {}
 
 def live_feed(url):
     """The machine-readable feed behind a live stats link, or None when there is none."""
-    url = unshorten(url)
+    url = womens(unshorten(url))
     if not url:
         return None
     if url in _feed_cache:
