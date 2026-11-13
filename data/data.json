@@ -1,7 +1,8 @@
 {
- "fetched_at": "2026-11-13T23:22:36+00:00",
+ "fetched_at": "2026-11-13T23:51:48+00:00",
  "errors": [
-  "Plymouth St. at Norwich feed: IncompleteRead(16033 bytes read, 92409 more expected)"
+  "Lancaster Bible at Johns Hopkins feed: Remote end closed connection without response",
+  "Plymouth St. at Norwich feed: IncompleteRead(114337 bytes read, 37019 more expected)"
  ],
  "stale": {},
  "dates": {
