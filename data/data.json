@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-13T22:52:57+00:00",
- "errors": [],
+ "fetched_at": "2026-11-13T23:22:36+00:00",
+ "errors": [
+  "Plymouth St. at Norwich feed: IncompleteRead(16033 bytes read, 92409 more expected)"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
