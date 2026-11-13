@@ -1,9 +1,6 @@
 {
- "fetched_at": "2026-11-13T02:07:53+00:00",
- "errors": [
-  "Crown at St. Mary's (MN) feed: Remote end closed connection without response",
-  "St. Scholastica at UW-Superior feed: IncompleteRead(16033 bytes read, 186520 more expected)"
- ],
+ "fetched_at": "2026-11-13T02:40:30+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
