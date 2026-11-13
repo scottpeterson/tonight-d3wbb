@@ -11,7 +11,7 @@ from build_site import LIVE_JS
 
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
-         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame",
+         "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame", "otherGame",
          "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords"]
 CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS"]
@@ -412,7 +412,21 @@ def test_a_hosts_feed_on_its_next_game_ends_ours():
     assert run(f"feedMovedOn({g},{{other:true}},{tip}+2*3600000)") is True
     assert run(f"feedMovedOn({g},{{other:false,seen:true,live:true}},{tip}+3*3600000)") is False
     assert run("groupOf({ended:true})") == 2 and run("groupOf({})") == 1 and run("groupOf({live:true})") == 0
-    assert run(f"nextCheck({g},{{ended:true,interest:20,wp:0.6}},{tip}+2*3600000)") is None
+    # An ended game keeps checking every 10 minutes until 4 hours after tipoff, so one bad read cannot freeze it.
+    assert run(f"(nextCheck({g},{{ended:true,interest:20,wp:0.6}},{tip}+2*3600000)-{tip})/60000") == 130
+    assert run(f"nextCheck({g},{{ended:true,interest:20,wp:0.6}},{tip}+4*3600000)") is None
+
+
+def test_a_feed_naming_our_teams_with_strangers_in_the_box_is_a_bad_read_not_the_hosts_next_game():
+    # York (PA)'s wbball feed, 2026-11-13: one read named York and Mary Washington but carried a 97-51 game with
+    # players on neither roster. The read is unusable, and the host has not moved on.
+    york, umw = [f"Ann York{c}" for c in "abcdef"], [f"Bea Wash{c}" for c in "abcdef"]
+    g = tourney("York (PA)", "Mary Washington", york, umw, ["York (PA)", "York"], ["Mary Washington"])
+    strangers = {"sides": {"H": {"name": "York", "id": "BSU"}, "V": {"name": "Mary Washington", "id": "GROVE"}},
+                 "lines": {"H": [{"first": "K", "last": f"Dileo{c}", "abbr": ""} for c in "abcdef"], "V": [{"first": "A", "last": f"Huds{c}", "abbr": ""} for c in "abcdef"]}}
+    next_game = dict(strangers, sides={"H": {"name": "York", "id": "YORK"}, "V": {"name": "Grove City", "id": "GROVE"}})
+    assert run(f"[feedIsGame({json.dumps(g)},{json.dumps(strangers)}),otherGame({json.dumps(g)},{json.dumps(strangers)}),"
+               f"otherGame({json.dumps(g)},{json.dumps(next_game)}),otherGame({json.dumps(g)},{{sides:{{}}}})]") == [False, False, True, False]
 
 
 def test_probe_feeds_add_the_pages_other_feeds_after_the_hosts_courts():

@@ -199,7 +199,7 @@ dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2
 <dt>Status words</dt><dd>
 <ul>
 <li><b>Postponed</b> or <b>Canceled</b> replaces the tipoff time when a schedule page says so.</li>
-<li><b>Final pending</b> marks a game whose host's feed moved on to its next game before the host posted a box score. The last score the page read stays on the card. The score follows once a schedule page links the box score.</li>
+<li><b>Final pending</b> marks a game whose host's feed moved on to its next game before the host posted a box score. The last score the page read stays on the card. The page looks at the feed every 10 minutes for four hours after tipoff in case it shows the game again. The score follows once a schedule page links the box score.</li>
 </ul>
 <p>The page remembers the last live score it read for each game, so a reload keeps it.</p>
 </dd>
@@ -346,10 +346,11 @@ function statsLabel(g,st){
   return !g.feed||st.noStats?'no live stats':null;
 }
 function nextCheck(g,st,now){
-  if(st.final||st.ended||!g.feed||g.off)return null;
+  if(st.final||!g.feed||g.off)return null;
   // A feed that has not shown this game by GIVE_UP_MS gets a look every RETRY_MS until LAST_LOOK_MS: a tournament
-  // host's feed shows the earlier game first, and some crews start late.
-  if(st.noStats){const tip=tipMs(g);return tip&&now<tip+LAST_LOOK_MS?now+RETRY_MS:null;}
+  // host's feed shows the earlier game first, and some crews start late. A feed that moved on gets the same looks,
+  // so a game ended by one bad read comes back when the feed shows it again.
+  if(st.noStats||st.ended){const tip=tipMs(g);return tip&&now<tip+LAST_LOOK_MS?now+RETRY_MS:null;}
   const tip=tipMs(g);
   if(tip&&now<tip+5*60000&&!st.live)return tip+5*60000;
   const end=(tip||now)+GAME_MS;
@@ -396,6 +397,13 @@ function feedIsGame(g,s){
   }
   if(!Object.values(S).some(x=>x&&(x.name||x.id)))return true;
   return ['H','V'].some(k=>S[k]&&['home','away'].some(t=>namesTeam(S[k],g,t)));
+}
+// The host's feed has moved on to another game only when a feed side names a team that is not ours. A feed that
+// names our two teams but lists strangers in the box score is a bad read (York (PA)'s feed alternated between Mary
+// Washington at York and a 97-51 game with other players, 2026-11-13), so the card keeps its last score and waits.
+function otherGame(g,s){
+  const S=s.sides||{};
+  return ['H','V'].filter(k=>S[k]&&(S[k].name||S[k].id)).some(k=>!['home','away'].some(t=>namesTeam(S[k],g,t)));
 }
 function sideFit(side,g,t,lines){
   const roster=rosterOf(g,t),names=g[t+'_names']||[g[t]];
@@ -503,7 +511,7 @@ async function readFeed(g,full){
     s={home:sc.H||0,away:sc.V||0,sides,complete,period,regulation,
        progress:complete?1:progressOf(period,clock,regulation),status:statusText(period,clock,regulation),lines:prestoLines(x)};
   }
-  if(f.type!=='espn'&&!feedIsGame(g,s)){g.st.other=true;return null;}
+  if(f.type!=='espn'&&!feedIsGame(g,s)){if(otherGame(g,s))g.st.other=true;return null;}
   // The stat crew's home side can differ from the schedule's, and so can its labels; flip when the evidence says so.
   if(orientFit(g,s,true)>orientFit(g,s,false)){[s.home,s.away]=[s.away,s.home];if(s.lines)s.lines={H:s.lines.V||[],V:s.lines.H||[]};}
   return s;
