@@ -1,7 +1,6 @@
 {
- "fetched_at": "2026-11-13T11:19:58+00:00",
+ "fetched_at": "2026-11-13T12:10:00+00:00",
  "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found"
  ],
  "stale": {},
@@ -13,8 +12,8 @@
   "2026-11-10": 30,
   "2026-11-11": 69,
   "2026-11-12": 15,
-  "2026-11-13": 63,
-  "2026-11-14": 137,
+  "2026-11-13": 62,
+  "2026-11-14": 136,
   "2026-11-15": 33,
   "2026-11-16": 12,
   "2026-11-17": 44,
@@ -29,7 +28,7 @@
   "2026-11-27": 5,
   "2026-11-28": 29,
   "2026-11-29": 18,
-  "2026-11-30": 16,
+  "2026-11-30": 17,
   "2026-12-01": 36,
   "2026-12-02": 110,
   "2026-12-03": 9,
@@ -112,8 +111,6 @@
   "2026-10-27": 1
  },
  "notes": [
-  "Monmouth at Greenville 2026-11-13: the pages list it on 2026-11-14, where the list has it too, left out",
-  "Heidelberg at Earlham 2026-11-14: neither schedule page lists a game that day, left out",
   "Bridgewater (VA) at Roanoke 2026-11-14: both schedule pages list other opponents, left out"
  ]
 }
