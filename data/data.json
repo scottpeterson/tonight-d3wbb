@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-13T01:11:07+00:00",
- "errors": [],
+ "fetched_at": "2026-11-13T01:39:41+00:00",
+ "errors": [
+  "Purchase at Albertus Magnus box score: HTTP Error 403: Forbidden"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
