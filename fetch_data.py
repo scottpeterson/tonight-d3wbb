@@ -695,13 +695,18 @@ def site_of(url):
     return re.sub(r"^www\.", "", host)
 
 
-def opponent_name(raw):
-    """'#12 Old Dominion University (Exhibition)' -> 'Old Dominion'."""
+def plain_name(raw):
+    """'#12 The College of New Jersey (Exhibition)' -> 'College of New Jersey': the marks go, "University" and
+    "College" stay."""
     name = re.sub(r"\([^)]*\)|#\d+|\bNo\. \d+\b", " ", raw or "")
     name = re.sub(r"^\s*(?:vs\.?|at)\s+", "", name, flags=re.I)
     name = re.sub(r"^\s*The\s+", "", name.strip())
-    name = re.sub(r"\s+(?:University|College)$", "", name.strip())
     return " ".join(name.split())
+
+
+def opponent_name(raw):
+    """'#12 Old Dominion University (Exhibition)' -> 'Old Dominion'."""
+    return re.sub(r"\s+(?:University|College)$", "", plain_name(raw))
 
 
 def name_key(name):
@@ -779,10 +784,10 @@ def opponent_resolver(schools, members):
         opp = sites.get(site)
         # A neutral row's link often points at the tournament host, not the opponent (Aurora's "Westminster
         # University" linked principiaathletics.com, 2026-11-07), so the link counts only when the name fits.
-        if opp and r["neutral"] and not (name_key(r["opponent"]) & name_key(opp)):
+        if opp and r["neutral"] and not any(name_key(r["opponent"]) & name_key(n) for n in aliases(opp)):
             opp = None
         if not opp and site not in upper:
-            hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) if k in keys}
+            hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) | name_keys(plain_name(r["opponent"])) if k in keys}
             above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]
             opp = hits.pop() if len(hits) == 1 and not above else None
         return opp
@@ -1097,13 +1102,29 @@ def team_sites(schools):
     return {site: teams[0] for site, teams in by_site.items() if len(teams) == 1}
 
 
+_aliases = None
+
+
+def aliases(team):
+    """The names sources use for `team`, the canonical name first: data/team_names.csv lists "College of NJ" and
+    "The College of New Jersey" for TCNJ."""
+    global _aliases
+    if _aliases is None:
+        _aliases = team_names()
+    return [team, *(n for n in _aliases.get(team, []) if n != team)]
+
+
 def d3_keys(schools):
-    """{name key: team} for D3 schools, keeping only keys that fit one school."""
+    """{name key: team} for D3 schools, from each school's name and the other names sources use for it, keeping
+    only keys that fit one school. Mary Washington's page listed "The College of New Jersey" on 2026-11-14, which
+    "TCNJ" alone never matched, so the Stat Lab's projected Mary Washington at DeSales pairing stayed on the page.
+    An alias keeps its "University" or "College": cut, "Colorado College" would claim a page's "Colorado"."""
     keys = {}
     for team, s in schools.items():
         if not s.get("extra"):
-            for k in name_keys(team):
-                keys.setdefault(k, set()).add(team)
+            for name in aliases(team):
+                for k in name_keys(name) | (name_keys(plain_name(name)) if name != team else set()):
+                    keys.setdefault(k, set()).add(team)
     return {k: next(iter(v)) for k, v in keys.items() if len(v) == 1}
 
 

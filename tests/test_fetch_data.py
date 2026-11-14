@@ -928,6 +928,31 @@ def test_a_projected_pairing_both_pages_contradict_is_left_out():
     assert not f.contradicted({"home": "Marywood", "away": "Hope"}, day, pages, resolve)
 
 
+YORK_SCHOOLS = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{s}/sports/womens-basketball/schedule", "tz": "America/New_York"}
+                for t, s in (("Mary Washington", "umweagles.com"), ("DeSales", "athletics.desales.edu"), ("TCNJ", "tcnjathletics.com"),
+                             ("York (PA)", "ycpspartans.com"), ("Colorado College", "cctigers.com"))}
+
+
+def test_a_page_name_from_team_names_csv_resolves():
+    # Mary Washington's page listed "The College of New Jersey" on 2026-11-14. "TCNJ" never matched it, so the
+    # Stat Lab's projected Mary Washington at DeSales pairing stood while the pages said TCNJ and York (PA).
+    day = date(2026, 11, 14)
+    resolve = f.opponent_resolver(YORK_SCHOOLS, MEMBERS)
+    assert resolve(f.row(day, None, False, True, "The College of New Jersey", {}, "", "")) == "TCNJ"
+    # A neutral row's link counts when the name fits one of the school's names.
+    assert resolve(f.row(day, None, False, True, "The College of New Jersey", {}, "", "", "https://tcnjathletics.com/")) == "TCNJ"
+    # An alias keeps its "College": a page's bare "Colorado" is not Colorado College.
+    assert resolve(f.row(day, None, False, True, "Colorado College", {}, "", "")) == "Colorado College"
+    assert resolve(f.row(day, None, False, True, "Colorado", {}, "", "")) is None
+    pages = {"Mary Washington": [f.row(day, (15, 0, "America/New_York"), False, True, "The College of New Jersey", {}, "", "")],
+             "DeSales": [f.row(day, (13, 0, "America/New_York"), False, False, "York College (PA)", {}, "W, 59-52", "")],
+             "TCNJ": [f.row(day, (15, 0, "America/New_York"), False, True, "Mary Washington", {}, "", "")],
+             "York (PA)": [f.row(day, (13, 0, "America/New_York"), True, False, "DeSales", {}, "L, 52-59", ""),
+                           f.row(day, (15, 0, "America/New_York"), True, False, "TCNJ vs. Mary Washington", {}, "", "")]}
+    assert f.contradicted({"home": "DeSales", "away": "Mary Washington"}, day, pages, resolve)
+    assert not f.contradicted({"home": "TCNJ", "away": "Mary Washington"}, day, pages, resolve)
+
+
 def test_a_game_neither_schedule_page_lists_is_left_out():
     # Massey carried Buena Vista at North Central (MN) on 2026-11-10; both pages showed Nov 7 and Nov 14 only.
     day, other = date(2026, 11, 10), date(2026, 11, 14)
