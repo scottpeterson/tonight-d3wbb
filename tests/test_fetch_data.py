@@ -70,6 +70,35 @@ def test_sidearm_table_page_falls_back_to_the_table_reader(monkeypatch):
     assert not any(r["neutral"] or r["exhibition"] for r in rows)
 
 
+def test_sidearm_component_page_reads_the_json_and_the_text_schedule(monkeypatch):
+    # rhodeslynx.com, 2026-11-14: the page embeds its games as JSON and draws them in the browser; the list reader
+    # found nothing, so Rhodes's result and box score link for Babson at Dallas never reached the finals pass.
+    page, txt = (FIX / "sidearm_component_rhodes.html").read_text(), (FIX / "sidearm_txt_rhodes.txt").read_text()
+    asked = []
+    def get(url, *a, **k):
+        asked.append(url)
+        return txt if "schedule_txt" in url else page
+    monkeypatch.setattr(f, "get", get)
+    rows = f.sidearm_rows("https://rhodeslynx.com/sports/womens-basketball/schedule", "America/Chicago")
+    assert asked == ["https://rhodeslynx.com/sports/womens-basketball/schedule", "https://rhodeslynx.com/services/schedule_txt.ashx?schedule=507"]
+    assert len(rows) == 26 and [r["day"] for r in rows] == sorted(r["day"] for r in rows)
+    babson = f.find_row(rows, date(2026, 11, 14), "Babson")
+    assert (babson["opponent"], babson["home"], babson["neutral"], babson["time"], babson["result"]) == \
+        ("Babson College", False, True, (13, 0, "America/Chicago"), "L, 52-83")
+    assert babson["links"] == {"live_stats": "https://udallasathletics.com/sidearmstats/wbball/summary", "video": "https://flosports.link/4BkatMw",
+                               "boxscore": "https://rhodeslynx.com/boxscore.aspx?id=10654"}
+    assert f.result_score(babson, False) == (83, 52)
+    # The JSON stops at the season's first games; the rest come from the text schedule, without links.
+    lyon = f.find_row(rows, date(2027, 2, 10), "Lyon")
+    assert (lyon["opponent"], lyon["home"], lyon["neutral"], lyon["time"], lyon["links"]) == ("Lyon College", True, False, (18, 0, "America/Chicago"), {})
+    saa = f.find_row(rows, date(2027, 2, 25), "SAA")
+    assert saa["neutral"] and saa["time"] is None
+    # A postponed game's result comes from the text.
+    assert f.find_row(rows, date(2026, 11, 7), "Hendrix")["result"] == "Postponed"
+    # The text alone, without the JSON, gives nothing: the JSON is what marks the layout.
+    assert f.sidearm_component_rows("<html></html>", "https://rhodeslynx.com/x", "America/Chicago") == []
+
+
 def test_sidearm_table_reader_handles_neutral_and_results():
     page = ('<table class="sidearm-table sidearm-schedule-table"><tr><th>Date</th></tr>'
             '<tr><td>1/2/2027</td><td>vs. Wilson College</td><td>W, 70-61</td></tr>'
@@ -725,6 +754,27 @@ def test_a_team_with_no_player_on_the_feed_is_not_playing():
     assert not f.feed_is_game(tourney_game("Principia", "Aurora"), sides, lines)
     # One side's lines missing: the rule waits for both sides.
     assert f.feed_is_game(tourney_game("Principia", "Aurora"), sides, {"H": box_lines("Aurora", 8)})
+
+
+def test_lines_a_crew_named_after_the_other_team_are_dropped():
+    # Rhodes's box score for Babson at Dallas, 2026-11-14, named six Babson players after Rhodes players with the
+    # same jersey numbers: Menendez had 23 points for Babson and 7 for Rhodes.
+    game = {**tourney_game("Babson", "Rhodes"), "date": "2026-11-14", "neutral": True}
+
+    def stats(lines, pts):
+        return [{**line, "min": 20, "pts": pts, "reb": 2, "ast": 1, "stl": 0, "blk": 0, "to": 1, "pf": 1, "fgm": 3, "fga": 6,
+                 "ftm": 0, "fta": 0, "oreb": 1, "dreb": 1} for line in lines]
+    menendez = {"first": "Macy", "last": "Menendez", "abbr": "Menendez , Macy"}
+    assert "Macy Menendez" in f.team_rosters()["Rhodes"] and "Macy Menendez" not in f.team_rosters()["Babson"]
+    lines = {"H": stats(box_lines("Babson", 8) + [menendez], 10), "V": stats(box_lines("Rhodes", 8), 6)}
+    sides = {"H": {"name": "Babson", "id": "BAB"}, "V": {"name": "Rhodes", "id": "RHO"}}
+    result = f.box_result(game, 83, 52, sides, lines)
+    assert (result["home"], result["away"]) == (83, 52)
+    assert [x["team"] for x in result["top"] if x["name"] == "Macy Menendez"] in ([], ["Rhodes"])
+    assert len([x for x in result["top"] if x["team"] == "Babson"]) == 8
+    # With one roster unpublished, the rule waits: the line stays.
+    kept = f.box_result({**game, "away_roster": []}, 83, 52, sides, lines)
+    assert len([x for x in kept["top"] if x["team"] == "Babson"]) == 9
 
 
 def test_players_outrank_names():

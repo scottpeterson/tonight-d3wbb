@@ -399,7 +399,80 @@ def sidearm_rows(url, tz):
                            "sidearm-schedule-neutral-game" in cls, text(opp_m.group(1)) if opp_m else "", links_in(b, url),
                            text(result_m.group(1)) if result_m else "", " ".join(text(m.group(1)) for m in (note_m, promo_m) if m),
                            opponent_link(opp_m.group(1)) if opp_m else ""))
-    return out or sidearm_table_rows(page, url, tz) or sidearm_card_rows(page, url, tz)
+    return out or sidearm_component_rows(page, url, tz) or sidearm_table_rows(page, url, tz) or sidearm_card_rows(page, url, tz)
+
+
+SCHEDULE_TXT = "/services/schedule_txt.ashx?schedule={id}"
+TEXT_COLUMNS = ("Date", "Time", "At", "Opponent", "Location", "Tournament", "Result")
+
+
+def sidearm_component_rows(page, url, tz):
+    """Rows of Sidearm's component layout (rhodeslynx.com, 2026-11-14), which embeds games as JSON in
+    `var obj = {"type":"events", ..., "data":[...]}` blocks and draws the list in the browser, so the list reader
+    finds nothing. The JSON carries each game's links and result but only the season's first 20 games; the site's
+    plain-text schedule (schedule_txt.ashx) lists the whole season, so the rest come from there without links."""
+    decoder, games, schedule_id = json.JSONDecoder(), {}, None
+    for m in re.finditer(r"var obj = ", page):
+        try:
+            obj, _ = decoder.raw_decode(page, m.end())
+        except ValueError:
+            continue
+        if not isinstance(obj, dict) or obj.get("type") not in ("events", "results"):
+            continue
+        for g in obj.get("data") or []:
+            if isinstance(g, dict) and g.get("date") and g.get("id") not in games:
+                games[g["id"]] = g
+                schedule_id = schedule_id or (g.get("schedule") or {}).get("id")
+    out = []
+    for g in games.values():
+        media, result, where = g.get("media") or {}, g.get("result") or {}, g.get("location_indicator")
+        links = {}
+        for key, href in (("live_stats", media.get("stats")), ("video", media.get("video")), ("boxscore", result.get("boxscore"))):
+            if href:
+                links[key] = womens(unshorten(absolute(href, url)))
+        score = f'{result["status"]}, {result["team_score"]}-{result["opponent_score"]}' \
+            if result.get("status") in ("W", "L", "T") and result.get("team_score") else ""
+        tournament = g.get("tournament")
+        note = " ".join(x for x in ((tournament.get("title") if isinstance(tournament, dict) else tournament),
+                                    media.get("game_promotion_name"), media.get("game_note")) if x)
+        out.append(row(date.fromisoformat(g["date"][:10]), None if g.get("tbd") else parse_time(g.get("time") or "", tz),
+                       where == "H", where == "N", " ".join(((g.get("opponent") or {}).get("name") or "").split()),
+                       links, score, note))
+    if out and schedule_id:
+        try:
+            text_rows = sidearm_text_rows(get(absolute(SCHEDULE_TXT.format(id=schedule_id), url)), tz)
+        except FETCH_ERRORS:
+            text_rows = []
+        by_game = {(r["day"], name_key(r["opponent"])): r for r in out}
+        for r in text_rows:
+            known = by_game.get((r["day"], name_key(r["opponent"])))
+            if not known:
+                out.append(r)
+            elif not known["result"]:
+                # The JSON gives a postponed game no result; the text says "Postponed".
+                known["result"] = r["result"]
+    return sorted(out, key=lambda r: r["day"])
+
+
+def sidearm_text_rows(txt, tz):
+    """Rows of a Sidearm plain-text schedule: fixed-width columns under a header line of Date, Time, At,
+    Opponent, Location, Tournament, and Result ("L 52-83", "Postponed")."""
+    lines = (txt or "").splitlines()
+    header = next((i for i, line in enumerate(lines) if line.startswith("Date ") and "Opponent" in line), None)
+    if header is None:
+        return []
+    starts = [lines[header].index(c) for c in TEXT_COLUMNS if c in lines[header]]
+    cols = [c for c in TEXT_COLUMNS if c in lines[header]]
+    out = []
+    for line in lines[header + 1:]:
+        cells = {c: line[a:b].strip() for c, a, b in zip(cols, starts, starts[1:] + [None])}
+        day = parse_month_day(cells.get("Date", ""))
+        if not day:
+            continue
+        at = cells.get("At", "").lower()
+        out.append(row(day, parse_time(cells.get("Time", ""), tz), at == "home", at == "neutral", cells.get("Opponent", ""),
+                       {}, cells.get("Result", ""), cells.get("Tournament", "")))
+    return out
 
 
 CARD_LINKS = {"live stats": "live_stats", "stats": "live_stats", "watch": "video", "box score": "boxscore"}
@@ -1535,6 +1608,7 @@ def box_result(game, home_score, away_score, sides, lines):
     if should_flip(game, sides, lines):
         home_score, away_score = away_score, home_score
         lines = {"H": lines.get("V", []), "V": lines.get("H", [])}
+    lines = {side: crew_named(game, side, lines.get(side, [])) for side in ("H", "V")}
     found = []
     classes = {"H": game.get("home_classes") or [], "V": game.get("away_classes") or []}
     for side, team, roster in (("H", game["home"], game["newcomers_home"]), ("V", game["away"], game["newcomers_away"])):
@@ -1553,6 +1627,18 @@ def box_result(game, home_score, away_score, sides, lines):
         top += sorted(mine, key=lambda x: -x["gmsc"])[:TOP_N]
     return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"]),
             "top": sorted(top, key=lambda x: -x["gmsc"])}
+
+
+def crew_named(game, side, lines):
+    """The side's box lines without the ones a stat crew named after the other team's players. Rhodes's box score
+    for Babson at Dallas, 2026-11-14, put six Rhodes names (same jersey numbers) on Babson's side: Menendez with
+    23 points for Babson and 7 for Rhodes. A line is dropped when its name fits the other roster and not its own;
+    both rosters must be published."""
+    own, other = (roster_of(game, t) for t in (("home", "away") if side == "H" else ("away", "home")))
+    if not own or not other:
+        return lines
+    own, other = [{"name": n} for n in own], [{"name": n} for n in other]
+    return [line for line in lines if match_player(line, own) or not match_player(line, other)]
 
 
 PT3_HASH = re.compile(r"eventIdHashCode\s*=\s*'([^']+)'")

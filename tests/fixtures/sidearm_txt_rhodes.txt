@@ -1,0 +1,37 @@
+Rhodes College
+2026-27 Women's Basketball Schedule
+
+Overall    0-2  .000
+Conference 0-0  .000
+Streak     L2
+Home       0-1
+Away       0-0
+Neutral    0-1
+
+Date           Time       At        Opponent                        Location                          Tournament   Result   
+Nov 7 (Sat)    1:00 PM    Away      Hendrix College                 Conway, AR                                     Postponed
+Nov 11 (Wed)   5:30 PM    Home      University of the Ozarks        Memphis, TN (Mallory Gymnasium)                L 66-71  
+Nov 14 (Sat)   1:00 PM    Neutral   Babson College                  Irving, TX (Univ. Dallas)                      L 52-83  
+Nov 15 (Sun)   12:00 PM   Away      University of Dallas            Irving, TX                                              
+Nov 20 (Fri)   7:00 PM    Away      East Texas Baptist University   Marshall, TX                                            
+Nov 21 (Sat)   1:00 PM    Neutral   Hardin-Simmons University       Marshall, TX (ETBU)                                     
+Nov 24 (Tue)   2:00 PM    Home      Austin College                  Memphis, TN (Mallory Gymnasium)                         
+Dec 1 (Tue)    6:00 PM    Home      Millsaps College                Memphis, TN (Mallory Gymnasium)                         
+Dec 4 (Fri)    5:00 PM    Away      Oglethorpe University           Atlanta, GA                                             
+Dec 11 (Fri)   6:00 PM    Home      Maryville College               Memphis, TN (Mallory Gymnasium)                         
+Dec 13 (Sun)   12:00 PM   Home      Centre College                  Memphis, TN (Mallory Gymnasium)                         
+Dec 18 (Fri)   5:00 PM    Away      Berry College                   Mount Berry, GA                                         
+Dec 20 (Sun)   12:00 PM   Away      Sewanee                         Sewanee, TN                                             
+Dec 30 (Wed)   2:00 PM    Home      Blackburn College               Memphis, TN (Mallory Gymnasium)                         
+Jan 8 (Fri)    6:00 PM    Home      Southwestern University         Memphis, TN (Mallory Gymnasium)                         
+Jan 10 (Sun)   11:30 AM   Home      Trinity University              Memphis, TN (Mallory Gymnasium)                         
+Jan 19 (Tue)   6:00 PM    Away      Millsaps College                Jackson, MS                                             
+Jan 24 (Sun)   12:00 PM   Home      Oglethorpe University           Memphis, TN (Mallory Gymnasium)                         
+Jan 29 (Fri)   5:00 PM    Away      Maryville College               Maryville, TN                                           
+Jan 31 (Sun)   12:00 PM   Away      Centre College                  Danville, KY                                            
+Feb 5 (Fri)    6:00 PM    Away      Southwestern University         Georgetown, TX                                          
+Feb 7 (Sun)    12:00 PM   Away      Trinity University              San Antonio, TX                                         
+Feb 10 (Wed)   6:00 PM    Home      Lyon College                    Memphis, TN (Mallory Gymnasium)                         
+Feb 19 (Fri)   6:00 PM    Home      Berry College                   Memphis, TN (Mallory Gymnasium)                         
+Feb 21 (Sun)   12:00 PM   Home      Sewanee                         Memphis, TN (Mallory Gymnasium)                         
+Feb 25 (Thu)   TBD        Neutral   SAA Championships               Memphis, TN (Mallory Gymnasium)
