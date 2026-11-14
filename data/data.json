@@ -1,6 +1,9 @@
 {
- "fetched_at": "2026-11-14T05:57:40+00:00",
- "errors": [],
+ "fetched_at": "2026-11-14T07:09:53+00:00",
+ "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
@@ -11,7 +14,7 @@
   "2026-11-11": 69,
   "2026-11-12": 15,
   "2026-11-13": 62,
-  "2026-11-14": 139,
+  "2026-11-14": 146,
   "2026-11-15": 33,
   "2026-11-16": 12,
   "2026-11-17": 44,
@@ -109,6 +112,8 @@
   "2026-10-27": 1
  },
  "notes": [
-  "Bridgewater (VA) at Roanoke 2026-11-14: both schedule pages list other opponents, left out"
+  "Bridgewater (VA) at Roanoke 2026-11-14: both schedule pages list other opponents, left out",
+  "Marietta at Rochester 2026-11-14: both schedule pages list other opponents, left out",
+  "Johns Hopkins at York (PA) 2026-11-14: both schedule pages list other opponents, left out"
  ]
 }
