@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-14T14:25:54+00:00",
+ "fetched_at": "2026-11-14T17:00:14+00:00",
  "errors": [
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found"
@@ -112,6 +112,7 @@
   "2026-10-27": 1
  },
  "notes": [
+  "Franklin at Albion 2026-11-14: both schedule pages list other opponents, left out",
   "Bridgewater (VA) at Roanoke 2026-11-14: both schedule pages list other opponents, left out",
   "Marietta at Rochester 2026-11-14: both schedule pages list other opponents, left out",
   "Johns Hopkins at York (PA) 2026-11-14: both schedule pages list other opponents, left out"
