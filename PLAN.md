@@ -30,7 +30,7 @@ Inputs for each game:
 - **Upset U**: the pregame underdog's gain in win probability, `U = max(0, live WP - pregame WP)` for the team that was the underdog. A 10% underdog now at 60% gives 0.5. A 45% underdog now at 55% gives 0.1. No cutoff.
 - **Progress P**: share of regulation played, 0 to 1.
 
-`interest = 100 * S * ((0.30 Q + 0.25 L) * (1 - P (1 - sqrt(C))) + (0.20 + 0.15 P) C + 0.25 U)`, capped at 100. Closeness counts for more late in the game, and rank and leverage fade as the result becomes certain, so a blowout between two top teams sinks below a close game. Stakes multiply the whole score, so a game between two 0% teams scores near 0 and gets checked about twice a game.
+`interest = 100 * S * ((0.60 Q + 0.10 L) * (1 - P (1 - sqrt(C))) + (0.30 + 0.10 P) C Q + 0.25 U q_favorite)`, capped at 100. Quality carries most of the score: an even game between two top-ten teams scores about 90 before tipoff, and #5 UW-Oshkosh vs #12 Wartburg at 59-41 scores 84 (it scored 49 under the earlier weights 0.30 Q, 0.25 L, 0.20 C on 2026-11-13, because leverage is small for every team in November). Closeness counts for more late in the game, and rank and leverage fade as the result becomes certain, so a blowout between two top teams sinks below a close game. Stakes multiply the whole score, so a game between two 0% teams scores near 0 and gets checked about twice a game.
 
 ## Win probability
 

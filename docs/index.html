@@ -142,6 +142,7 @@ dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2
 <li><b>Closeness.</b> A 50-50 game counts in full and a 90-10 game counts a fifth as much. Late in the game, this counts more. It is weighted by the quality of the two teams, so a close game between two teams ranked near 300 adds little.</li>
 <li><b>Upset.</b> How far an underdog is past its pregame chance, weighted by the quality of the team being upset. An upset of the 20th team is news. An upset of the 254th is not.</li>
 </ul>
+<p>Team quality carries most of the score. Before tipoff, an even game between two top-ten teams scores about 90, and a 60-40 game between the 5th and 12th teams about 84. Game Leverage adds up to 10 points.</p>
 <p>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</p>
 <p>A finished game gets its own score from four parts:</p>
 <ul>
@@ -297,7 +298,10 @@ function interest(g,st){
   // #327 Curry leading #254 Elmira by 14 in the third quarter scored 9, above every decided game between ranked
   // teams (2026-11-08), because the upset term alone carried it.
   const favorite=teamQuality(homeDog?g.away_rank:g.home_rank);
-  return Math.min(100,100*S*((0.30*Q+0.25*L)*settled+(0.20+0.15*P)*C*Q+0.25*U*favorite));
+  // Quality carries most of the score, so a game between two top teams reads high before tipoff whatever the
+  // leverage: #5 UW-Oshkosh vs #12 Wartburg scored 49 on 2026-11-13 with leverage 2.8 (quality 0.30, leverage 0.25,
+  // closeness 0.20 before tipoff), and scores 84 now. Leverage is small for every team in November.
+  return Math.min(100,100*S*((0.60*Q+0.10*L)*settled+(0.30+0.10*P)*C*Q+0.25*U*favorite));
 }
 // Minutes to wait before the next check: 60^((1 - I/100)^WAIT_CURVE), so 1 at interest 100 and 60 at interest 0,
 // stretched by the leader's margin, (0.5/p)^MARGIN_STRETCH with p the trailing team's chance.
