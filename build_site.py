@@ -456,7 +456,7 @@ HOW = f"""<dl class="terms">
 <li><b>Closeness.</b> A 50-50 game counts in full and a 90-10 game counts a fifth as much. Late in the game, this counts more. It is weighted by the quality of the two teams, so a close game between two teams ranked near 300 adds little.</li>
 <li><b>Upset.</b> How far an underdog is past its pregame chance, weighted by the quality of the team being upset. An upset of the 20th team is news. An upset of the 254th is not.</li>
 </ul>
-<p>Team quality carries most of the score. Before tipoff, an even game between two top-ten teams scores about 90, and a 60-40 game between the 5th and 12th teams about 84. Game Leverage adds up to 10 points.</p>
+<p>Team quality is the largest part of the score. Before tipoff, an even game between two top-ten teams scores about 90, and a 60-40 game between the 5th and 12th teams about 84. Game Leverage adds up to 10 points.</p>
 <p>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</p>
 <p>A finished game gets its own score from four parts:</p>
 <ul>
