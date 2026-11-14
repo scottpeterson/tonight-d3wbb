@@ -1,8 +1,10 @@
 {
- "fetched_at": "2026-11-14T17:00:14+00:00",
+ "fetched_at": "2026-11-14T17:28:38+00:00",
  "errors": [
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Dean at MCLA box score: WAF challenge from athletics.mcla.edu",
+  "UMass Boston at Suffolk box score: WAF challenge from gosuffolkrams.com"
  ],
  "stale": {},
  "dates": {
