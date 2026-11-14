@@ -1,9 +1,7 @@
 {
- "fetched_at": "2026-11-14T19:53:48+00:00",
+ "fetched_at": "2026-11-14T20:22:48+00:00",
  "errors": [
-  "Framingham St. at Brandeis feed: Remote end closed connection without response",
-  "Mt. St. Mary at Curry box score: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+  "Mt. St. Mary at Curry box score: HTTP Error 405: Not Allowed"
  ],
  "stale": {},
  "dates": {
