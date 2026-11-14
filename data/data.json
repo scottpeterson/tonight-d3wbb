@@ -1,8 +1,9 @@
 {
- "fetched_at": "2026-11-14T01:18:50+00:00",
+ "fetched_at": "2026-11-14T01:24:55+00:00",
  "errors": [
-  "Pacific Lutheran at Austin box score: HTTP Error 403: Forbidden",
-  "Methodist at Averett feed: Remote end closed connection without response"
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Pacific Lutheran at Austin box score: HTTP Error 403: Forbidden"
  ],
  "stale": {},
  "dates": {
@@ -14,7 +15,7 @@
   "2026-11-11": 69,
   "2026-11-12": 15,
   "2026-11-13": 62,
-  "2026-11-14": 136,
+  "2026-11-14": 139,
   "2026-11-15": 33,
   "2026-11-16": 12,
   "2026-11-17": 44,
