@@ -1,7 +1,10 @@
 {
- "fetched_at": "2026-11-14T17:57:49+00:00",
+ "fetched_at": "2026-11-14T18:26:55+00:00",
  "errors": [
+  "Mt. St. Mary at Curry box score: HTTP Error 405: Not Allowed",
+  "Wellesley at Elms box score: HTTP Error 405: Not Allowed",
   "Dean at MCLA box score: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "UMass Boston at Suffolk box score: HTTP Error 405: Not Allowed"
  ],
  "stale": {},
