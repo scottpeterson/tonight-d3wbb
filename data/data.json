@@ -1,11 +1,16 @@
 {
- "fetched_at": "2026-11-14T18:55:36+00:00",
+ "fetched_at": "2026-11-14T19:24:45+00:00",
  "errors": [
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Mt. St. Mary at Curry box score: HTTP Error 405: Not Allowed",
   "Wellesley at Elms box score: HTTP Error 405: Not Allowed",
-  "Dean at MCLA box score: HTTP Error 405: Not Allowed",
-  "Springfield at Maine Farmington feed: HTTP Error 500: Internal Server Error",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+  "Hiram at Franklin feed: Remote end closed connection without response",
+  "Otterbein at La Roche box score: HTTP Error 405: Not Allowed",
+  "Alverno at Lake Forest feed: Remote end closed connection without response",
+  "William Smith at Pitt-Bradford box score: HTTP Error 405: Not Allowed",
+  "Wilkes at Pratt feed: Remote end closed connection without response",
+  "Maine Presque Isle at Southern Maine feed: Remote end closed connection without response",
+  "Christopher Newport at Stockton feed: Remote end closed connection without response"
  ],
  "stale": {},
  "dates": {
