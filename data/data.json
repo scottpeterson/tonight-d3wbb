@@ -1,7 +1,9 @@
 {
- "fetched_at": "2026-11-14T20:22:48+00:00",
+ "fetched_at": "2026-11-14T20:23:13+00:00",
  "errors": [
-  "Mt. St. Mary at Curry box score: HTTP Error 405: Not Allowed"
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
+  "Mt. St. Mary at Curry box score: WAF challenge from curryathletics.com"
  ],
  "stale": {},
  "dates": {
@@ -14,7 +16,7 @@
   "2026-11-12": 15,
   "2026-11-13": 62,
   "2026-11-14": 146,
-  "2026-11-15": 33,
+  "2026-11-15": 34,
   "2026-11-16": 12,
   "2026-11-17": 44,
   "2026-11-18": 71,
@@ -112,6 +114,8 @@
  },
  "notes": [
   "Franklin at Albion 2026-11-14: both schedule pages list other opponents, left out",
+  "John Carroll at Augustana 2026-11-14: both schedule pages list other opponents, left out",
+  "Mary Washington at DeSales 2026-11-14: both schedule pages list other opponents, left out",
   "Bridgewater (VA) at Roanoke 2026-11-14: both schedule pages list other opponents, left out",
   "Marietta at Rochester 2026-11-14: both schedule pages list other opponents, left out",
   "Johns Hopkins at York (PA) 2026-11-14: both schedule pages list other opponents, left out"
