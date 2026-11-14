@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-14T21:50:19+00:00",
- "errors": [],
+ "fetched_at": "2026-11-14T22:19:33+00:00",
+ "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
