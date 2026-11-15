@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame", "otherGame",
-         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords"]
+         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf"]
 CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS"]
 
@@ -514,6 +514,13 @@ def test_live_lines_carry_the_class_year_from_the_slate_roster():
     assert run(f"matchNewcomer({{first:'Jean',last:'Sierra',abbr:'J. SIERRA'}},{roster}).name") == "Sierra Jean"
     assert run(f"matchNewcomer({{first:'',last:'',abbr:'A. LEE'}},{roster})") is None
     assert run(f"newcomerLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Zoe Park", "FR"]]
+    # Sisters on one roster, one of them a newcomer: the line names Jaydn in full, so Jazmine's newcomer entry does not
+    # take it (Maine Farmington, 2026-11-14). Without a roster the newcomer list is all there is.
+    g = {"home": "Maine Farmington", "away": "Springfield", "home_classes": [{"name": "Jaydn Pingree", "class": "JR"}, {"name": "Jazmine Pingree", "class": "JR"}],
+         "away_classes": [], "newcomers_home": [{"name": "Jazmine Pingree", "reason": "No 2025-26 minutes", "class": "JR"}], "newcomers_away": []}
+    s = {"lines": {"H": [dict(line, abbr="Pingree, Jaydn"), dict(line, abbr="Pingree, Jazmine", min=10)], "V": []}}
+    assert run(f"newcomerLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.line.min])") == [["Jazmine Pingree", 10]]
+    assert run(f"newcomerLines({json.dumps({**g, 'home_classes': []})},{json.dumps(s)},'live').map(x=>[x.name,x.line.min])") == [["Jazmine Pingree", 20], ["Jazmine Pingree", 10]]
 
 
 def test_progress_sort_puts_the_game_furthest_along_first_then_the_earliest_tipoff():

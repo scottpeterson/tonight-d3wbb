@@ -884,10 +884,16 @@ function matchNewcomer(l,roster){
 }
 // The class year of the roster player a box line belongs to, or '' when no one fits.
 function classOf(l,roster){const who=matchNewcomer(l,roster||[]);return (who&&who.class)||'';}
+// The newcomer a line belongs to: matched against the whole roster first, so a teammate who is not a newcomer still
+// counts as a candidate (Jaydn Pingree's 34 points went to her sister Jazmine, the only newcomer named Pingree, 2026-11-14).
+function newcomerOf(l,newcomers,roster){
+  if(roster&&roster.length){const who=matchNewcomer(l,roster);if(who)return newcomers.find(n=>norm(n.name)===norm(who.name))||null;}
+  return matchNewcomer(l,newcomers);
+}
 function newcomerLines(g,s,when){
   const out=[];
   [['H',g.home,g.newcomers_home,g.home_classes],['V',g.away,g.newcomers_away,g.away_classes]].forEach(([side,team,roster,classes])=>{
-    ((s.lines||{})[side]||[]).forEach(l=>{const who=matchNewcomer(l,roster||[]);if(who&&played(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
+    ((s.lines||{})[side]||[]).forEach(l=>{const who=newcomerOf(l,roster||[],classes||[]);if(who&&played(l))out.push({team,name:who.name,reason:who.reason,gmsc:Math.round(gameScore(l)*10)/10,when,
       line:boxLine(l),class:who.class||classOf(l,classes)});});
   });
   return out;

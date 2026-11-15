@@ -1529,6 +1529,20 @@ def match_newcomer(line, roster):
     return match_player(line, roster)
 
 
+def newcomer_of(line, newcomers, roster):
+    """The newcomer a box line belongs to, or None. The line is matched against the whole roster first, so a
+    teammate who is not a newcomer still counts as a candidate: Maine Farmington's box score for Springfield,
+    2026-11-14, named "Pingree, Jaydn" (34 points), and against the newcomer list alone, where her sister Jazmine
+    is the only Pingree, the initial-and-last-name step handed the line to Jazmine. With no roster published, the
+    newcomer list is all there is."""
+    if roster:
+        who = match_player(line, roster)
+        if who:
+            hit = [n for n in newcomers if norm(n["name"]) == norm(who["name"])]
+            return hit[0] if hit else None
+    return match_player(line, newcomers)
+
+
 def line_class(line, roster):
     """The class year of the roster player a box line belongs to, or '' when no one fits."""
     who = match_newcomer(line, roster)
@@ -1613,7 +1627,7 @@ def box_result(game, home_score, away_score, sides, lines):
     classes = {"H": game.get("home_classes") or [], "V": game.get("away_classes") or []}
     for side, team, roster in (("H", game["home"], game["newcomers_home"]), ("V", game["away"], game["newcomers_away"])):
         for line in lines.get(side, []):
-            who = match_newcomer(line, roster)
+            who = newcomer_of(line, roster, classes[side])
             if who and played(line):
                 found.append({"team": team, "name": who["name"], "reason": who["reason"], "gmsc": round(game_score(line), 1),
                               "class": who.get("class") or line_class(line, classes[side]),

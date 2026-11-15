@@ -289,6 +289,18 @@ def test_match_newcomer():
     assert f.roster_player(dict(LINE, first="Nia", last="Brown", abbr="N. BROWN"), ROSTER) == ("Nia Brown", "")
 
 
+def test_newcomer_of_matches_against_the_whole_roster_first():
+    # Maine Farmington, 2026-11-14: Jaydn Pingree (34 points) is not a newcomer; her sister Jazmine is. Against the
+    # newcomer list alone the initial-and-last-name step gave Jaydn's line to Jazmine.
+    roster = [{"name": "Jaydn Pingree", "class": "JR"}, {"name": "Jazmine Pingree", "class": "JR"}]
+    newcomers = [{"name": "Jazmine Pingree", "reason": "No 2025-26 minutes", "class": "JR"}]
+    assert f.newcomer_of(dict(LINE, abbr="Pingree, Jaydn"), newcomers, roster) is None
+    assert f.newcomer_of(dict(LINE, abbr="Pingree, Jazmine"), newcomers, roster)["name"] == "Jazmine Pingree"
+    # A newcomer the roster page lacks still matches through the newcomer list; no roster at all, the same.
+    assert f.newcomer_of(dict(LINE, abbr="Park, Zoe"), [{"name": "Zoe Park", "reason": "Freshman"}], roster)["name"] == "Zoe Park"
+    assert f.newcomer_of(dict(LINE, abbr="Pingree, Jaydn"), newcomers, [])["name"] == "Jazmine Pingree"
+
+
 def test_presto_lines_skip_team_rows():
     root = ET.fromstring(
         '<bbgame><team vh="H" name="Home"><player name="Lee, Ann" code="12"><stats tp="21" fgm="8" fga="15" ftm="5" fta="6" '
