@@ -1,7 +1,10 @@
 {
- "fetched_at": "2026-11-15T18:53:46+00:00",
+ "fetched_at": "2026-11-15T19:22:19+00:00",
  "errors": [
-  "Manhattanville at Fitchburg St. box score: HTTP Error 403: Forbidden"
+  "Swarthmore at Batten feed: Unterminated string starting at: line 1 column 16031 (char 16030)",
+  "St. Mary's (MD) at Bridgewater (VA) feed: IncompleteRead(16033 bytes read, 211803 more expected)",
+  "St. Lawrence at Colby feed: IncompleteRead(16035 bytes read, 70393 more expected)",
+  "UW-River Falls at Penn St. Altoona feed: IncompleteRead(16033 bytes read, 89871 more expected)"
  ],
  "stale": {},
  "dates": {
