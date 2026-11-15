@@ -1,9 +1,6 @@
 {
- "fetched_at": "2026-11-15T21:44:59+00:00",
- "errors": [
-  "Johnson & Wales Providence at NC Wesleyan feed: IncompleteRead(16033 bytes read, 206666 more expected)",
-  "Puget Sound at McMurry feed: Remote end closed connection without response"
- ],
+ "fetched_at": "2026-11-15T22:13:33+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
