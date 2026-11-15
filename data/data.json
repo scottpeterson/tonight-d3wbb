@@ -1,9 +1,6 @@
 {
- "fetched_at": "2026-11-15T22:25:06+00:00",
- "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found"
- ],
+ "fetched_at": "2026-11-15T22:41:52+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
