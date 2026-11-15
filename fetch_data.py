@@ -849,6 +849,14 @@ def opponent_resolver(schools, members):
     name that fits one D3 school and no Division I or II member. A placeholder row ("WashU Tournament" linking the
     host's site) and a host's listing of another game ("Benedictine (Ill.) vs. Central College") name no opponent."""
     sites, keys, upper = team_sites(schools), d3_keys(schools), upper_sites(members)
+    own = {}
+
+    def own_sites(team):
+        """The team's schedule site and its NCAA member site, which can differ (Alvernia: athletics.alvernia.edu)."""
+        if team not in own:
+            own[team] = {s for s, t in sites.items() if t == team} | {
+                m["site"] for n in aliases(team) for m in members["name"].get(name_key(n), []) if m["site"]}
+        return own[team]
 
     def resolve(r):
         if PLACEHOLDER.search(r["opponent"] or ""):
@@ -863,6 +871,11 @@ def opponent_resolver(schools, members):
             hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) | name_keys(plain_name(r["opponent"])) if k in keys}
             above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]
             opp = hits.pop() if len(hits) == 1 and not above else None
+            # A link to another NCAA member's site names that member, whatever the name fits. NC Wesleyan listed
+            # "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15; the name alone read as
+            # Johnson & Wales Providence, and the site carried a game Providence never had.
+            if opp and site in members["site"] and site not in own_sites(opp):
+                opp = None
         return opp
     return resolve
 

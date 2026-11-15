@@ -1446,3 +1446,34 @@ def test_restamp_defense_rewrites_old_slates_with_the_current_factors(monkeypatc
     stamp = (tmp_path / "2026-11-06.json").stat().st_mtime_ns
     f.restamp_defense({}, set())
     assert (tmp_path / "2026-11-06.json").stat().st_mtime_ns == stamp   # no factors: nothing rewritten
+
+
+def test_a_link_to_another_members_site_overrules_the_name_match():
+    # NC Wesleyan's page listed "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15. The
+    # name, stripped of its parenthetical, fit Johnson & Wales Providence, and the slate carried a game Providence
+    # never had. The link names Johnson & Wales Charlotte, a member outside the NPI list.
+    day = date(2026, 11, 15)
+    schools = dict(YORK_SCHOOLS, **{"Johnson & Wales Providence": {"team": "Johnson & Wales Providence", "type": "Sidearm",
+                                     "schedule": "https://providence.jwuathletics.com/sports/womens-basketball/schedule",
+                                     "tz": "America/New_York"}})
+    members = {"site": dict(MEMBERS["site"]), "name": {k: list(v) for k, v in MEMBERS["name"].items()}}
+    for m in ({"name": "Johnson & Wales University (Providence)", "division": 3, "site": "providence.jwuathletics.com"},
+              {"name": "Johnson & Wales University Charlotte", "division": 3, "site": "charlotte.jwuathletics.com"},
+              {"name": "Alvernia University", "division": 3, "site": "athletics.alvernia.edu"}):
+        members["site"][m["site"]] = m
+        members["name"].setdefault(f.name_key(m["name"]), []).append(m)
+    resolve = f.opponent_resolver(schools, members)
+    charlotte = f.row(day, (15, 15, "America/New_York"), True, False, "Johnson & Wales (N.C.)", {}, "", "",
+                      "https://charlotte.jwuathletics.com/landing/index")
+    assert resolve(charlotte) is None
+    # The same name linking Providence's own site, or no site at all, still resolves.
+    assert resolve(f.row(day, None, True, False, "Johnson & Wales (N.C.)", {}, "", "", "https://providence.jwuathletics.com/")) == "Johnson & Wales Providence"
+    assert resolve(f.row(day, None, True, False, "Johnson & Wales", {}, "", "")) == "Johnson & Wales Providence"
+    # A member site that differs from the schedule site is still the team's own (Alvernia).
+    schools["Alvernia"] = {"team": "Alvernia", "type": "Sidearm", "schedule": "https://alverniaathletics.com/sports/womens-basketball/schedule", "tz": "America/New_York"}
+    resolve = f.opponent_resolver(schools, members)
+    assert resolve(f.row(day, None, True, False, "Alvernia", {}, "", "", "https://athletics.alvernia.edu/")) == "Alvernia"
+    # The game stays off the slate.
+    pages = {"NC Wesleyan": [charlotte]}
+    schools["NC Wesleyan"] = {"team": "NC Wesleyan", "type": "Sidearm", "schedule": "https://ncwsports.com/sports/womens-basketball/schedule", "tz": "America/New_York"}
+    assert f.page_games(day, schools, pages, [], {}, members) == []
