@@ -1,10 +1,8 @@
 {
- "fetched_at": "2026-11-15T14:56:13+00:00",
+ "fetched_at": "2026-11-15T17:28:00+00:00",
  "errors": [
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Whitworth at Caltech feed: Remote end closed connection without response",
-  "Puget Sound at McMurry feed: Remote end closed connection without response"
+  "VTSU Johnson schedule: HTTP Error 404: Not Found"
  ],
  "stale": {},
  "dates": {
