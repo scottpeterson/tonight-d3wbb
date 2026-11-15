@@ -1429,3 +1429,20 @@ def test_a_mens_stats_folder_on_a_womens_page_means_the_hosts_womens_folder(monk
         {"type": "sidearm", "url": "https://sidearmstats.com/ursinuscollege/wbball/game.json"}
     block = '<a href="/sidearmstats/mbball/summary">Live Stats</a>'
     assert f.links_in(block, "https://ursinusathletics.com/") == {"live_stats": "https://ursinusathletics.com/sidearmstats/wbball/summary"}
+
+
+def test_restamp_defense_rewrites_old_slates_with_the_current_factors(monkeypatch, tmp_path):
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    old = {"date": "2026-11-06", "games": [{"id": "a", "home": "A", "away": "B", "home_def": 1.05, "away_def": 0.96},
+                                           {"id": "c", "home": "C", "away": "Outside", "home_def": 1.0, "away_def": None}]}
+    today = {"date": "2026-11-15", "games": [{"id": "x", "home": "A", "away": "C", "home_def": 1.05, "away_def": 1.0}]}
+    (tmp_path / "2026-11-06.json").write_text(json.dumps(old))
+    (tmp_path / "2026-11-15.json").write_text(json.dumps(today))
+    f.restamp_defense({"A": 1.16, "B": 0.89, "C": 1.0}, {"2026-11-15"})
+    games = json.loads((tmp_path / "2026-11-06.json").read_text())["games"]
+    assert (games[0]["home_def"], games[0]["away_def"]) == (1.16, 0.89)
+    assert (games[1]["home_def"], games[1]["away_def"]) == (1.0, None)   # a team outside the ratings stays average
+    assert json.loads((tmp_path / "2026-11-15.json").read_text()) == today   # written this run already
+    stamp = (tmp_path / "2026-11-06.json").stat().st_mtime_ns
+    f.restamp_defense({}, set())
+    assert (tmp_path / "2026-11-06.json").stat().st_mtime_ns == stamp   # no factors: nothing rewritten

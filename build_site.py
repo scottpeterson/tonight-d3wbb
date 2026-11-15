@@ -536,7 +536,7 @@ HOW = f"""<dl class="terms">
 </dd>
 <dt>Game score</dt><dd>
 <p>Game score adds PTS, 0.4 FGM, 0.7 OREB, 0.3 DREB, STL, 0.7 AST, and 0.7 BLK. It subtracts 0.7 FGA, 0.4 missed free throws (FTA minus FTM), 0.4 PF, and TO.</p>
-<p>The lists rank players by <b>adjusted game score</b>: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</p>
+<p>The lists rank players by <b>adjusted game score</b>: game score times the cube of the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 25% less. The cube comes from a fit of this season's lines: within a player, a game score moves about three times as far with the opponent's adjusted defense as the plain ratio would move it, because game score is a net stat. An opponent outside Division III counts as average.</p>
 </dd>
 <dt>Season top 15 lists</dt><dd>
 <p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by first-years. They come from every recorded box score. A player with more than one line in a list shows the count beside her name.</p>

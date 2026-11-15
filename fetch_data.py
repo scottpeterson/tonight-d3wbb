@@ -2039,6 +2039,30 @@ def finals_only(previous):
     return out
 
 
+def restamp_defense(defense, written):
+    """Write the current defense factors into every stored slate not written this run.
+
+    The ratings move with each daily export and the season lists read the factor each slate stores,
+    so an old slate keeps a factor from the day it was last built unless this rewrites it. A slate
+    is rewritten only when a factor changes. An empty factor list leaves every slate as it is."""
+    if not defense:
+        return
+    for path in sorted(SLATES.glob("*.json")):
+        if path.stem in written:
+            continue
+        slate = read_json(path)
+        if not slate:
+            continue
+        changed = False
+        for g in slate.get("games", []):
+            factors = defense.get(g["home"]), defense.get(g["away"])
+            if (g.get("home_def"), g.get("away_def")) != factors:
+                g["home_def"], g["away_def"] = factors
+                changed = True
+        if changed:
+            path.write_text(json.dumps(slate, separators=(",", ":")))
+
+
 def read_json(path, default=None):
     try:
         return json.loads(path.read_text())
@@ -2129,6 +2153,7 @@ def collect(previous):
         for g in slate["games"]:
             g["home_def"], g["away_def"] = defense.get(g["home"]), defense.get(g["away"])
         path.write_text(json.dumps(slate, separators=(",", ":")))
+    restamp_defense(defense, {d.isoformat() for d in window})
 
     record_finals(out, today, pages, extra.get("links"))
     return out
