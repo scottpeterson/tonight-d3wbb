@@ -1,8 +1,6 @@
 {
- "fetched_at": "2026-11-15T17:56:43+00:00",
- "errors": [
-  "Manhattanville at Fitchburg St. box score: HTTP Error 403: Forbidden"
- ],
+ "fetched_at": "2026-11-15T18:25:06+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
