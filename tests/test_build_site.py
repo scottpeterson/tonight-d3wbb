@@ -25,13 +25,13 @@ def write_slates(tmp_path):
             [line("B. Lee", "Smith", 24.0, "Freshman"), line("Cara Park", "Smith", 10.0, "Transfer from Hope", cls="JR")],
             home_def=1.0, away_def=0.8)]}
     two = {"date": "2026-11-07", "games": [game("Smith", "Hope",
-            [line("Ava Jones", "Hope", 26.0)] + [line(f"Player {i}", "Smith", 12.0 + i) for i in range(12)],
+            [line("Ava Jones", "Hope", 26.0)] + [line(f"Player {i}", "Smith", 6.0 + i) for i in range(17)],
             [], home_def=1.2, away_def=1.0)]}
     for s in (one, two):
         (tmp_path / f"{s['date']}.json").write_text(json.dumps(s))
 
 
-def test_season_lists_rank_by_adjusted_score_keep_ten_and_fill_in_the_class(tmp_path, monkeypatch):
+def test_season_lists_rank_by_adjusted_score_keep_fifteen_and_fill_in_the_class(tmp_path, monkeypatch):
     write_slates(tmp_path)
     monkeypatch.setattr(b, "SLATES", tmp_path)
     rosters = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR"), ("Smith", "Cara Perry", "SO")])
@@ -40,7 +40,8 @@ def test_season_lists_rank_by_adjusted_score_keep_ten_and_fill_in_the_class(tmp_
     # A line meets the opponent's defense: Ava's 30 at home against Smith (0.8) is 24.0, her 26 at Smith (1.2) is 31.2,
     # and the freshman's 24 at Hope (1.0) ties the 24.0, where the raw score breaks the tie.
     assert [(x["name"], x["adj"], x["date"]) for x in s["top"][:3]] == [("Ava Jones", 31.2, "2026-11-07"), ("Ava Jones", 24.0, "2026-11-06"), ("Bianca Lee", 24.0, "2026-11-06")]
-    assert len(s["top"]) == b.SEASON_N and s["top"][-1]["adj"] >= 17.0
+    # Twenty lines offered, fifteen kept: the cut falls at 11.0 and drops the five below it.
+    assert len(s["top"]) == b.SEASON_N and s["top"][-1]["adj"] == 11.0
     # Class: a full-name roster match, then first initial plus last name, and a stored class wins over the lookup.
     assert [x["class"] for x in s["top"][:3]] == ["SR", "SR", "FR"]
     # The roster name is canonical: "B. Lee" shows as Bianca Lee. A stored class keeps its stored name.

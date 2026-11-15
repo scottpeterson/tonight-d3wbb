@@ -271,7 +271,7 @@ def load_slate(day):
     return fill_classes(json.loads(path.read_text()), roster_classes()) if path.exists() else None
 
 
-SEASON_N = 10
+SEASON_N = 15
 NC_HEADERS = ["Player", "Team", "Class", "Points", "Rebounds", "Assists", "Steals plus blocks", "Field goals", "Game score", "Adjusted game score", "Game"]
 
 
@@ -312,7 +312,7 @@ def fill_classes(slate, rosters):
 def season_lines():
     """The SEASON_N best stored box lines of the season by adjusted game score, three ways: every player ("top"),
     newcomers ("nc"), and freshmen ("fr"). Reads only the lines each slate already stores (at most 15 per team per
-    game) and keeps a running cut at the tenth score, so a line below it costs one comparison."""
+    game) and keeps a running cut at the fifteenth score, so a line below it costs one comparison."""
     lists = {"top": [], "nc": [], "fr": []}
 
     def offer(key, x):
@@ -371,11 +371,11 @@ def season_sections():
     season = season_lines()
     tail = ' Ranked by adjusted game score. The list updates at each rebuild, so a game still going joins after its final is recorded.</p>'
     return "\n".join((
-        twisty("Top 10 game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by any player, from every recorded box score.' + tail
+        twisty("Top 15 game scores this season", '<p class="small">The 15 best adjusted game scores since opening night by any player, from every recorded box score.' + tail
                + nc_table(season["top"], "No box score has been recorded yet."), count=len(season["top"]), open_=False, id_="s-top"),
-        twisty("Top 10 newcomer game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by first-years, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
+        twisty("Top 15 newcomer game scores this season", '<p class="small">The 15 best adjusted game scores since opening night by first-years, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
                + nc_table(season["nc"], "No newcomer line has been recorded yet."), count=len(season["nc"]), open_=False, id_="s-nc"),
-        twisty("Top 10 first-year game scores this season", '<p class="small">The 10 best adjusted game scores since opening night by first-years.' + tail
+        twisty("Top 15 first-year game scores this season", '<p class="small">The 15 best adjusted game scores since opening night by first-years.' + tail
                + nc_table(season["fr"], "No first-year line has been recorded yet."), count=len(season["fr"]), open_=False, id_="s-fr")))
 
 
