@@ -1,6 +1,9 @@
 {
- "fetched_at": "2026-11-15T07:01:29+00:00",
- "errors": [],
+ "fetched_at": "2026-11-15T07:30:08+00:00",
+ "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
@@ -12,8 +15,8 @@
   "2026-11-12": 15,
   "2026-11-13": 62,
   "2026-11-14": 146,
-  "2026-11-15": 34,
-  "2026-11-16": 12,
+  "2026-11-15": 36,
+  "2026-11-16": 13,
   "2026-11-17": 44,
   "2026-11-18": 71,
   "2026-11-19": 22,
@@ -109,11 +112,6 @@
   "2026-10-27": 1
  },
  "notes": [
-  "Franklin at Albion 2026-11-14: both schedule pages list other opponents, left out",
-  "John Carroll at Augustana 2026-11-14: both schedule pages list other opponents, left out",
-  "Mary Washington at DeSales 2026-11-14: both schedule pages list other opponents, left out",
-  "Bridgewater (VA) at Roanoke 2026-11-14: both schedule pages list other opponents, left out",
-  "Marietta at Rochester 2026-11-14: both schedule pages list other opponents, left out",
-  "Johns Hopkins at York (PA) 2026-11-14: both schedule pages list other opponents, left out"
+  "Whitworth at Occidental 2026-11-15: neither schedule page lists a game that day, left out"
  ]
 }
