@@ -1,11 +1,6 @@
 {
- "fetched_at": "2026-11-15T19:22:19+00:00",
- "errors": [
-  "Swarthmore at Batten feed: Unterminated string starting at: line 1 column 16031 (char 16030)",
-  "St. Mary's (MD) at Bridgewater (VA) feed: IncompleteRead(16033 bytes read, 211803 more expected)",
-  "St. Lawrence at Colby feed: IncompleteRead(16035 bytes read, 70393 more expected)",
-  "UW-River Falls at Penn St. Altoona feed: IncompleteRead(16033 bytes read, 89871 more expected)"
- ],
+ "fetched_at": "2026-11-15T19:50:49+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
