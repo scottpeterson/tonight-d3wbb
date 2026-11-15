@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame", "otherGame",
-         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf"]
+         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf", "winnerChance"]
 CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS"]
 
@@ -529,3 +529,12 @@ def test_progress_sort_puts_the_game_furthest_along_first_then_the_earliest_tipo
     assert run(f"{json.dumps(games)}.sort(SORTS.progress).map(g=>g.tip)") == \
         ["2026-11-12T01:00:00Z", "2026-11-12T00:00:00Z", "2026-11-11T23:00:00Z", "2026-11-12T00:30:00Z", None]
     assert "closest" not in run("Object.keys(SORTS)")
+
+
+def test_upset_sort_puts_the_winner_with_the_lowest_pregame_chance_first():
+    # A 20% home team that won, a 70% home team that lost (the 30% visitor won), a 70% home team that won, and a
+    # game against a Division II team, which has no line and goes last.
+    games = [{"id": "a", "pregame_wp": 0.2, "st": {"score": [60, 55], "interest": 50}}, {"id": "b", "pregame_wp": 0.7, "st": {"score": [55, 60], "interest": 40}},
+             {"id": "c", "pregame_wp": 0.7, "st": {"score": [70, 50], "interest": 90}}, {"id": "d", "division": "II", "pregame_wp": 0.5, "st": {"score": [40, 80], "interest": 10}}]
+    assert run(f"{json.dumps(games)}.sort((a,b)=>SORTS.upset(a,b)||b.st.interest-a.st.interest).map(g=>g.id)") == ["a", "b", "c", "d"]
+    assert run(f"{json.dumps(games)}.map(g=>winnerChance(g,g.st))") == [0.2, pytest.approx(0.3), 0.7, None]

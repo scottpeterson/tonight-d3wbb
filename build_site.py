@@ -408,7 +408,12 @@ def sections():
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
             '<button type="button" class="sorter" data-sort="progress">Progress</button><button type="button" class="sorter" data-sort="leverage">Game Leverage</button></div></div>')
-    groups = "".join(twisty(title, '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
+    # The Final group has its own order: the Sort buttons above, or the winner with the lowest pregame chance first.
+    final_sort = ('<div class="sortbar ctl"><span class="seglabel caption" id="lbl-fsort">Sort finals</span>'
+                  '<div class="seg" role="group" aria-labelledby="lbl-fsort">'
+                  '<button type="button" class="fsorter" data-fsort="board">As above</button>'
+                  '<button type="button" class="fsorter" data-fsort="upset">Largest upset</button></div></div>')
+    groups = "".join(twisty(title, (final_sort if key == "final" else "") + '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
                      for key, title in (("mine", "My Watchlist"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
     board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("Method and definitions", HOW, open_=False, id_="how")
@@ -437,6 +442,7 @@ HOW = f"""<dl class="terms">
 <li><b>Progress</b> puts the game furthest along first, then the earliest tipoff.</li>
 <li><b>Game Leverage</b> puts the most at stake first.</li>
 </ul>
+<p>The Final group has its own Sort finals buttons. <b>As above</b> follows the Sort buttons. <b>Largest upset</b> puts the winner with the lowest pregame win chance first, so every upset comes before every expected result. A game the model has no line for goes last.</p>
 </dd>
 <dt>Which games</dt><dd>
 <p>Every game between two teams that count for the NCAA Power Index. A game appears only when a schedule page lists it.</p>
@@ -542,7 +548,7 @@ const GAME_MS=2*3600000;           // tipoff to expected final
 const SD=11;                       // points, full-game spread of the final margin
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let night=BOOT.night,games=[],timer=null,sortKey='interest',onlyMine=false,findText='';
+let night=BOOT.night,games=[],timer=null,sortKey='interest',finalKey='board',onlyMine=false,findText='';
 // The team rank cut for both top 15 lists: 0 shows every team. This browser remembers it.
 let rankCut=(()=>{try{const v=+localStorage.getItem(KEY+'-cut');return [0,100,200].includes(v)?v:0}catch(e){return 0}})();
 const LOGOS=new Set(BOOT.logos||[]);
@@ -1091,8 +1097,11 @@ function card(g){
     '<div class="side">'+side.join('')+'</div><button type="button" class="star" aria-pressed="'+starred+'" aria-label="'+(starred?'Remove this game from My Watchlist':'Add this game to My Watchlist')+'" title="'+(starred?'Remove from My Watchlist':'Add to My Watchlist')+'">'+(starred?'\u2605':'\u2606')+'</button>'+
     '<div class="meta">'+meta.join('')+'</div></article>';
 }
+// The winner's pregame chance: the lower, the larger the upset. A game the model has no line for sorts last.
+function winnerChance(g,st){if(!modeled(g)||!st.score||st.score[0]===st.score[1])return Infinity;return st.score[0]>st.score[1]?g.pregame_wp:1-g.pregame_wp;}
 const SORTS={
   interest:(a,b)=>b.st.interest-a.st.interest,
+  upset:(a,b)=>winnerChance(a,a.st)-winnerChance(b,b.st),
   tipoff:(a,b)=>(tipMs(a)||Infinity)-(tipMs(b)||Infinity),
   progress:(a,b)=>(b.st.progress||0)-(a.st.progress||0)||(tipMs(a)||Infinity)-(tipMs(b)||Infinity),
   leverage:(a,b)=>(b.division?-1:leverage(b))-(a.division?-1:leverage(a)),
@@ -1121,12 +1130,14 @@ function render(){
   const list=games.filter(shown).sort((a,b)=>groupOf(a.st)-groupOf(b.st)||SORTS[sortKey](a,b)||b.st.interest-a.st.interest);
   // A starred game appears in My Watchlist and stays in its status group. The My Watchlist button shows the watchlist alone.
   GROUPS.forEach(name=>{
-    const d=$('#g-'+name),part=name==='mine'?list.filter(g=>stars.has(g.id)):onlyMine?[]:list.filter(g=>groupOf(g.st)===STATES.indexOf(name));
+    const d=$('#g-'+name);let part=name==='mine'?list.filter(g=>stars.has(g.id)):onlyMine?[]:list.filter(g=>groupOf(g.st)===STATES.indexOf(name));
+    if(name==='final'&&finalKey!=='board')part=part.slice().sort((a,b)=>SORTS[finalKey](a,b)||b.st.interest-a.st.interest);
     d.hidden=!part.length;d.querySelector('.count').textContent=part.length;
     paint(d.querySelector('.board'),part);
   });
   message(!games.length?'No NPI games on this night.':list.length?'':onlyMine&&!findText?'You have no starred games on this night.':'No game on this night matches.');
   document.querySelectorAll('.sorter').forEach(b=>b.classList.toggle('active',b.dataset.sort===sortKey));
+  document.querySelectorAll('.fsorter').forEach(b=>b.classList.toggle('active',b.dataset.fsort===finalKey));
   renderNewcomers();
   renderNext();
   if(window.renderTimes)window.renderTimes();
@@ -1206,6 +1217,7 @@ $('#next').addEventListener('click',()=>{const i=BOOT.dates.indexOf(night);if(i<
 function defaultNight(){const t=todayET(),ahead=BOOT.dates.filter(d=>d>=t);return ahead[0]||(BOOT.dates.length?BOOT.dates[BOOT.dates.length-1]:BOOT.night);}
 $('#tonight').addEventListener('click',()=>go(defaultNight()));
 document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;render();}));
+document.querySelectorAll('.fsorter').forEach(b=>b.addEventListener('click',()=>{finalKey=b.dataset.fsort;render();}));
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
 document.querySelectorAll('.cut').forEach(b=>b.addEventListener('click',()=>{rankCut=+b.dataset.cut;try{localStorage.setItem(KEY+'-cut',rankCut)}catch(err){}renderNewcomers();}));
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
