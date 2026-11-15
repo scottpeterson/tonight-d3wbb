@@ -68,6 +68,13 @@ def test_season_table_matches_the_nightly_columns_and_sorts():
     assert html.count("<th ") == len(b.NC_HEADERS) and 'class="nc sortable"' in html and "aria-sort=none" in html
     assert '<td class="n">SR</td>' in html and '<span class="cls"> · SR</span>' in html and "Smith at Hope" in html and "Nov 6" in html
     assert b.nc_table([], "none") == '<p class="empty">none</p>'
+    # A player with more than one line in the list shows the count beside her name; a single line shows nothing.
+    assert "times" not in html
+    twice = b.nc_table([x, dict(x, adj=20.0, date="2026-11-07")], "none")
+    assert twice.count('<span class="times"> · 2 lines</span>') == 2
+    # Keyed by team and name: a namesake on another team is a different player.
+    other = b.nc_table([x, dict(x, team="Smith")], "none")
+    assert "times" not in other
     # LIVE_JS draws the nightly lists with the same column list.
     js = re.search(r"const NC_HEAD='<thead><tr>'\+\[(.*?)\]\.map", b.LIVE_JS).group(1)
     assert [h.strip("'") for h in js.split(",")] == b.NC_HEADERS

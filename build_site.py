@@ -12,6 +12,7 @@ pace set by the game's interest score (see PLAN.md and README.md).
 import csv
 import html
 import json
+from collections import Counter
 import re
 from datetime import datetime
 from pathlib import Path
@@ -144,7 +145,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:600}.tag.close{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
 #how{scroll-margin-top:64px}dl.terms{max-width:900px}
 .nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:var(--fs-caption);color:var(--muted);font-weight:400}
-.nc td.m{display:none}.nc .cls{display:none}
+.nc td.m{display:none}.nc .cls{display:none}.nc .times{color:var(--muted);font-weight:400;font-size:var(--fs-sm);white-space:nowrap}
 @media (max-width:640px){.nc thead{display:none}.nc,.nc tbody{display:block}
 .nc tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"p g" "t g" "m m" "gm gm";column-gap:var(--s3);row-gap:2px;padding:var(--s2) var(--s3);border-top:1px solid var(--line)}
 .nc tr:first-child{border-top:0}.nc td,.nc td.gm{padding:0;border:0;white-space:normal;min-width:0;text-align:left}
@@ -348,11 +349,14 @@ def reason_text(reason):
     return "First-year" if reason == "Freshman" else reason
 
 
-def line_row(x):
-    """One row of a season list, in the shape LIVE_JS draws for the nightly lists (td.m is the phone layout's one-line stats)."""
+def line_row(x, repeats=None):
+    """One row of a season list, in the shape LIVE_JS draws for the nightly lists (td.m is the phone layout's one-line stats).
+    repeats counts each (team, name) in the list; a player with more than one line shows the count beside her name."""
     l, g, cls = x["line"], x["game"], x.get("class") or ""
     when = datetime.fromisoformat(x["date"]).strftime("%b %-d")
-    reason = f'<span class="reason">{esc(reason_text(x["reason"]))}</span>' if x.get("reason") else ""
+    times = (repeats or {}).get((x["team"], x["name"]), 1)
+    reason = (f'<span class="times"> · {times} lines</span>' if times > 1 else "") + \
+        (f'<span class="reason">{esc(reason_text(x["reason"]))}</span>' if x.get("reason") else "")
     stats = f'{l["pts"]} PTS · {l["reb"]} REB · {l["ast"]} AST · {l["stl"] + l["blk"]} STL+BLK · {l["fgm"]}-{l["fga"]} FG · {x["gmsc"]:.1f} game score'
     return (f'<tr><td class="lead p">{esc(x["name"])}{reason}</td><td class="lead t">{esc(x["team"])}{f"<span class={chr(34)}cls{chr(34)}> · {esc(cls)}</span>" if cls else ""}</td>'
             f'<td class="n">{esc(cls)}</td><td class="n">{l["pts"]}</td><td class="n">{l["reb"]}</td><td class="n">{l["ast"]}</td><td class="n">{l["stl"] + l["blk"]}</td>'
@@ -364,7 +368,8 @@ def nc_table(rows, empty):
     if not rows:
         return f'<p class="empty">{esc(empty)}</p>'
     th = "".join(f'<th{" class=lead" if i in (0, 1, len(NC_HEADERS) - 1) else ""} role=button tabindex=0 aria-sort=none>{h}</th>' for i, h in enumerate(NC_HEADERS))
-    return f'<div class="tablewrap"><table class="nc sortable"><thead><tr>{th}</tr></thead><tbody>{"".join(line_row(x) for x in rows)}</tbody></table></div>'
+    repeats = Counter((x["team"], x["name"]) for x in rows)
+    return f'<div class="tablewrap"><table class="nc sortable"><thead><tr>{th}</tr></thead><tbody>{"".join(line_row(x, repeats) for x in rows)}</tbody></table></div>'
 
 
 def season_sections():
@@ -533,8 +538,8 @@ HOW = f"""<dl class="terms">
 <p>Game score adds PTS, 0.4 FGM, 0.7 OREB, 0.3 DREB, STL, 0.7 AST, and 0.7 BLK. It subtracts 0.7 FGA, 0.4 missed free throws (FTA minus FTM), 0.4 PF, and TO.</p>
 <p>The lists rank players by <b>adjusted game score</b>: game score times the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 9% less. An opponent outside Division III counts as average.</p>
 </dd>
-<dt>Season top 10 lists</dt><dd>
-<p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by first-years. They come from every recorded box score.</p>
+<dt>Season top 15 lists</dt><dd>
+<p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by first-years. They come from every recorded box score. A player with more than one line in a list shows the count beside her name.</p>
 <p>They update at each rebuild. Rebuilds run a few times a day, plus every 20 minutes on game nights. A game still going joins after its final is recorded.</p>
 </dd>
 </dl>"""
