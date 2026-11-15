@@ -1,12 +1,6 @@
 {
- "fetched_at": "2026-11-15T20:18:11+00:00",
- "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Manchester at Benedictine feed: Remote end closed connection without response",
-  "Kean at Gallaudet feed: Remote end closed connection without response",
-  "Clarkson at Hartwick feed: Remote end closed connection without response"
- ],
+ "fetched_at": "2026-11-15T20:19:04+00:00",
+ "errors": [],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
