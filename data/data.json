@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-16T23:09:17+00:00",
- "errors": [],
+ "fetched_at": "2026-11-16T23:38:37+00:00",
+ "errors": [
+  "Berea at Spalding feed: URL can't contain control characters. '/Golden Eagles/wbball/game.json?detail=full' (found at least ' ')"
+ ],
  "stale": {},
  "dates": {
   "2026-11-06": 78,
