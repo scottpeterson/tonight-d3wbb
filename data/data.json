@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-16T11:13:04+00:00",
+ "fetched_at": "2026-11-16T12:08:50+00:00",
  "errors": [
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "VTSU Johnson schedule: HTTP Error 404: Not Found"
@@ -17,7 +17,7 @@
   "2026-11-14": 139,
   "2026-11-15": 33,
   "2026-11-16": 13,
-  "2026-11-17": 44,
+  "2026-11-17": 46,
   "2026-11-18": 71,
   "2026-11-19": 22,
   "2026-11-20": 57,
@@ -111,5 +111,8 @@
   "2027-02-27": 4,
   "2026-10-27": 1
  },
- "notes": []
+ "notes": [
+  "Carlow at Fredonia St. 2026-11-17: neither schedule page lists a game that day, left out",
+  "Wesleyan (CT) at Skidmore 2026-11-17: neither schedule page lists a game that day, left out"
+ ]
 }
