@@ -266,13 +266,18 @@ def load_schools():
         return {r["team"]: r for r in csv.DictReader(f)}
 
 
-def tournament_chance():
-    """Team -> share of simulations that reach the NCAA tournament, 0 to 1."""
+def tournament_chance(rows):
+    """Team -> share of simulations that reach the NCAA tournament, 0 to 1, from seasonSimulations.json rows."""
     out = {}
-    for r in statlab("seasonSimulations.json"):
+    for r in rows:
         raw = str(r.get("Tourn%") or "0").rstrip("%")
         out[r["Team"]] = float(raw) / 100 if raw not in ("", "-") else 0.0
     return out
+
+
+def conferences(rows):
+    """Team -> conference, from seasonSimulations.json rows. The page's conference filter reads it."""
+    return {r["Team"]: r["Conf"] for r in rows if r.get("Conf")}
 
 
 def newcomers_by_team():
@@ -2092,12 +2097,15 @@ def collect(previous):
         games = statlab_games["games"]
         # Average adjusted defense / the team's own: the page multiplies it into each opposing player's game score.
         defense = statlab_games.get("defense", {})
-        tourn = tournament_chance()
+        sims = statlab("seasonSimulations.json")
+        tourn = tournament_chance(sims)
+        out["conferences"] = conferences(sims)
         newcomers = newcomers_by_team()
     except FETCH_ERRORS as exc:
         out["errors"].append(f"The D3 Stat Lab: {exc}")
         out["stale"]["statlab"] = previous.get("stale", {}).get("statlab") or previous.get("fetched_at")
         out["dates"] = previous.get("dates", {})
+        out["conferences"] = previous.get("conferences", {})
         return out
     extra = read_json(EXTRA, {"schools": {}, "games": []})
     names, rosters, classes = team_names(), team_rosters(), team_classes()

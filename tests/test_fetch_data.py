@@ -1477,3 +1477,10 @@ def test_a_link_to_another_members_site_overrules_the_name_match():
     pages = {"NC Wesleyan": [charlotte]}
     schools["NC Wesleyan"] = {"team": "NC Wesleyan", "type": "Sidearm", "schedule": "https://ncwsports.com/sports/womens-basketball/schedule", "tz": "America/New_York"}
     assert f.page_games(day, schools, pages, [], {}, members) == []
+
+
+def test_conferences_and_tournament_chance_read_the_simulation_rows():
+    import fetch_data as f
+    rows = [{"Team": "Hope", "Conf": "MIAA", "Tourn%": "41.5%"}, {"Team": "Alverno", "Conf": "", "Tourn%": "-"}]
+    assert f.conferences(rows) == {"Hope": "MIAA"}
+    assert f.tournament_chance(rows) == {"Hope": 0.415, "Alverno": 0.0}

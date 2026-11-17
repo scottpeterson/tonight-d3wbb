@@ -127,6 +127,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .toolbar button{height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font-size:var(--fs-md);white-space:nowrap}
 .toolbar button:disabled{color:var(--faint);cursor:default}.toolbar .step{padding:0;width:var(--pill)}.toolbar .label{font-weight:600;white-space:nowrap;text-align:center;min-width:5.6em}
 .toolbar input{flex:0 1 220px;min-width:0;width:100%;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font:inherit}.toolbar input::placeholder{color:var(--muted)}
+.relrow{display:flex;flex-wrap:wrap;gap:var(--s2);width:100%}.relrow select{flex:0 1 260px;min-width:0;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font:inherit;font-size:var(--fs-md)}.relrow select:disabled{color:var(--faint)}
 .toolbar .mine{margin-left:auto}.toolbar .mine[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .sortbar{margin:var(--s3) 0;align-items:flex-start}.sortbar .caption{width:100%}.sortbar .caption{display:flex;justify-content:space-between;gap:var(--s3)}.sortbar .checked{font-size:var(--fs-caption);color:var(--muted)}
 .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));grid-auto-rows:1fr;gap:var(--s3);padding-bottom:var(--s1)}
@@ -384,13 +385,26 @@ def season_sections():
                + nc_table(season["fr"], "No first-year line has been recorded yet."), count=len(season["fr"]), open_=False, id_="s-fr")))
 
 
+def season_results():
+    """[winner, loser] for every final between Division III teams in the stored slates. The team filter reads them."""
+    out = []
+    for path in sorted(SLATES.glob("*.json")):
+        for g in json.loads(path.read_text()).get("games", []):
+            fin = g.get("final")
+            if g.get("division") or g.get("off") or not fin or fin[0] == fin[1]:
+                continue
+            out.append([g["home"], g["away"]] if fin[0] > fin[1] else [g["away"], g["home"]])
+    return out
+
+
 def sections():
     dates = sorted(DATA.get("dates", {}))
     night = default_night(dates)
     slate = load_slate(night)
     boot = {"dates": dates, "counts": DATA.get("dates", {}), "night": night, "slate": slate,
             "slates": sorted(p.stem for p in SLATES.glob("*.json")),
-            "logos": sorted(p.stem for p in (OUT.parent / "logos").glob("*.webp"))}
+            "logos": sorted(p.stem for p in (OUT.parent / "logos").glob("*.webp")),
+            "results": season_results(), "conf": DATA.get("conferences", {})}
     toolbar = ('<div class="toolbar" role="group" aria-label="Night and filters">'
                '<button type="button" class="step" id="prev" aria-label="Previous night">&#8249;</button>'
                '<span class="label" id="nightlabel"></span>'
@@ -420,7 +434,12 @@ def sections():
                   '<button type="button" class="fsorter" data-fsort="upset">Largest upset</button></div></div>')
     groups = "".join(twisty(title, (final_sort if key == "final" else "") + '<div class="board"></div>', count="", id_=f"g-{key}", hidden=True)
                      for key, title in (("mine", "My Watchlist"), ("live", "Live"), ("pre", "Not started"), ("final", "Final")))
-    board = f'{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
+    team_filter = ('<div class="sortbar ctl"><span class="seglabel caption" id="lbl-rel">Team filter</span>'
+                   '<div class="relrow"><select id="focus" aria-label="Team"><option value="">Pick a team</option></select>'
+                   '<select id="rel" aria-label="Games to show" disabled><option value="">All games</option>'
+                   '<option value="beat">Teams it beat</option><option value="oo">Opponents of its opponents</option>'
+                   '<option value="conf">Its conference</option></select></div></div>')
+    board = f'{team_filter}{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("Method and definitions", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
     return f'{toolbar}\n{newcomers}\n{topgames}\n{board}\n{season_sections()}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
@@ -448,6 +467,15 @@ HOW = f"""<dl class="terms">
 <li><b>Game Leverage</b> puts the most at stake first.</li>
 </ul>
 <p>The Final group has its own Sort finals buttons. <b>As above</b> follows the Sort buttons. <b>Largest upset</b> puts the winner with the lowest pregame win chance first, so every upset comes before every expected result. A game the model has no line for goes last.</p>
+</dd>
+<dt>Team filter</dt><dd>
+<p>Pick a team, then pick which games to show:</p>
+<ul>
+<li><b>Teams it beat</b> shows games with a team the picked team beat.</li>
+<li><b>Opponents of its opponents</b> shows games with a team that one of the picked team's opponents played.</li>
+<li><b>Its conference</b> shows games with a team from the picked team's conference.</li>
+</ul>
+<p>Wins and opponents come from the final scores on this page since opening night. A game with no final score here does not count. This browser remembers your choice.</p>
 </dd>
 <dt>Which games</dt><dd>
 <p>Every game between two teams that count for the NCAA Power Index. A game appears only when a schedule page lists it.</p>
@@ -553,7 +581,7 @@ const GAME_MS=2*3600000;           // tipoff to expected final
 const SD=11;                       // points, full-game spread of the final margin
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let night=BOOT.night,games=[],timer=null,sortKey='interest',finalKey='board',onlyMine=false,findText='';
+let night=BOOT.night,games=[],timer=null,sortKey='interest',finalKey='board',onlyMine=false,findText='',focusTeam='',relKey='',relTeams=null;
 // The team rank cut for both top 15 lists: 0 shows every team. This browser remembers it.
 let rankCut=(()=>{try{const v=+localStorage.getItem(KEY+'-cut');return [0,100,200].includes(v)?v:0}catch(e){return 0}})();
 const LOGOS=new Set(BOOT.logos||[]);
@@ -1112,8 +1140,18 @@ const SORTS={
   leverage:(a,b)=>(b.division?-1:leverage(b))-(a.division?-1:leverage(a)),
 };
 const plain=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// The teams a team filter keeps, from the season's finals ([winner, loser]) and the conference map. Null shows every game.
+function relSet(team,rel,results,conf){
+  if(!team||!rel)return null;
+  if(rel==='conf'){const c=conf[team];return new Set(c?Object.keys(conf).filter(t=>conf[t]===c):[team]);}
+  if(rel==='beat')return new Set(results.filter(r=>r[0]===team).map(r=>r[1]));
+  const opp=t=>results.filter(r=>r[0]===t||r[1]===t).map(r=>r[0]===t?r[1]:r[0]),out=new Set();
+  opp(team).forEach(o=>opp(o).forEach(x=>{if(x!==team)out.add(x);}));
+  return out;
+}
 function shown(g){
   if(onlyMine&&!stars.has(g.id))return false;
+  if(relTeams&&!relTeams.has(g.home)&&!relTeams.has(g.away))return false;
   const q=plain(findText);
   return !q||plain(g.home).includes(q)||plain(g.away).includes(q);
 }
@@ -1224,6 +1262,22 @@ $('#tonight').addEventListener('click',()=>go(defaultNight()));
 document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;render();}));
 document.querySelectorAll('.fsorter').forEach(b=>b.addEventListener('click',()=>{finalKey=b.dataset.fsort;render();}));
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
+// The team filter: the option labels name the picked team and its conference.
+function setFilter(team,rel){
+  const conf=BOOT.conf||{};focusTeam=conf[team]||(BOOT.results||[]).some(r=>r.includes(team))?team:'';relKey=focusTeam?rel:'';
+  $('#focus').value=focusTeam;const sel=$('#rel');sel.disabled=!focusTeam;sel.value=relKey;
+  const labels={'':'All games',beat:focusTeam?'Teams '+focusTeam+' beat':'Teams it beat',oo:focusTeam?'Opponents of '+focusTeam+"'s opponents":'Opponents of its opponents',
+    conf:focusTeam&&conf[focusTeam]?conf[focusTeam]+' teams':'Its conference'};
+  [...sel.options].forEach(o=>{o.textContent=labels[o.value];});
+  relTeams=relSet(focusTeam,relKey,BOOT.results||[],conf);
+  try{localStorage.setItem(KEY+'-focus',JSON.stringify([focusTeam,relKey]))}catch(err){}
+}
+{const teams=new Set(Object.keys(BOOT.conf||{}));(BOOT.results||[]).forEach(r=>r.forEach(t=>teams.add(t)));
+ [...teams].sort((a,b)=>a.localeCompare(b)).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;$('#focus').append(o);});
+ let saved=['',''];try{saved=JSON.parse(localStorage.getItem(KEY+'-focus'))||saved}catch(err){}
+ setFilter(saved[0]||'',saved[1]||'');}
+$('#focus').addEventListener('change',e=>{setFilter(e.target.value,relKey);render();});
+$('#rel').addEventListener('change',e=>{setFilter(focusTeam,e.target.value);render();});
 document.querySelectorAll('.cut').forEach(b=>b.addEventListener('click',()=>{rankCut=+b.dataset.cut;try{localStorage.setItem(KEY+'-cut',rankCut)}catch(err){}renderNewcomers();}));
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
 // One listener for every star, because cards come and go as scores change.

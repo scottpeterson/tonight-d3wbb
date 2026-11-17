@@ -93,3 +93,12 @@ def test_published_slates_carry_the_class_on_old_lines_and_the_rosters(tmp_path,
     assert [x["class"] for x in g["newcomer_games"]] == ["FR", "JR"]  # the stored JR stays
     assert g["home_classes"] == [{"name": "Ava Jones", "class": "SR"}] and g["away_classes"] == [{"name": "Bianca Lee", "class": "FR"}]
     assert b.load_slate("2026-11-06")["games"][0]["top_lines"][0]["class"] == "SR"
+
+
+def test_season_results_list_each_division_iii_final_as_winner_then_loser(tmp_path, monkeypatch):
+    games = [{"home": "Hope", "away": "Calvin", "final": [70, 60]}, {"home": "Alma", "away": "Hope", "final": [50, 61]},
+             {"home": "Duke", "away": "Smith", "final": [90, 40], "division": 1}, {"home": "Trine", "away": "Hope", "final": None},
+             {"home": "Olivet", "away": "Hope", "final": [0, 0], "off": "Postponed"}]
+    (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
+    monkeypatch.setattr(b, "SLATES", tmp_path)
+    assert b.season_results() == [["Hope", "Calvin"], ["Hope", "Alma"]]

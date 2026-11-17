@@ -12,7 +12,7 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame", "otherGame",
-         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf", "winnerChance"]
+         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf", "winnerChance", "relSet"]
 CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
           "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS"]
 
@@ -538,3 +538,17 @@ def test_upset_sort_puts_the_winner_with_the_lowest_pregame_chance_first():
              {"id": "c", "pregame_wp": 0.7, "st": {"score": [70, 50], "interest": 90}}, {"id": "d", "division": "II", "pregame_wp": 0.5, "st": {"score": [40, 80], "interest": 10}}]
     assert run(f"{json.dumps(games)}.sort((a,b)=>SORTS.upset(a,b)||b.st.interest-a.st.interest).map(g=>g.id)") == ["a", "b", "c", "d"]
     assert run(f"{json.dumps(games)}.map(g=>winnerChance(g,g.st))") == [0.2, pytest.approx(0.3), 0.7, None]
+
+
+RESULTS = [["Hope", "Calvin"], ["Hope", "Trine"], ["Albion", "Hope"], ["Calvin", "Alma"], ["Wittenberg", "Trine"], ["Smith", "Amherst"]]
+CONF = {"Hope": "MIAA", "Calvin": "MIAA", "Trine": "MIAA", "Albion": "MIAA", "Alma": "MIAA", "Wittenberg": "NCAC", "Smith": "NEWMAC", "Amherst": "NESCAC"}
+
+
+def test_team_filter_sets():
+    rel = lambda team, key: run(f"[...(relSet({json.dumps(team)},{json.dumps(key)},{json.dumps(RESULTS)},{json.dumps(CONF)})||['ALL'])].sort()")
+    assert rel("Hope", "beat") == ["Calvin", "Trine"]
+    # Opponents of Hope's opponents (Calvin, Trine, Albion), without Hope itself.
+    assert rel("Hope", "oo") == ["Alma", "Wittenberg"]
+    assert rel("Hope", "conf") == ["Albion", "Alma", "Calvin", "Hope", "Trine"]
+    assert rel("Hope", "") == ["ALL"] and rel("", "beat") == ["ALL"]
+    assert rel("Albion", "beat") == ["Hope"] and rel("Alma", "beat") == []
