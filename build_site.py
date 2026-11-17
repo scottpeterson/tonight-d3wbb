@@ -49,15 +49,21 @@ def link(href, text, cls=""):
     return f'<a href="{esc(href)}" target="_blank" rel="noopener"{f" class={chr(34)}{cls}{chr(34)}" if cls else ""}>{esc(text)}</a>'
 
 
-def table(headers, rows, lead_cols=1, caption=None, sortable=True):
-    """A table whose first `lead_cols` columns are left-aligned and whose data
-    columns are centered, header cells included. Headers sort on click unless
-    `sortable=False`. Pass cells as HTML strings; put a `data-sort` attribute
-    on a cell when its visible text is not what should sort (a date, a rank)."""
-    th = "".join(f'<th{" class=lead" if i < lead_cols else ""}{" role=button tabindex=0 aria-sort=none" if sortable else ""}>{h}</th>' for i, h in enumerate(headers))
+def table(headers, rows, lead_cols=1, caption=None, sortable=True, text_cols=()):
+    """A table whose first `lead_cols` columns and any `text_cols` (indexes of
+    text columns such as dates or opponents) are left-aligned. Every other
+    column is numeric and right-aligned, header cells included, so place values
+    line up. Headers sort on click unless `sortable=False`. Pass cells as HTML
+    strings; put a `data-sort` attribute on a cell when its visible text is not
+    what should sort (a date, a rank)."""
+
+    def cls(i):
+        return " class=lead" if i < lead_cols else (" class=txt" if i in text_cols else " class=num")
+
+    th = "".join(f'<th{cls(i)}{" role=button tabindex=0 aria-sort=none" if sortable else ""}>{h}</th>' for i, h in enumerate(headers))
     body = []
     for row in rows:
-        td = "".join(f'<td{" class=lead" if i < lead_cols else ""}>{c}</td>' for i, c in enumerate(row))
+        td = "".join(f"<td{cls(i)}>{c}</td>" for i, c in enumerate(row))
         body.append(f"<tr>{td}</tr>")
     cap = f"<caption>{esc(caption)}</caption>" if caption else ""
     return f'<div class="tablewrap"><table{" class=sortable" if sortable else ""}>{cap}<thead><tr>{th}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
@@ -100,7 +106,7 @@ p{margin:0 0 var(--s3)}.sub{color:var(--muted);max-width:760px}.small{font-size:
 .settings summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;height:var(--control-h);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font-size:var(--fs-md)}.settings summary::-webkit-details-marker{display:none}.settings[open] summary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .settings-panel{flex-basis:100%;order:3}.top:has(.settings[open]) .settings-panel{display:block}.settings-panel{display:none;padding:var(--s2) 0}
 .controls{display:flex;gap:var(--s4);align-items:flex-start;flex-wrap:wrap}.ctl{display:flex;flex-direction:column;gap:var(--s1)}
-.seglabel{font-size:var(--fs-caption);font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-left:2px}
+.seglabel{font-size:var(--fs-caption);font-weight:500;color:var(--muted);padding-left:2px}
 .seg{display:inline-flex;align-items:stretch;border:1px solid var(--ctl-line);border-radius:999px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:transparent;color:var(--muted);height:calc(var(--control-h) - 2px);padding:0 var(--s3);font-size:var(--fs-md);min-width:44px}.seg button+button{border-left:1px solid var(--line)}
 .seg button.active{background:var(--accent);color:#fff;font-weight:600}.seg button.active::before{content:"\2713\00a0"}
@@ -115,10 +121,10 @@ p{margin:0 0 var(--s3)}.sub{color:var(--muted);max-width:760px}.small{font-size:
 .chips{display:flex;flex-wrap:wrap;gap:var(--s1) var(--s2)}.chip{display:inline-block;background:var(--chip);border-radius:999px;padding:1px 9px;font-size:var(--fs-sm);color:var(--ink)}
 .tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
 table{border-collapse:collapse;width:100%;font-size:var(--fs-md)}caption{text-align:left;padding:var(--s3) var(--s4) 0;font-weight:600}
-th,td{padding:var(--s2) var(--s3);border-top:1px solid var(--line);text-align:center;white-space:nowrap}
+th,td{padding:var(--s2) var(--s3);border-top:1px solid var(--line);text-align:left;white-space:nowrap}
 thead th{border-top:0;background:var(--surface2);font-weight:600;color:var(--muted)}
-th.lead,td.lead{text-align:left}td.lead{font-weight:600}
-.sortable th{cursor:pointer;user-select:none}.sortable th::after{content:"";display:inline-block;width:.9em;color:var(--faint)}.sortable th[aria-sort="ascending"]::after{content:"\25B4"}.sortable th[aria-sort="descending"]::after{content:"\25BE"}
+th.num,td.num{text-align:right}td.lead{font-weight:600}
+.sortable th{cursor:pointer;user-select:none}.sortable th::after{content:"";display:inline-block;width:.9em;color:var(--faint)}.sortable th[aria-sort="ascending"]::after{content:"\25B4"}.sortable th[aria-sort="descending"]::after{content:"\25BE"}.sortable th.num::before{content:"";display:inline-block;width:.9em;color:var(--faint)}.sortable th.num[aria-sort="ascending"]::before{content:"\25B4"}.sortable th.num[aria-sort="descending"]::before{content:"\25BE"}.sortable th.num::after{content:none}
 .opinion{margin-top:var(--s6);padding:var(--s4) var(--s5);border-radius:12px;background:var(--gray)}
 .opinion h2{margin:0 0 var(--s2);border:0;padding:0;font-size:var(--fs-h3)}.opinion .note{margin:0 0 var(--s3);font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
 .opinion blockquote{margin:0;padding:0;font-style:italic}.opinion blockquote p::before{content:"\201C"}.opinion blockquote p::after{content:"\201D"}
@@ -157,6 +163,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .nc td.gm{grid-area:gm;font-size:var(--fs-caption);color:var(--muted)}.nc td.lead.gm .reason{display:inline}.nc td.gm .reason::before{content:" · "}}
 .empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
 dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2) var(--s4);margin:0}dl.terms dt{font-weight:600}dl.terms dd{margin:0;color:var(--muted)}dl.terms dd p{margin:0 0 var(--s2)}dl.terms ul{margin:0 0 var(--s2);padding-left:1.2em}dl.terms li{margin:0 0 var(--s1)}dl.terms dd>:last-child{margin-bottom:0}dl.terms b{font-weight:600;color:var(--ink)}dl.terms .sym{display:inline-block;width:1.7em}dl.terms ul.legend{list-style:none;padding-left:0}
+@media (max-width:600px){:root{--pill:44px;--control-h:44px}.seg button{min-height:44px}.toolbar .step{flex:none;min-width:44px}}
 @media (max-width:640px){.board{grid-auto-rows:auto;gap:var(--s2)}main{padding:var(--s2) var(--s4) 48px}h1{font-size:var(--fs-h3)}.controls{width:100%}th,td{padding:var(--s2)}.toolbar .mine span{display:none}.toolbar input{flex:1 1 56px;padding:0 var(--s2)}.toolbar .label{min-width:0}.toolbar button{padding:0 var(--s2)}.toolbar .step{padding:0}.toolbar .mine{margin-left:0;flex:none;width:var(--pill);padding:0}.toolbar button,.toolbar input,.settings summary{font-size:var(--fs-sm)}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
 """
 
@@ -360,15 +367,15 @@ def line_row(x, repeats=None):
         (f'<span class="reason">{esc(reason_text(x["reason"]))}</span>' if x.get("reason") else "")
     stats = f'{l["pts"]} PTS · {l["reb"]} REB · {l["ast"]} AST · {l["stl"] + l["blk"]} STL+BLK · {l["fgm"]}-{l["fga"]} FG · {x["gmsc"]:.1f} game score'
     return (f'<tr><td class="lead p">{esc(x["name"])}{reason}</td><td class="lead t">{esc(x["team"])}{f"<span class={chr(34)}cls{chr(34)}> · {esc(cls)}</span>" if cls else ""}</td>'
-            f'<td class="n">{esc(cls)}</td><td class="n">{l["pts"]}</td><td class="n">{l["reb"]}</td><td class="n">{l["ast"]}</td><td class="n">{l["stl"] + l["blk"]}</td>'
-            f'<td class="n">{l["fgm"]}-{l["fga"]}</td><td class="m">{stats}</td><td class="n">{x["gmsc"]:.1f}</td><td class="gs">{x["adj"]:.1f}</td>'
+            f'<td class="n">{esc(cls)}</td><td class="n num">{l["pts"]}</td><td class="n num">{l["reb"]}</td><td class="n num">{l["ast"]}</td><td class="n num">{l["stl"] + l["blk"]}</td>'
+            f'<td class="n num">{l["fgm"]}-{l["fga"]}</td><td class="m">{stats}</td><td class="n num">{x["gmsc"]:.1f}</td><td class="gs num">{x["adj"]:.1f}</td>'
             f'<td class="lead gm">{esc(g["away"])} at {esc(g["home"])}<span class="reason">{esc(when)}</span></td></tr>')
 
 
 def nc_table(rows, empty):
     if not rows:
         return f'<p class="empty">{esc(empty)}</p>'
-    th = "".join(f'<th{" class=lead" if i in (0, 1, len(NC_HEADERS) - 1) else ""} role=button tabindex=0 aria-sort=none>{h}</th>' for i, h in enumerate(NC_HEADERS))
+    th = "".join(f'<th{" class=lead" if i in (0, 1, len(NC_HEADERS) - 1) else "" if i == 2 else " class=num"} role=button tabindex=0 aria-sort=none>{h}</th>' for i, h in enumerate(NC_HEADERS))
     repeats = Counter((x["team"], x["name"]) for x in rows)
     return f'<div class="tablewrap"><table class="nc sortable"><thead><tr>{th}</tr></thead><tbody>{"".join(line_row(x, repeats) for x in rows)}</tbody></table></div>'
 
@@ -1200,7 +1207,7 @@ function renderNext(){
 // The opponent's defense factor (D3 average adjusted defense / the opponent's). An opponent outside Division III counts as average.
 function defFactor(x){const g=x.game,f=x.team===g.home?g.away_def:x.team===g.away?g.home_def:null;return f||1;}
 // The same columns as the season lists build_site.py renders (NC_HEADERS); a test keeps the two in step.
-const NC_HEAD='<thead><tr>'+['Player','Team','Class','Points','Rebounds','Assists','Steals plus blocks','Field goals','Game score','Adjusted game score','Game'].map((h,i)=>'<th'+(i<2||i===10?' class="lead"':'')+' role="button" tabindex="0" aria-sort="none">'+h+'</th>').join('')+'</tr></thead>';
+const NC_HEAD='<thead><tr>'+['Player','Team','Class','Points','Rebounds','Assists','Steals plus blocks','Field goals','Game score','Adjusted game score','Game'].map((h,i)=>'<th'+(i<2||i===10?' class="lead"':i===2?'':' class="num"')+' role="button" tabindex="0" aria-sort="none">'+h+'</th>').join('')+'</tr></thead>';
 function renderLines(id,box,list,empty){
   if(rankCut){list=list.filter(x=>lineRank(x)<=rankCut);if(list.length===0)empty='No player from a top '+rankCut+' team has a line on this night yet.';}
   list.forEach(x=>{x.adj=Math.round(x.gmsc*defFactor(x)*10)/10;});
@@ -1210,9 +1217,9 @@ function renderLines(id,box,list,empty){
   const rows=list.map(x=>{const l=x.line,g=x.game;
     // td.m repeats the five stat cells as one line; the phone layout shows it in their place.
     return '<tr><td class="lead p">'+esc(x.name)+(x.reason?'<span class="reason">'+esc(reasonText(x.reason))+'</span>':'')+'</td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td>'+
-      '<td class="n">'+l.pts+'</td><td class="n">'+l.reb+'</td><td class="n">'+l.ast+'</td><td class="n">'+(l.stl+l.blk)+'</td><td class="n">'+l.fgm+'-'+l.fga+'</td>'+
+      '<td class="n num">'+l.pts+'</td><td class="n num">'+l.reb+'</td><td class="n num">'+l.ast+'</td><td class="n num">'+(l.stl+l.blk)+'</td><td class="n num">'+l.fgm+'-'+l.fga+'</td>'+
       `<td class="m">${l.pts} PTS · ${l.reb} REB · ${l.ast} AST · ${l.stl+l.blk} STL+BLK · ${l.fgm}-${l.fga} FG · ${x.gmsc.toFixed(1)} game score</td>`+
-      '<td class="n">'+x.gmsc.toFixed(1)+'</td><td class="gs">'+x.adj.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
+      '<td class="n num">'+x.gmsc.toFixed(1)+'</td><td class="gs num">'+x.adj.toFixed(1)+'</td><td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
   $(box).innerHTML='<div class="tablewrap"><table class="nc sortable">'+NC_HEAD+'<tbody>'+rows+'</tbody></table></div>';
   if(window.bindSort)$(box).querySelectorAll('table.sortable').forEach(window.bindSort);
 }
