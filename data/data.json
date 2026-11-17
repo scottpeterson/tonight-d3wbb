@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-17T20:49:35+00:00",
- "errors": [],
+ "fetched_at": "2026-11-17T21:18:10+00:00",
+ "errors": [
+  "VTSU Johnson schedule: HTTP Error 404: Not Found"
+ ],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
