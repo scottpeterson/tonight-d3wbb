@@ -1,9 +1,7 @@
 {
- "fetched_at": "2026-11-17T00:07:54+00:00",
+ "fetched_at": "2026-11-17T00:37:07+00:00",
  "errors": [
-  "Franklin & Marshall at FDU-Florham feed: IncompleteRead(16034 bytes read, 166070 more expected)",
-  "Berea at Spalding feed: URL can't contain control characters. '/Golden Eagles/wbball/game.json?detail=full' (found at least ' ')",
-  "Scranton at Union feed: IncompleteRead(16033 bytes read, 139901 more expected)"
+  "Berea at Spalding feed: URL can't contain control characters. '/Golden Eagles/wbball/game.json?detail=full' (found at least ' ')"
  ],
  "stale": {},
  "dates": {
