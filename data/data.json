@@ -1,9 +1,6 @@
 {
- "fetched_at": "2026-11-17T19:46:30+00:00",
- "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found"
- ],
+ "fetched_at": "2026-11-17T20:49:35+00:00",
+ "errors": [],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
