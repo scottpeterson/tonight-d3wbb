@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-17T22:14:35+00:00",
- "errors": [],
+ "fetched_at": "2026-11-17T23:22:59+00:00",
+ "errors": [
+  "Warren Wilson at Maryville feed: HTTP Error 404: Not Found"
+ ],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
