@@ -127,7 +127,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .toolbar button{height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font-size:var(--fs-md);white-space:nowrap}
 .toolbar button:disabled{color:var(--faint);cursor:default}.toolbar .step{padding:0;width:var(--pill)}.toolbar .label{font-weight:600;white-space:nowrap;text-align:center;min-width:5.6em}
 .toolbar input{flex:0 1 220px;min-width:0;width:100%;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font:inherit}.toolbar input::placeholder{color:var(--muted)}
-.relrow{display:flex;flex-wrap:wrap;gap:var(--s2);width:100%}.relrow select{-webkit-appearance:none;appearance:none;flex:0 1 260px;min-width:0;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface) var(--chev) no-repeat right var(--s4) center/12px 8px;color:var(--ink);border-radius:999px;padding:0 calc(var(--s4) + 12px + var(--s3)) 0 var(--s4);font:inherit;font-size:var(--fs-md)}.relrow select:disabled{color:var(--faint)}
+.relrow{display:flex;flex-wrap:wrap;gap:var(--s2);width:100%}.relrow select{-webkit-appearance:none;appearance:none;flex:0 1 300px;text-overflow:ellipsis;min-width:0;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface) var(--chev) no-repeat right var(--s4) center/12px 8px;color:var(--ink);border-radius:999px;padding:0 calc(var(--s4) + 12px + var(--s3)) 0 var(--s4);font:inherit;font-size:var(--fs-md)}.relrow select:disabled{color:var(--faint)}.relrow button{height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s4);font:inherit;font-size:var(--fs-md);white-space:nowrap}.relrow button:disabled{color:var(--faint);cursor:default}
 .toolbar .mine{margin-left:auto}.toolbar .mine[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .sortbar{margin:var(--s3) 0;align-items:flex-start}.sortbar .caption{width:100%}.sortbar .caption{display:flex;justify-content:space-between;gap:var(--s3)}.sortbar .checked{font-size:var(--fs-caption);color:var(--muted)}
 .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));grid-auto-rows:1fr;gap:var(--s3);padding-bottom:var(--s1)}
@@ -437,8 +437,9 @@ def sections():
     team_filter = ('<div class="sortbar ctl"><span class="seglabel caption" id="lbl-rel">Team filter</span>'
                    '<div class="relrow"><select id="focus" aria-label="Team"><option value="">Pick a team</option></select>'
                    '<select id="rel" aria-label="Games to show" disabled><option value="">All games</option>'
-                   '<option value="beat">Teams it beat</option><option value="oo">Opponents of its opponents</option>'
-                   '<option value="conf">Its conference</option></select></div></div>')
+                   '<option value="beat">Teams it beat</option><option value="oo">Its opponents’ opponents</option>'
+                   '<option value="conf">Its conference</option></select>'
+                   '<button type="button" id="relclear" disabled>Clear</button></div></div>')
     board = f'{team_filter}{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("Method and definitions", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
@@ -472,7 +473,7 @@ HOW = f"""<dl class="terms">
 <p>Pick a team, then pick which games to show:</p>
 <ul>
 <li><b>Teams it beat</b> shows games with a team the picked team beat.</li>
-<li><b>Opponents of its opponents</b> shows games with a team that one of the picked team's opponents played.</li>
+<li><b>Its opponents’ opponents</b> shows games with a team that one of the picked team's opponents played.</li>
 <li><b>Its conference</b> shows games with a team from the picked team's conference.</li>
 </ul>
 <p>Wins and opponents come from the final scores on this page since opening night. A game with no final score here does not count. This browser remembers your choice.</p>
@@ -1266,9 +1267,10 @@ $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
 function setFilter(team,rel){
   const conf=BOOT.conf||{};focusTeam=conf[team]||(BOOT.results||[]).some(r=>r.includes(team))?team:'';relKey=focusTeam?rel:'';
   $('#focus').value=focusTeam;const sel=$('#rel');sel.disabled=!focusTeam;sel.value=relKey;
-  const labels={'':'All games',beat:focusTeam?'Teams '+focusTeam+' beat':'Teams it beat',oo:focusTeam?'Opponents of '+focusTeam+"'s opponents":'Opponents of its opponents',
-    conf:focusTeam&&conf[focusTeam]?conf[focusTeam]+' teams':'Its conference'};
+  // The first select names the team, so these labels stay short enough for a phone.
+  const labels={'':'All games',beat:'Teams it beat',oo:'Its opponents\u2019 opponents',conf:focusTeam&&conf[focusTeam]?conf[focusTeam]+' teams':'Its conference'};
   [...sel.options].forEach(o=>{o.textContent=labels[o.value];});
+  $('#relclear').disabled=!focusTeam;
   relTeams=relSet(focusTeam,relKey,BOOT.results||[],conf);
   try{localStorage.setItem(KEY+'-focus',JSON.stringify([focusTeam,relKey]))}catch(err){}
 }
@@ -1278,6 +1280,7 @@ function setFilter(team,rel){
  setFilter(saved[0]||'',saved[1]||'');}
 $('#focus').addEventListener('change',e=>{setFilter(e.target.value,relKey);render();});
 $('#rel').addEventListener('change',e=>{setFilter(focusTeam,e.target.value);render();});
+$('#relclear').addEventListener('click',()=>{setFilter('','');render();});
 document.querySelectorAll('.cut').forEach(b=>b.addEventListener('click',()=>{rankCut=+b.dataset.cut;try{localStorage.setItem(KEY+'-cut',rankCut)}catch(err){}renderNewcomers();}));
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
 // One listener for every star, because cards come and go as scores change.
