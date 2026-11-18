@@ -1,7 +1,9 @@
 {
- "fetched_at": "2026-11-18T00:48:03+00:00",
+ "fetched_at": "2026-11-18T01:16:28+00:00",
  "errors": [
-  "Warren Wilson at Maryville feed: HTTP Error 404: Not Found"
+  "Bard at Elms box score: HTTP Error 403: Forbidden",
+  "Warren Wilson at Maryville feed: HTTP Error 404: Not Found",
+  "Plymouth St. at Regis box score: HTTP Error 403: Forbidden"
  ],
  "stale": {},
  "conferences": {
