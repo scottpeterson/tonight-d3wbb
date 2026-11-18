@@ -1,10 +1,6 @@
 {
- "fetched_at": "2026-11-18T01:44:37+00:00",
- "errors": [
-  "Mt. Union at Grove City feed: Remote end closed connection without response",
-  "St. Vincent at Mt. Aloysius feed: IncompleteRead(32417 bytes read, 253430 more expected)",
-  "Lebanon Valley at Muhlenberg feed: IncompleteRead(48802 bytes read, 213659 more expected)"
- ],
+ "fetched_at": "2026-11-18T02:13:01+00:00",
+ "errors": [],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
