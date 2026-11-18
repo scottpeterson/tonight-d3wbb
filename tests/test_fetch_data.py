@@ -1332,6 +1332,17 @@ def test_presto_snapshot_reads_the_live_json_as_its_own_paced_request(monkeypatc
     # The runner's page reader takes the same path when it can reach the page.
     game = {"home": "SUNY Delhi", "away": "Bryn Mawr", "date": "2026-11-08", "newcomers_home": [], "newcomers_away": []}
     assert f.read_presto_page(game, PT3_URL)["score"] == {"V": 28, "H": 35}
+    # The runner can get the page and still be refused the live update JSON; the Mac's copy stands in.
+    def page_only(url, *a, **k):
+        if url == PT3_LIVE:
+            refused(url)
+        return PT3_PAGE
+    monkeypatch.setattr(f, "get", page_only)
+    monkeypatch.setattr(f, "_presto_cache", None)
+    assert f.read_presto_page(game, PT3_URL)["score"] == {"V": 28, "H": 35}
+    monkeypatch.setattr(f, "_presto_cache", {"boxes": {}})
+    with pytest.raises(f.FETCH_ERRORS):
+        f.read_presto_page(game, PT3_URL)
 
 
 SHORT = "https://gocobbers.com/links/rsensu"

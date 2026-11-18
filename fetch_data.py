@@ -1744,13 +1744,15 @@ def read_presto_page(game, url):
     if presto_box_date(url) != date.fromisoformat(game["date"]):
         return None
     try:
-        page = get(url)
+        box = presto_page_box(get(url), url)
     except FETCH_ERRORS:
-        box = cached_box(url)  # Presto refuses the runner; the Mac's copy stands in
+        # Presto refuses the runner the page, or serves the page and answers 403 for the live update JSON behind it
+        # (Carnegie Mellon, Goucher, La Roche, Suffolk, 2026-11-18); the Mac's copy stands in
+        box = cached_box(url)
         if box is None:
             raise
     else:
-        box = presto_page_box(page, url)
+        box = box or cached_box(url)
     return box if box and feed_is_game(game, box["sides"], box["lines"]) else None
 
 
