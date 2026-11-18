@@ -1,9 +1,6 @@
 {
- "fetched_at": "2026-11-18T02:51:14+00:00",
- "errors": [
-  "VTSU Johnson schedule: HTTP Error 404: Not Found",
-  "Bard at Elms box score: HTTP Error 403: Forbidden"
- ],
+ "fetched_at": "2026-11-18T03:11:28+00:00",
+ "errors": [],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
