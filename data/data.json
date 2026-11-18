@@ -1,9 +1,9 @@
 {
- "fetched_at": "2026-11-18T01:16:28+00:00",
+ "fetched_at": "2026-11-18T01:44:37+00:00",
  "errors": [
-  "Bard at Elms box score: HTTP Error 403: Forbidden",
-  "Warren Wilson at Maryville feed: HTTP Error 404: Not Found",
-  "Plymouth St. at Regis box score: HTTP Error 403: Forbidden"
+  "Mt. Union at Grove City feed: Remote end closed connection without response",
+  "St. Vincent at Mt. Aloysius feed: IncompleteRead(32417 bytes read, 253430 more expected)",
+  "Lebanon Valley at Muhlenberg feed: IncompleteRead(48802 bytes read, 213659 more expected)"
  ],
  "stale": {},
  "conferences": {
