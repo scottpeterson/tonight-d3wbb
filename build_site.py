@@ -505,6 +505,7 @@ HOW = f"""<dl class="terms">
 <li><b>Closeness.</b> A 50-50 game counts in full and a 90-10 game counts a fifth as much. Late in the game, this counts more. It is weighted by the quality of the two teams, so a close game between two teams ranked near 300 adds little.</li>
 <li><b>Upset.</b> How far an underdog is past its pregame chance, weighted by the quality of the team being upset. An upset of the 20th team is news. An upset of the 254th is not.</li>
 </ul>
+<p>Late in a game, a score within reach moves the game toward 100. Within reach means the margin is small for the time left: 2 points with three minutes left counts almost in full, and 6 points with one minute left counts for almost nothing. The lift is small before halftime and largest in the last minutes. It counts in full for a game between good teams and adds little to a game between low-ranked teams or a game that is not close.</p>
 <p>Team quality is the largest part of the score. Before tipoff, an even game between two top-ten teams scores about 90, and a 60-40 game between the 5th and 12th teams about 84. Game Leverage adds up to 10 points.</p>
 <p>The page then multiplies the score by the better of the two teams' tournament chances. A game between two teams with almost no chance scores near 0.</p>
 <p>A finished game gets its own score from four parts:</p>
@@ -665,7 +666,15 @@ function interest(g,st){
   // Quality carries most of the score, so a game between two top teams reads high before tipoff whatever the
   // leverage: #5 UW-Oshkosh vs #12 Wartburg scored 49 on 2026-11-13 with leverage 2.8 (quality 0.30, leverage 0.25,
   // closeness 0.20 before tipoff), and scores 84 now. Leverage is small for every team in November.
-  return Math.min(100,100*S*((0.60*Q+0.10*L)*settled+(0.30+0.10*P)*C*Q+0.25*U*favorite));
+  const base=Math.min(100,100*S*((0.60*Q+0.10*L)*settled+(0.30+0.10*P)*C*Q+0.25*U*favorite));
+  // The finish: a game within reach late moves toward 100, so it outranks a good game that has just tipped off.
+  // "Within reach" reads the margin against the time left, with no pregame line: the line made #159 Bethany Lutheran,
+  // down 2 to #30 St. Mary's (MN) with 3:07 left, a 23% chance and the game scored 40 (2026-11-18). The lift grows
+  // with the square of the share played and with team quality, in full once quality reaches 0.5, so a blowout or a
+  // game between two low-ranked teams gains almost nothing in the fourth quarter.
+  const lead=st.score?st.score[0]-st.score[1]:null,left=Math.max(0.02,1-P);
+  const reach=lead==null?C:Math.exp(-Math.pow(lead/(SD*Math.sqrt(left)),2)/4);
+  return base+(100-base)*P*P*reach*Math.min(1,2*Q)*S;
 }
 // Minutes to wait before the next check: 60^((1 - I/100)^WAIT_CURVE), so 1 at interest 100 and 60 at interest 0,
 // stretched by the leader's margin, (0.5/p)^MARGIN_STRETCH with p the trailing team's chance.

@@ -70,6 +70,19 @@ def test_interest_ranks_close_elite_game_above_blowout_and_dead_game():
     assert close > 60 and blowout < close / 2 and dead == 0
 
 
+def test_interest_lifts_a_close_finish_between_good_teams_only():
+    # 2026-11-18: #159 Bethany Lutheran trailed #30 St. Mary's (MN) 67-65 with 3:07 left and ranked under games that had just started.
+    bl = dict(GAME, home_rank=159, away_rank=30, pregame_wp=0.293, pregame_margin=-6.0, home_lev=4.76, away_lev=17.65)
+    late = lambda g, score, left: run(f"(()=>{{const g={json.dumps(g)},P=1-{left}/2400;return interest(g,{{progress:P,wp:winProb(g,{score[0] - score[1]},P),score:{json.dumps(score)}}})}})()")
+    close = late(bl, [65, 67], 187)
+    assert close > 70 and close > run(f"interest({json.dumps(bl)},{{progress:0.1,wp:0.293,score:[4,6]}})") + 20
+    # Not close: no lift in the fourth quarter.
+    assert late(bl, [55, 67], 187) < 10 and late(bl, [61, 67], 60) < 10
+    # Low-ranked teams: the same score and clock gain little.
+    low = dict(bl, home_rank=300, away_rank=280)
+    assert late(low, [65, 67], 187) < late(low, [4, 6], 2200) + 8
+
+
 def test_interest_rewards_an_upset_in_progress():
     g = json.dumps(dict(GAME, pregame_wp=0.9))
     assert run(f"interest({g},{{progress:0.6,wp:0.3}})") > run(f"interest({g},{{progress:0.6,wp:0.9}})")
