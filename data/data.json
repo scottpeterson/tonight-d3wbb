@@ -1,5 +1,5 @@
 {
- "fetched_at": "2026-11-20T16:19:49+00:00",
+ "fetched_at": "2026-11-20T17:13:10+00:00",
  "errors": [
   "VTSU Johnson schedule: HTTP Error 404: Not Found"
  ],
@@ -525,7 +525,6 @@
  },
  "notes": [
   "SUNY Oneonta at Eastern Connecticut St. 2026-11-20: both schedule pages list other opponents, left out",
-  "Trine at Wisconsin Lutheran 2026-11-20: neither schedule page lists a game that day, left out",
-  "Regis at Mt. Holyoke 2026-11-21: neither schedule page lists a game that day, left out"
+  "Trine at Wisconsin Lutheran 2026-11-20: neither schedule page lists a game that day, left out"
  ]
 }
