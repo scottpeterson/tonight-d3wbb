@@ -685,10 +685,14 @@ def cached_box(url):
 
 def presto_snapshot(previous=None):
     """The Mac's run (`fetch_data.py --presto`): read Presto pages one at a time, PRESTO_PACE seconds apart, and
-    write data/presto_cache.json for the runner, which Presto's CloudFront refuses. Order: the schedule pages of
-    Presto schools with a game in the finals window, the box score page of every such game still without one, then
-    the other Presto schools, up to PRESTO_BUDGET requests. A page that fails or comes back empty keeps its last
-    copy. Twelve parallel reads tripped the WAF challenge on every box score page (2026-11-08)."""
+    write data/presto_cache.json for the runner, which Presto's CloudFront refuses. Order, up to PRESTO_BUDGET
+    requests: the box score pages already known for games past tipoff, the schedule pages of Presto schools with a
+    game in the finals window (teams of games past tipoff first), any box score page those pages add for a game
+    past tipoff, then the other Presto schools. Box scores come first because a Saturday puts more than
+    PRESTO_BUDGET Presto schools in the window, and the schedule pages used up every request before any live box
+    score (2026-11-21: one of today's box scores read by 18:41 UTC). A game before tipoff has no box score to read.
+    A page that fails or comes back empty keeps its last copy. Twelve parallel reads tripped the WAF challenge on
+    every box score page (2026-11-08)."""
     out = {"fetched_at": now().isoformat(timespec="seconds"), "errors": []}
     schools = load_schools()
     extra = read_json(EXTRA, {"schools": {}})
@@ -701,7 +705,11 @@ def presto_snapshot(previous=None):
     window = [today - timedelta(days=i) for i in range(FINALS_DAYS_BACK + 1)]
     games = [g for d in window for g in (read_json(SLATES / f"{d.isoformat()}.json") or {}).get("games", [])
              if not g.get("box_read") and not g.get("off")]
-    playing = [t for t in dict.fromkeys(t for g in games for t in (g["home"], g["away"])) if t in presto]
+    def started(g):
+        return not g.get("tip") or datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) <= now()
+
+    under_way = [g for g in games if started(g)]
+    playing = [t for t in dict.fromkeys(t for g in under_way + games for t in (g["home"], g["away"])) if t in presto]
     order = playing + [t for t in presto if t not in playing]
 
     pages = dict(old.get("pages", {}))
@@ -750,10 +758,29 @@ def presto_snapshot(previous=None):
         if box["sides"]:
             boxes[url] = {"at": out["fetched_at"], "box": box}
 
+    links = dict(old.get("links", {}))
+    done = set()
+
+    def read_boxes():
+        """Each box score page of a game past tipoff not read yet in this run, today's first, then its live JSON."""
+        urls = set()
+        for g in under_way:
+            rows = {t: [row_from_json(r) for r in pages.get(t, [])] for t in (g["home"], g["away"])}
+            link, _ = box_link(g, rows)
+            candidates = [link, g.get("boxscore"), g.get("link"), *stats_links(g)]
+            urls.update(u for u in (links.get(c, c) for c in candidates) if presto_box_date(u))
+        for url in sorted(urls - done, key=lambda u: (presto_box_date(u) != today, u)):
+            done.add(url)
+            paced(read, url)
+        while followups:
+            paced(read_live, *followups.pop(0))
+
+    def stats_links(g):
+        return [r["links"].get("live_stats") for t in (g["home"], g["away"]) for r in pages.get(t, []) if r.get("day") == g["date"]]
+
+    read_boxes()
     for team in playing:
         paced(load, team)
-
-    links = dict(old.get("links", {}))
 
     def resolve(url):
         try:
@@ -764,9 +791,6 @@ def presto_snapshot(previous=None):
         if target:
             links[url] = target
 
-    def stats_links(g):
-        return [r["links"].get("live_stats") for t in (g["home"], g["away"]) for r in pages.get(t, []) if r.get("day") == g["date"]]
-
     # Short links of the window's games, one request each, once: the answer stays in the cache.
     for url in dict.fromkeys(u for g in games for u in stats_links(g) if u and SHORT_LINK.match(u) and u not in links):
         paced(resolve, url)
@@ -775,16 +799,7 @@ def presto_snapshot(previous=None):
             if "links" in r:
                 r["links"] = {k: links.get(u, u) for k, u in r["links"].items()}
     old["links"] = links
-    urls = set()
-    for g in games:
-        rows = {t: [row_from_json(r) for r in pages.get(t, [])] for t in (g["home"], g["away"])}
-        link, _ = box_link(g, rows)
-        candidates = [link, g.get("boxscore"), g.get("link"), *stats_links(g)]
-        urls.update(u for u in (links.get(c, c) for c in candidates) if presto_box_date(u))
-    for url in sorted(urls, key=lambda u: (presto_box_date(u) != today, u)):
-        paced(read, url)
-    for url, live in followups:
-        paced(read_live, url, live)
+    read_boxes()
     for team in order[len(playing):]:
         paced(load, team)
 

@@ -1237,8 +1237,8 @@ def test_get_treats_a_waf_challenge_as_a_fetch_error(monkeypatch):
 
 
 def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_path):
-    # Schedule pages of schools with games first, then their box scores, then the rest; a failed or empty read keeps
-    # the last copy; PRESTO_BUDGET caps the run.
+    # Box scores of games past tipoff first, then the schedule pages of schools with games, then the rest; a failed
+    # or empty read keeps the last copy; PRESTO_BUDGET caps the run.
     schedule = (FIX / "presto_willamette_2025.html").read_text()
     seen, sleeps = [], []
 
@@ -1264,7 +1264,7 @@ def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_pa
     (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
     out = f.presto_snapshot()
     assert [u.split("/")[2] for u in seen] == ["laserpride.lasell.edu", "laserpride.lasell.edu", "idle.example", "other.example"]
-    assert "/boxscores/" in seen[1] and sleeps == [f.PRESTO_PACE] * 3 and out["requests"] == 4
+    assert "/boxscores/" in seen[0] and sleeps == [f.PRESTO_PACE] * 3 and out["requests"] == 4
     cache = json.loads((tmp_path / "presto_cache.json").read_text())
     assert set(cache["pages"]) == {"Lasell", "Idle", "Other"} and cache["pages"]["Idle"] == [{"old": True}]
     assert list(cache["boxes"]) == [PRESTO_URL] and out["errors"] == ["Idle schedule: WAF challenge from idle"]
@@ -1272,6 +1272,15 @@ def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_pa
     monkeypatch.setattr(f, "PRESTO_BUDGET", 2)
     seen.clear()
     assert f.presto_snapshot()["requests"] == 2 and len(seen) == 2
+    # A game before tipoff has no box score to read; its school's schedule page still comes before the rest.
+    monkeypatch.setattr(f, "PRESTO_BUDGET", 45)
+    monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 6, 17, 0, tzinfo=timezone.utc))
+    games[0]["tip"] = "2026-11-06T23:00:00Z"
+    (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
+    seen.clear()
+    f.presto_snapshot()
+    assert [u.split("/")[2] for u in seen] == ["laserpride.lasell.edu", "idle.example", "other.example"]
+    assert all("/boxscores/" not in u for u in seen)
 
 
 PT3_PAGE = """<html><script>var conf = new Object(); conf.eventId = 'ppt8tzpj1kv2o45s';
@@ -1326,7 +1335,7 @@ def test_presto_snapshot_reads_the_live_json_as_its_own_paced_request(monkeypatc
     games = [{"id": "a", "date": "2026-11-08", "home": "SUNY Delhi", "away": "Bryn Mawr", "neutral": False, "link": PT3_URL}]
     (tmp_path / "2026-11-08.json").write_text(json.dumps({"date": "2026-11-08", "games": games}))
     out = f.presto_snapshot()
-    assert seen[1:] == [PT3_URL, PT3_LIVE] and out["requests"] == 3 and out["errors"] == []
+    assert seen[:2] == [PT3_URL, PT3_LIVE] and out["requests"] == 3 and out["errors"] == []
     cache = json.loads((tmp_path / "presto_cache.json").read_text())
     assert cache["boxes"][PT3_URL]["box"]["score"] == {"V": 28, "H": 35} and cache["boxes"][PT3_URL]["box"]["complete"] is False
     # The runner's page reader takes the same path when it can reach the page.
