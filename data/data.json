@@ -1,10 +1,8 @@
 {
- "fetched_at": "2026-11-21T15:32:59+00:00",
+ "fetched_at": "2026-11-21T16:45:35+00:00",
  "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com",
-  "UC Santa Cruz at Willamette feed: not well-formed (invalid token): line 1, column 0",
-  "UC Santa Cruz at Willamette box score: WAF challenge from wubearcats.com"
+  "UC Santa Cruz at Willamette feed: not well-formed (invalid token): line 1, column 0"
  ],
  "stale": {},
  "conferences": {
