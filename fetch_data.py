@@ -288,7 +288,8 @@ def newcomers_by_team():
 
 
 def regulars_by_team():
-    """{team: [each of the team's top 8 players by 2026-27 minutes per game, with per-game stats]} from regulars.json.
+    """{team: [each of the team's top 8 players by 2026-27 minutes per game, plus its All-American and All-Region
+    honorees with their `honors` list, with per-game stats]} from regulars.json.
     {} when The D3 Stat Lab has not published the file, so the rest of the page still builds."""
     try:
         players = statlab("regulars.json")["players"]
@@ -296,7 +297,7 @@ def regulars_by_team():
         return {}
     out = {}
     for p in players:
-        out.setdefault(p["team"], []).append({k: p[k] for k in ("name", "class", "mpg", "ppg", "rpg", "apg")})
+        out.setdefault(p["team"], []).append({k: p[k] for k in ("name", "class", "mpg", "ppg", "rpg", "apg", "honors") if k in p})
     return out
 
 

@@ -1586,3 +1586,9 @@ def test_a_streak_counts_earlier_games_with_no_minutes_and_stops_at_an_unread_bo
     out = {r["name"]: r["out"] for r in f.with_streaks(regs, history)["Hope"]}
     assert out == {"Ana Boyd": 2, "Bea Cole": 0, "Cam Dunn": 0}
     assert [len(s) for _, s in history["Calvin"]] == [0, 0, 0, 0]
+
+
+def test_an_honorees_honors_ride_along_onto_the_sat_out_list():
+    star = dict(regular("Bea Cole", 12.0), honors=["2025-26 All-American, 2nd team"])
+    lines = [floor_line(*p["name"].split()) for p in SAT_ROSTER[2:7]]
+    assert f.sat_out("Hope", [star], lines, SAT_ROSTER) == [{"team": "Hope", **star}]

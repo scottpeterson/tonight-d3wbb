@@ -441,7 +441,7 @@ def sections():
                        'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 15 game scores", '<p class="small">The 15 best adjusted game scores on this night by any player, in every game with a live stats feed. '
                       'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
-    sat = twisty("Key players with no minutes", '<p class="small">The 35 players with the most 2026-27 minutes per game whose box score on this night shows no minutes. '
+    sat = twisty("Key players with no minutes", '<p class="small">Players whose box score on this night shows no minutes. All-Americans and All-Region picks come first, then the players with the most 2026-27 minutes per game, up to 35 in all. '
                  'Minutes, points, rebounds, and assists are 2026-27 averages per game from the last stats update before this night. A game joins when it ends, or at halftime when its feed includes box lines.</p>'
                  + rank_bar("sat") + '<div id="satlist"></div>', count="", open_=False, id_="sat")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
@@ -591,6 +591,13 @@ HOW = f"""<dl class="terms">
 </dd>
 <dt>Key players with no minutes</dt><dd>
 <p>Each team's 8 players with the most 2026-27 minutes per game are its regulars. A team's games are its players' total minutes divided by 200. A regular joins the list when her team's box score on this night shows her with no minutes or does not list her. The list sorts by minutes per game and shows 35.</p>
+<p>These players also count as regulars and always sort first, each with her honors under her name:</p>
+<ul>
+<li>2026-27 preseason All-Americans</li>
+<li>2025-26 preseason and postseason All-Americans</li>
+<li>2025-26 All-Region picks</li>
+</ul>
+<p>An honoree counts even outside her team's top 8 and even with no 2026-27 minutes. A 2025-26 honor follows a player who transferred.</p>
 <p>Under each name is her count of team games in a row with no minutes, this night included. The count goes back only through games whose box score this site read, so it can be short.</p>
 <p>A box score with fewer than 5 players on the floor for a team lists no one from that team. A box line can spell a regular's name another way. So when a line with her last name matches no roster player, she stays off the list.</p>
 </dd>
@@ -1286,16 +1293,21 @@ const SAT_N=35;
 // Games in a row with no minutes, this night included: `out` counts the earlier ones (with_streaks() in fetch_data.py).
 function satRun(x){const n=(+x.out||0)+1;return n===1?'1 game with no minutes':n+' games in a row with no minutes';}
 const SAT_HEAD='<thead><tr>'+['Player','Team','Class','Minutes','Points','Rebounds','Assists','Game'].map((h,i)=>'<th'+(i<2||i===7?' class="lead"':i===2?'':' class="num"')+' role="button" tabindex="0" aria-sort="none">'+h+'</th>').join('')+'</tr></thead>';
+// Honorees (All-Americans and All-Region picks) come first and all stay; the rest fill the list to SAT_N.
+function satOrder(list){
+  const out=list.slice().sort((a,b)=>(b.honors?1:0)-(a.honors?1:0)||b.mpg-a.mpg||b.ppg-a.ppg);
+  return out.slice(0,Math.max(SAT_N,out.filter(x=>x.honors).length));
+}
 function renderSat(){
   let list=[],empty='Players appear here once box scores for this night come in.';
   games.forEach(g=>g.st.sat.forEach(x=>list.push(Object.assign({game:g},x))));
   if(rankCut){list=list.filter(x=>lineRank(x)<=rankCut);if(list.length===0)empty='No regular from a top '+rankCut+' team has sat out on this night yet.';}
-  list.sort((a,b)=>b.mpg-a.mpg||b.ppg-a.ppg);list.splice(SAT_N);
+  list=satOrder(list);
   $('#sat').querySelector('.count').textContent=list.length;
   if(!list.length){$('#satlist').innerHTML='<p class="empty">'+empty+'</p>';return;}
   const f=v=>(+v).toFixed(1);
   const rows=list.map(x=>{const g=x.game;
-    return '<tr><td class="lead p">'+esc(x.name)+'<span class="reason">'+satRun(x)+'</span></td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td><td class="gs num">'+f(x.mpg)+'</td>'+
+    return '<tr><td class="lead p">'+esc(x.name)+(x.honors||[]).map(h=>'<span class="reason honor">'+esc(h)+'</span>').join('')+'<span class="reason">'+satRun(x)+'</span></td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td><td class="gs num">'+f(x.mpg)+'</td>'+
       '<td class="n num">'+f(x.ppg)+'</td><td class="n num">'+f(x.rpg)+'</td><td class="n num">'+f(x.apg)+'</td>'+
       `<td class="m">${f(x.ppg)} PTS · ${f(x.rpg)} REB · ${f(x.apg)} AST per game</td>`+
       '<td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');

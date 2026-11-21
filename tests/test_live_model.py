@@ -12,9 +12,9 @@ from build_site import LIVE_JS
 FUNCS = ["logoSlug", "phi", "scoreWp", "winProb", "teamQuality", "quality", "stakes", "dogSurprise", "finalInterest", "interest", "waitMs", "tipMs", "nextCheck", "progressOf", "clockToSec", "periodName",
          "statusText", "gameScore", "played", "lineName", "topLines", "lineRank", "matchNewcomer", "tags", "rank", "sideTag", "winCell",
          "num", "ma", "espnState", "espnLines", "teamTokens", "overlap", "initials", "codeHit", "sideFit", "orientFit", "nameWords", "lineLast", "rosterOf", "rosterHits", "namesTeam", "feedIsGame", "otherGame",
-         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf", "winnerChance", "relSet"]
+         "remembered", "remember", "newcomerLines", "initState", "canBeFinal", "todayET", "siblingFeeds", "siblingLink", "probeFeeds", "modeled", "dogChance", "feedMovedOn", "groupOf", "snapLive", "snapState", "statsLabel", "newerSnap", "liveSeen", "rememberLive", "classOf", "lineWords", "newcomerOf", "winnerChance", "relSet", "satOrder"]
 CONSTS = ["KEY", "words", "GENERIC_WORDS", "TOP_N", "boxLine", "GAME_MS", "SD", "LINE_SD", "esc", "WAIT_CURVE", "norm", "GIVE_UP_MS", "SIBLING_FEEDS", "UPSET_MAX_DOG",
-          "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS"]
+          "QUALITY_GATE", "SCORE_DECIDED", "SNAP_LIVE_MS", "SORTS", "SAT_N"]
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
 
@@ -568,3 +568,14 @@ def test_team_filter_sets():
     assert rel("Hope", "conf") == ["Albion", "Alma", "Calvin", "Hope", "Trine"]
     assert rel("Hope", "") == ["ALL"] and rel("", "beat") == ["ALL"]
     assert rel("Albion", "beat") == ["Hope"] and rel("Alma", "beat") == []
+
+
+def test_honorees_lead_the_sat_out_list_and_all_stay_past_the_cap():
+    plain = [{"name": f"P{i}", "mpg": 30 - i * 0.1, "ppg": 10} for i in range(40)]
+    stars = [{"name": "Star", "mpg": 5.0, "ppg": 2, "honors": ["2026-27 preseason All-American, 1st team"]},
+             {"name": "Hurt", "mpg": 0.0, "ppg": 0, "honors": ["2025-26 All-Region, 1st team"]}]
+    out = run(f"satOrder({json.dumps(plain + stars)}).map(x=>x.name)")
+    # Honorees first by minutes per game, then the plain list by minutes per game, 35 in all.
+    assert out[:3] == ["Star", "Hurt", "P0"] and len(out) == 35
+    many = [dict(stars[0], name=f"S{i}") for i in range(37)]
+    assert len(run(f"satOrder({json.dumps(many + plain)})")) == 37
