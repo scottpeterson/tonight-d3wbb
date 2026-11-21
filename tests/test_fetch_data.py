@@ -1495,3 +1495,25 @@ def test_conferences_and_tournament_chance_read_the_simulation_rows():
     rows = [{"Team": "Hope", "Conf": "MIAA", "Tourn%": "41.5%"}, {"Team": "Alverno", "Conf": "", "Tourn%": "-"}]
     assert f.conferences(rows) == {"Hope": "MIAA"}
     assert f.tournament_chance(rows) == {"Hope": 0.415, "Alverno": 0.0}
+
+
+def test_a_home_page_linking_statbroadcast_keeps_the_house_feed_as_an_alternative(monkeypatch):
+    # Texas Lutheran at Millsaps, 2026-11-20: Millsaps's page linked StatBroadcast, and its Sidearm feed still held
+    # the 2026-02-21 game against Oglethorpe.
+    f._feed_cache.clear()
+    monkeypatch.setattr(f, "get", lambda url, **k: 'var client_shortname = "millsaps";')
+    day = date(2026, 11, 20)
+    schools = {"Millsaps": {"team": "Millsaps", "type": "Sidearm", "tz": "America/Chicago",
+                            "schedule": "https://gomajors.com/sports/womens-basketball/schedule"}}
+    sb = "https://stats.statbroadcast.com/broadcast/?id=686892"
+    pages = {"Millsaps": [f.row(day, (17, 30, "America/Chicago"), True, False, "Texas Lutheran", {"live_stats": sb}, "", "")]}
+    game = {"date": "2026-11-20", "home": "Millsaps", "away": "Texas Lutheran", "neutral": False}
+    built = f.build_slate(day, [game], schools, pages, {}, {}, {})["games"][0]
+    assert built["feed"] is None
+    assert built["link"] == sb
+    assert built["alt_feeds"] == [{"feed": {"type": "sidearm", "url": "https://sidearmstats.com/millsaps/wbball/game.json"},
+                                   "link": None}]
+    # With no live stats link yet, the house feed is still the guess.
+    pages = {"Millsaps": [f.row(day, (17, 30, "America/Chicago"), True, False, "Texas Lutheran", {}, "", "")]}
+    built = f.build_slate(day, [game], schools, pages, {}, {}, {})["games"][0]
+    assert built["feed"] == {"type": "sidearm", "url": "https://sidearmstats.com/millsaps/wbball/game.json"}

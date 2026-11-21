@@ -1903,7 +1903,10 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             feed, link = live_feed(home_link), home_link
         if not feed and hub_link and hub_home:
             feed, link = live_feed(hub_link), link or hub_link
-        if not feed and not g["neutral"]:
+        # A home page that links StatBroadcast says the crew is not on Sidearm tonight; the house feed then holds an
+        # older game (Millsaps's held its 2026-02-21 game against Oglethorpe for Texas Lutheran at Millsaps,
+        # 2026-11-20), so it rides along only as an alternative.
+        if not feed and not g["neutral"] and not STATBROADCAST.search(home_link or ""):
             feed = house_feed(schools.get(g["home"]))
             if feed and not link:
                 # Link the host's stat page, the one the feed reads, rather than the away school's.
