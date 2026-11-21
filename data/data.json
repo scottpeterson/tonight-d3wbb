@@ -1,8 +1,6 @@
 {
- "fetched_at": "2026-11-21T02:08:04+00:00",
+ "fetched_at": "2026-11-21T02:35:05+00:00",
  "errors": [
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
-  "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
