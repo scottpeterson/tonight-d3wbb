@@ -69,6 +69,14 @@ The section shows the 15 best newcomer game scores of the night, from every newc
 
 The section sits above the scoreboard, lists player, team, reason (freshman, transfer from X, no 2025-26 minutes, under 30 minutes), line, and game, and sorts by game score.
 
+## Key players with no minutes
+
+A regular is one of a team's 8 players with the most 2026-27 minutes per game (`regulars.json`). The section lists the 25 regulars with the most minutes per game whose team's box score on the night shows them with 0 minutes or does not list them. The finals pass stores each game's list as `sat`; the page adds a live game at halftime when its feed has box lines. A side with fewer than 5 players on the floor lists no one, and a played line that matches no roster player keeps regulars with its last name off the list. The rank buttons apply.
+
+## Saved page settings
+
+The browser keeps each twisty's open state, the Sort and Sort finals buttons, My Watchlist, the Teams rank buttons, the team filter, the theme, and the time zone in `localStorage`. The night shown and the search text are not saved.
+
 ## Feed facts
 
 - Sidearm light feed `sidearmstats.com/<client>/wbball/game.json`: about 4 KB, score, period, clock, `IsComplete`. Holds the client's latest game, so the date must match.

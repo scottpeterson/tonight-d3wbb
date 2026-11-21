@@ -1517,3 +1517,52 @@ def test_a_home_page_linking_statbroadcast_keeps_the_house_feed_as_an_alternativ
     pages = {"Millsaps": [f.row(day, (17, 30, "America/Chicago"), True, False, "Texas Lutheran", {}, "", "")]}
     built = f.build_slate(day, [game], schools, pages, {}, {}, {})["games"][0]
     assert built["feed"] == {"type": "sidearm", "url": "https://sidearmstats.com/millsaps/wbball/game.json"}
+
+
+def regular(name, mpg):
+    return {"name": name, "class": "SR", "mpg": mpg, "ppg": 10.0, "rpg": 4.0, "apg": 2.0}
+
+
+def floor_line(first, last, minutes=20):
+    return {"first": first, "last": last, "abbr": f"{first} {last}", "min": minutes, "pts": 4 if minutes else 0}
+
+
+SAT_ROSTER = [{"name": n, "class": "SR"} for n in
+              ("Ana Boyd", "Bea Cole", "Cam Dunn", "Dee Ford", "Eve Gray", "Fay Hale", "Gia Irons", "Hal Jones")]
+
+
+def test_a_regular_with_a_zero_minute_line_or_no_line_sat_out():
+    regs = [regular("Ana Boyd", 32.0), regular("Bea Cole", 30.5), regular("Gia Irons", 28.0)]
+    lines = [floor_line(*p["name"].split()) for p in SAT_ROSTER[2:6]] + [floor_line("Ana", "Boyd", 0),
+                                                                          floor_line("Gia", "Irons")]
+    out = f.sat_out("Hope", regs, lines, SAT_ROSTER)
+    # Ana Boyd has a 0-minute line, Bea Cole has no line, Gia Irons played.
+    assert [p["name"] for p in out] == ["Ana Boyd", "Bea Cole"]
+    assert out[0] == {"team": "Hope", **regs[0]}
+
+
+def test_an_unmatched_line_with_her_last_name_keeps_a_regular_off_the_list():
+    # "Bee Cole" fits no one on the roster, so it may be Bea Cole under another spelling.
+    regs = [regular("Bea Cole", 30.5)]
+    lines = [floor_line(*p["name"].split()) for p in SAT_ROSTER[2:7]] + [floor_line("Bee", "Cole")]
+    assert f.sat_out("Hope", regs, lines, SAT_ROSTER) == []
+
+
+def test_a_side_with_fewer_than_five_players_on_the_floor_lists_no_one():
+    lines = [floor_line(*p["name"].split()) for p in SAT_ROSTER[2:6]]
+    assert f.sat_out("Hope", [regular("Ana Boyd", 32.0)], lines, SAT_ROSTER) == []
+
+
+def test_box_result_lists_each_teams_regulars_who_sat_out():
+    game = {**tourney_game("Babson", "Rhodes"), "date": "2026-11-14", "neutral": True}
+    home, away = f.team_rosters()["Babson"], f.team_rosters()["Rhodes"]
+
+    def stats(lines):
+        return [{**line, "min": 20, "pts": 6, "reb": 2, "ast": 1, "stl": 0, "blk": 0, "to": 1, "pf": 1, "fgm": 3, "fga": 6,
+                 "ftm": 0, "fta": 0, "oreb": 1, "dreb": 1} for line in lines]
+    game.update(regulars_home=[regular(home[0], 30.0), regular(home[9], 25.0)],
+                regulars_away=[regular(away[0], 33.0)])
+    lines = {"H": stats(box_lines("Babson", 8)), "V": stats(box_lines("Rhodes", 8))}
+    sides = {"H": {"name": "Babson", "id": "BAB"}, "V": {"name": "Rhodes", "id": "RHO"}}
+    sat = f.box_result(game, 70, 60, sides, lines)["sat"]
+    assert [(p["team"], p["name"]) for p in sat] == [("Babson", home[9])]

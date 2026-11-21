@@ -287,6 +287,19 @@ def newcomers_by_team():
     return out
 
 
+def regulars_by_team():
+    """{team: [each of the team's top 8 players by 2026-27 minutes per game, with per-game stats]} from regulars.json.
+    {} when The D3 Stat Lab has not published the file, so the rest of the page still builds."""
+    try:
+        players = statlab("regulars.json")["players"]
+    except FETCH_ERRORS:
+        return {}
+    out = {}
+    for p in players:
+        out.setdefault(p["team"], []).append({k: p[k] for k in ("name", "class", "mpg", "ppg", "rpg", "apg")})
+    return out
+
+
 # ---------------------------------------------------------------- schedule pages
 
 def parse_month_day(label):
@@ -1657,8 +1670,29 @@ def box_result(game, home_score, away_score, sides, lines):
                  "line": {k: line[k] for k in ("min", "pts", "reb", "ast", "stl", "blk", "fgm", "fga")}}
                 for line in lines.get(side, []) if played(line) for who in (roster_player(line, classes[side]),)]
         top += sorted(mine, key=lambda x: -x["gmsc"])[:TOP_N]
+    sat = []
+    for side, team, regs in (("H", game["home"], game.get("regulars_home")), ("V", game["away"], game.get("regulars_away"))):
+        sat += sat_out(team, regs or [], lines.get(side, []), classes[side])
     return {"home": home_score, "away": away_score, "newcomers": sorted(found, key=lambda x: -x["gmsc"]),
-            "top": sorted(top, key=lambda x: -x["gmsc"])}
+            "top": sorted(top, key=lambda x: -x["gmsc"]), "sat": sorted(sat, key=lambda x: -x["mpg"])}
+
+
+def sat_out(team, regulars, lines, roster):
+    """The regulars with no minutes in one team's box lines: a 0-minute line or no line at all. A side with fewer than
+    MIN_ROSTER players who played is a box score that lost the team, so it lists no one. A regular whose last name is
+    on a played line that fits no one stays off the list, because that line may be hers under another spelling."""
+    played_lines = [line for line in lines if played(line)]
+    if len(played_lines) < MIN_ROSTER:
+        return []
+    seen, loose = set(), set()
+    for line in played_lines:
+        who = (match_player(line, roster) if roster else None) or match_player(line, regulars)
+        if who:
+            seen.add(norm(who["name"]))
+        else:
+            loose.add(line_last(line))
+    return [{"team": team, **r} for r in regulars
+            if norm(r["name"]) not in seen and norm((r["name"].split() or [""])[-1]) not in loose]
 
 
 def crew_named(game, side, lines):
@@ -1784,7 +1818,7 @@ def final_can_exist(game, today=None):
 
 def drop_final(game):
     """Forget a stored final and what was read with it."""
-    game.update(final=None, newcomer_games=[], top_lines=[], box_read=False)
+    game.update(final=None, newcomer_games=[], top_lines=[], sat=[], box_read=False)
 
 
 def box_link(game, pages):
@@ -1857,9 +1891,9 @@ def result_score(r, page_is_home):
 
 
 def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=None, hub=(), espn=(), others=frozenset(),
-                names=None, rosters=None, hosted=None, classes=None):
+                names=None, rosters=None, hosted=None, classes=None, regulars=None):
     prev = {g["id"]: g for g in (previous or {}).get("games", [])}
-    names, rosters, hosted, classes = names or {}, rosters or {}, hosted or {}, classes or {}
+    names, rosters, hosted, classes, regulars = names or {}, rosters or {}, hosted or {}, classes or {}, regulars or {}
     keys = d3_keys(schools)
     out = []
     for g in games:
@@ -1949,8 +1983,9 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             "video": video or old.get("video"),
             "final": final, "newcomer_games": old.get("newcomer_games", []),
             "boxscore": next((r["links"]["boxscore"] for r in (home_row, away_row) if r and r["links"].get("boxscore")), None) or old.get("boxscore"),
-            "top_lines": old.get("top_lines", []), "box_read": old.get("box_read", False),
+            "top_lines": old.get("top_lines", []), "sat": old.get("sat", []), "box_read": old.get("box_read", False),
             "newcomers_home": newcomers.get(g["home"], []), "newcomers_away": newcomers.get(g["away"], []),
+            "regulars_home": regulars.get(g["home"], []), "regulars_away": regulars.get(g["away"], []),
             # Every name sources use and the full roster, so a feed showing another game can be told apart.
             "home_names": names.get(g["home"], [g["home"]]), "away_names": names.get(g["away"], [g["away"]]),
             "home_roster": rosters.get(g["home"], []), "away_roster": rosters.get(g["away"], []),
@@ -2045,6 +2080,7 @@ def record_finals(out, today, pages, links=None):
                     g["final"] = [result["home"], result["away"]]
                     g["newcomer_games"] = result["newcomers"]
                     g["top_lines"] = result["top"]
+                    g["sat"] = result["sat"]
                     g["newcomers_read"] = g["box_read"] = True
                     g.pop("snapshot", None)
         path.write_text(json.dumps(slate, separators=(",", ":")))
@@ -2106,6 +2142,7 @@ def collect(previous):
         tourn = tournament_chance(sims)
         out["conferences"] = conferences(sims)
         newcomers = newcomers_by_team()
+        regulars = regulars_by_team()
     except FETCH_ERRORS as exc:
         out["errors"].append(f"The D3 Stat Lab: {exc}")
         out["stale"]["statlab"] = previous.get("stale", {}).get("statlab") or previous.get("fetched_at")
@@ -2175,7 +2212,8 @@ def collect(previous):
             out["dates"][d.isoformat()] = out["dates"].get(d.isoformat(), 0) + len(added)
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, known + added, schools, pages, tourn, newcomers, read_json(path),
-                            extra.get("links"), hub, (), upper_sites(members), names, rosters, host_listings(d, pages, schools), classes)
+                            extra.get("links"), hub, (), upper_sites(members), names, rosters, host_listings(d, pages, schools), classes,
+                            regulars)
         for g in slate["games"]:
             g["home_def"], g["away_def"] = defense.get(g["home"]), defense.get(g["away"])
         path.write_text(json.dumps(slate, separators=(",", ":")))

@@ -70,7 +70,7 @@ def table(headers, rows, lead_cols=1, caption=None, sortable=True, text_cols=())
 
 
 def twisty(title, inner, count=None, open_=True, id_=None, hidden=False):
-    """A section the reader can collapse. All twisties reopen on refresh."""
+    """A section the reader can collapse. The page script restores each twisty as this browser last left it."""
     badge = f' <span class="count">{esc(count)}</span>' if count is not None else ""
     attrs = (f' id="{esc(id_)}"' if id_ else "") + (" open" if open_ else "") + (" hidden" if hidden else "")
     return f'<details class="group"{attrs}><summary><h2>{esc(title)}{badge}</h2></summary>{inner}</details>'
@@ -159,6 +159,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .nc .cls{display:inline}.nc td.n{display:none}.nc td.p{grid-area:p}.nc td.t{grid-area:t;color:var(--muted);font-size:var(--fs-sm)}
 .nc td.m{display:block;grid-area:m;font-variant-numeric:tabular-nums;padding-top:2px}
 .nc td.gs{grid-area:g;align-self:center;text-align:right;font-size:var(--fs-h2);font-weight:600;font-variant-numeric:tabular-nums}
+.nc.sat td.gs::after{content:"minutes per game"}
 .nc td.gs::after{content:"adjusted game score";display:block;font-size:var(--fs-caption);font-weight:400;color:var(--muted);letter-spacing:.02em}
 .nc td.gm{grid-area:gm;font-size:var(--fs-caption);color:var(--muted)}.nc td.lead.gm .reason{display:inline}.nc td.gm .reason::before{content:" · "}}
 .empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
@@ -213,6 +214,14 @@ function bindSort(t){
 window.bindSort=bindSort;document.querySelectorAll('table.sortable').forEach(bindSort);
 // Expand all / collapse all for the twisties.
 window.setAll=function(open){document.querySelectorAll('details.group').forEach(d=>{d.open=open});};
+// Each twisty opens or closes as the reader last left it. The key is the twisty's id, else its heading text.
+const twistyKey=d=>d.id||((d.querySelector('summary h2')||{}).firstChild||{}).textContent||'';
+const openState=(()=>{try{return JSON.parse(localStorage.getItem(KEY+'-open'))||{}}catch(e){return {}}})();
+document.querySelectorAll('details.group').forEach(d=>{
+  const k=twistyKey(d);if(!k)return;
+  if(typeof openState[k]==='boolean')d.open=openState[k];
+  d.addEventListener('toggle',()=>{openState[k]=d.open;try{localStorage.setItem(KEY+'-open',JSON.stringify(openState))}catch(e){}});
+});
 })();
 """
 
@@ -432,6 +441,9 @@ def sections():
                        'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 15 game scores", '<p class="small">The 15 best adjusted game scores on this night by any player, in every game with a live stats feed. '
                       'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
+    sat = twisty("Key players with no minutes", '<p class="small">The 25 players with the most 2026-27 minutes per game whose box score on this night shows no minutes. '
+                 'Minutes, points, rebounds, and assists are 2026-27 averages per game from the last stats update before this night. A game joins when it ends, or at halftime when its feed includes box lines.</p>'
+                 + rank_bar("sat") + '<div id="satlist"></div>', count="", open_=False, id_="sat")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
             '<div class="seg" role="group" aria-labelledby="lbl-sort">'
             '<button type="button" class="sorter" data-sort="interest">Interest</button><button type="button" class="sorter" data-sort="tipoff">Tipoff</button>'
@@ -452,7 +464,7 @@ def sections():
     board = f'{team_filter}{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
     how = twisty("Method and definitions", HOW, open_=False, id_="how")
     data = json.dumps(boot, separators=(",", ":")).replace("</", "<\\/")
-    return f'{toolbar}\n{newcomers}\n{topgames}\n{board}\n{season_sections()}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
+    return f'{toolbar}\n{newcomers}\n{topgames}\n{sat}\n{board}\n{season_sections()}\n{how}\n<script id="boot" type="application/json">{data}</script><script>{LIVE_JS}</script>'
 
 
 HOW = f"""<dl class="terms">
@@ -577,6 +589,10 @@ HOW = f"""<dl class="terms">
 <p>Game score adds PTS, 0.4 FGM, 0.7 OREB, 0.3 DREB, STL, 0.7 AST, and 0.7 BLK. It subtracts 0.7 FGA, 0.4 missed free throws (FTA minus FTM), 0.4 PF, and TO.</p>
 <p>The lists rank players by <b>adjusted game score</b>: game score times the cube of the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 25% less. Game score is a net stat, so it swings further than points allowed. A fit of this season's lines measured the swing at about three times the plain ratio. The cube matches it. An opponent outside Division III counts as average.</p>
 </dd>
+<dt>Key players with no minutes</dt><dd>
+<p>Each team's 8 players with the most 2026-27 minutes per game are its regulars. A team's games are its players' total minutes divided by 200. A regular joins the list when her team's box score on this night shows her with no minutes or does not list her. The list sorts by minutes per game and shows 25.</p>
+<p>A box score with fewer than 5 players on the floor for a team lists no one from that team. A box line can spell a regular's name another way. So when a line with her last name matches no roster player, she stays off the list.</p>
+</dd>
 <dt>Season top 15 lists</dt><dd>
 <p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by first-years. They come from every recorded box score. A player with more than one line in a list shows the count beside her name.</p>
 <p>They update at each rebuild. Rebuilds run a few times a day, plus every 20 minutes on game nights. A game still going joins after its final is recorded.</p>
@@ -593,6 +609,12 @@ const SD=11;                       // points, full-game spread of the final marg
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let night=BOOT.night,games=[],timer=null,sortKey='interest',finalKey='board',onlyMine=false,findText='',focusTeam='',relKey='',relTeams=null;
+// The Sort, Sort finals, and My Watchlist choices this browser last made. A stored value no button offers is ignored.
+const saved=(k,ok)=>{try{const v=JSON.parse(localStorage.getItem(KEY+'-'+k));return ok(v)?v:null}catch(e){return null}};
+const save=(k,v)=>{try{localStorage.setItem(KEY+'-'+k,JSON.stringify(v))}catch(e){}};
+sortKey=saved('sort',v=>[...document.querySelectorAll('.sorter')].some(b=>b.dataset.sort===v))||sortKey;
+finalKey=saved('fsort',v=>[...document.querySelectorAll('.fsorter')].some(b=>b.dataset.fsort===v))||finalKey;
+onlyMine=saved('mine',v=>v===true)||false;
 // The team rank cut for both top 15 lists: 0 shows every team. This browser remembers it.
 let rankCut=(()=>{try{const v=+localStorage.getItem(KEY+'-cut');return [0,100,200].includes(v)?v:0}catch(e){return 0}})();
 const LOGOS=new Set(BOOT.logos||[]);
@@ -960,7 +982,7 @@ function newcomerLines(g,s,when){
 // ---------- state
 function initState(g){
   const st={wp:g.pregame_wp,progress:0,live:false,final:false,score:null,status:null,finalRead:!!g.box_read,nc:(g.newcomer_games||[]).map(x=>Object.assign({when:'final'},x)),
-    top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x))};
+    top:(g.top_lines||[]).map(x=>Object.assign({when:'final'},x)),sat:(g.sat||[]).map(x=>Object.assign({when:'final'},x))};
   // A final this browser read from the feed counts until the slate has one: the feed moves on to the host's next game,
   // and a reload must not put a finished game back under Not started.
   const possible=canBeFinal(g),slateFinal=possible?g.final:null,seenFinal=slateFinal||!possible?null:remembered()[g.id];
@@ -993,8 +1015,23 @@ function remember(id,score,status){
     keep[id]={score,status};localStorage.setItem(KEY+'-finals',JSON.stringify(keep));
   }catch(e){}
 }
-// Every box read feeds both top 15 lists.
-function readBox(g,s,when){addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);}
+// The regulars with no minutes in one team's box lines (sat_out() in fetch_data.py has the same steps). A side with
+// fewer than MIN_ROSTER players on the floor lists no one. A played line that fits no one keeps a regular with its
+// last name off the list, because the line may be hers under another spelling.
+function satOut(team,regulars,lines,roster,when){
+  const on=(lines||[]).filter(played);if(on.length<MIN_ROSTER)return [];
+  const seen=new Set(),loose=new Set();
+  on.forEach(l=>{const who=(roster&&roster.length?matchNewcomer(l,roster):null)||matchNewcomer(l,regulars);if(who)seen.add(norm(who.name));else loose.add(lineLast(l));});
+  return regulars.filter(r=>!seen.has(norm(r.name))&&!loose.has(norm(r.name.trim().split(/\s+/).pop()))).map(r=>Object.assign({team,when},r));
+}
+// Every box read feeds both top 15 lists. A live box joins the sat-out list after halftime, when a regular with no
+// minutes is unlikely to be waiting for her first shift.
+function readBox(g,s,when){
+  addNewcomers(g,newcomerLines(g,s,when));g.st.top=topLines(g,s,when);
+  if(when==='live'&&g.st.progress<0.5)return;
+  g.st.sat=[['H',g.home,g.regulars_home,g.home_classes],['V',g.away,g.regulars_away,g.away_classes]]
+    .flatMap(([side,team,regs,classes])=>satOut(team,regs||[],(s.lines||{})[side],classes,when));
+}
 // The host's feed has moved on to another game today: ours is over when this page saw it live (before or since a
 // reload), or once its expected end has passed. The box score follows through the slate.
 function feedMovedOn(g,st,now){const tip=tipMs(g);return !!st.other&&((st.seen&&st.live)||snapLive(st,now)||(!!tip&&now>=tip+GAME_MS));}
@@ -1060,7 +1097,7 @@ async function refreshSlate(){
     ['boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
     if(x.off&&!g.off){g.off=x.off;g.st=initState(g);g.st.nextAt=null;}
     if(x.final){
-      Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[]});
+      Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[],sat:x.sat||[]});
       const st=initState(g);st.nextAt=null;g.st=st;
     }else if(x.snapshot&&!g.st.live){snapState(g,g.st,x.snapshot);g.st.interest=interest(g,g.st);}
     if(x.feed&&!g.st.nextAt&&!g.st.final&&!g.off)g.st.nextAt=Date.now();
@@ -1240,6 +1277,26 @@ function renderNewcomers(){
   games.forEach(g=>{g.st.nc.forEach(x=>nc.push(Object.assign({game:g},x)));g.st.top.forEach(x=>top.push(Object.assign({game:g},x)));});
   renderLines('nc','#newcomers',nc,'Newcomer lines appear here once box scores for this night come in.');
   renderLines('top','#topgames',top,'The best game scores appear here once box scores for this night come in.');
+  renderSat();
+}
+// The SAT_N regulars with the most minutes per game who did not play on this night, under the same rank cut.
+const SAT_N=25;
+const SAT_HEAD='<thead><tr>'+['Player','Team','Class','Minutes','Points','Rebounds','Assists','Game'].map((h,i)=>'<th'+(i<2||i===7?' class="lead"':i===2?'':' class="num"')+' role="button" tabindex="0" aria-sort="none">'+h+'</th>').join('')+'</tr></thead>';
+function renderSat(){
+  let list=[],empty='Players appear here once box scores for this night come in.';
+  games.forEach(g=>g.st.sat.forEach(x=>list.push(Object.assign({game:g},x))));
+  if(rankCut){list=list.filter(x=>lineRank(x)<=rankCut);if(list.length===0)empty='No regular from a top '+rankCut+' team has sat out on this night yet.';}
+  list.sort((a,b)=>b.mpg-a.mpg||b.ppg-a.ppg);list.splice(SAT_N);
+  $('#sat').querySelector('.count').textContent=list.length;
+  if(!list.length){$('#satlist').innerHTML='<p class="empty">'+empty+'</p>';return;}
+  const f=v=>(+v).toFixed(1);
+  const rows=list.map(x=>{const g=x.game;
+    return '<tr><td class="lead p">'+esc(x.name)+'</td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td><td class="gs num">'+f(x.mpg)+'</td>'+
+      '<td class="n num">'+f(x.ppg)+'</td><td class="n num">'+f(x.rpg)+'</td><td class="n num">'+f(x.apg)+'</td>'+
+      `<td class="m">${f(x.ppg)} PTS · ${f(x.rpg)} REB · ${f(x.apg)} AST per game</td>`+
+      '<td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');
+  $('#satlist').innerHTML='<div class="tablewrap"><table class="nc sat sortable">'+SAT_HEAD+'<tbody>'+rows+'</tbody></table></div>';
+  if(window.bindSort)$('#satlist').querySelectorAll('table.sortable').forEach(window.bindSort);
 }
 
 // ---------- nights
@@ -1278,8 +1335,8 @@ $('#next').addEventListener('click',()=>{const i=BOOT.dates.indexOf(night);if(i<
 // The page is built a few times a day, so BOOT.night can be stale by morning: pick tonight from the device clock.
 function defaultNight(){const t=todayET(),ahead=BOOT.dates.filter(d=>d>=t);return ahead[0]||(BOOT.dates.length?BOOT.dates[BOOT.dates.length-1]:BOOT.night);}
 $('#tonight').addEventListener('click',()=>go(defaultNight()));
-document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;render();}));
-document.querySelectorAll('.fsorter').forEach(b=>b.addEventListener('click',()=>{finalKey=b.dataset.fsort;render();}));
+document.querySelectorAll('.sorter').forEach(b=>b.addEventListener('click',()=>{sortKey=b.dataset.sort;save('sort',sortKey);render();}));
+document.querySelectorAll('.fsorter').forEach(b=>b.addEventListener('click',()=>{finalKey=b.dataset.fsort;save('fsort',finalKey);render();}));
 $('#find').addEventListener('input',e=>{findText=e.target.value;render();});
 // The team filter: the option labels name the picked team and its conference.
 function setFilter(team,rel){
@@ -1300,7 +1357,8 @@ $('#focus').addEventListener('change',e=>{setFilter(e.target.value,relKey);rende
 $('#rel').addEventListener('change',e=>{setFilter(focusTeam,e.target.value);render();});
 $('#relclear').addEventListener('click',()=>{setFilter('','');render();});
 document.querySelectorAll('.cut').forEach(b=>b.addEventListener('click',()=>{rankCut=+b.dataset.cut;try{localStorage.setItem(KEY+'-cut',rankCut)}catch(err){}renderNewcomers();}));
-$('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;$('#mine').setAttribute('aria-pressed',onlyMine);render();});
+$('#mine').setAttribute('aria-pressed',onlyMine);
+$('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;save('mine',onlyMine);$('#mine').setAttribute('aria-pressed',onlyMine);render();});
 // One listener for every star, because cards come and go as scores change.
 document.querySelector('main').addEventListener('click',e=>{
   const b=e.target.closest('.star');if(!b)return;
