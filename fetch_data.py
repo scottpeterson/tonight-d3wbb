@@ -872,7 +872,9 @@ def opponent_division(r, members):
     return (m["division"], m) if m else (None, None)
 
 PLACEHOLDER = re.compile(r"\b(?:Tournament|Tourney|Classic|Invitational|Tip-?Off|Challenge|Shootout|Showcase|TBA|TBD|"
-                         r"Winner|Loser|Consolation|Semifinals?|Championship)\b|\S\s+(?:vs\.?|v\.)\s+\S", re.I)
+                         r"Winner|Loser|Consolation|Semifinals?|Championship)\b|\S\s+(?:vs\.?|v\.|or)\s+\S", re.I)
+# "A or B" is a tournament's second-day opponent before the first day ends. Dickinson listed "Messiah or Gwynedd
+# Mercy" linking gomessiah.com, which read as Dickinson at Messiah on 2026-11-21; Messiah played RIT.
 
 
 def page_games(day, schools, pages, known, ranks, members):
@@ -909,7 +911,8 @@ def page_games(day, schools, pages, known, ranks, members):
 def opponent_resolver(schools, members):
     """A function from a schedule row to the D3 school its opponent names, or None: by the link's site, then by a
     name that fits one D3 school and no Division I or II member. A placeholder row ("WashU Tournament" linking the
-    host's site) and a host's listing of another game ("Benedictine (Ill.) vs. Central College") name no opponent."""
+    host's site), an undecided opponent ("Messiah or Gwynedd Mercy"), and a host's listing of another game
+    ("Benedictine (Ill.) vs. Central College") name no opponent."""
     sites, keys, upper = team_sites(schools), d3_keys(schools), upper_sites(members)
     own = {}
 

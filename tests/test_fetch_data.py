@@ -897,12 +897,16 @@ def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
         # A neutral row whose link points at the tournament host (Principia) names a Westminster, not the host.
         "Aurora": [f.row(day, (14, 0, "America/Chicago"), False, True, "Westminster University", {}, "", "", "http://principiaathletics.com")],
         "Principia": [], "Westminster (MO)": [], "Westminster (PA)": [],
+        # An undecided second-day opponent that links one of the two names the host (Dickinson, 2026-11-21).
+        "Dickinson": [f.row(day, (13, 0, "America/New_York"), False, True, "Messiah or Gwynedd Mercy", {}, "", "", "http://gomessiah.com")],
+        "Messiah": [],
     }
     schools = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{t.lower().replace(' ', '')}.example/", "tz": "America/New_York"} for t in pages}
     schools["Hope"]["schedule"] = "https://athletics.hope.edu/sports/womens-basketball/schedule"
     schools["Illinois Wesleyan"]["schedule"] = "https://www.iwusports.com/sports/womens-basketball/schedule"
     schools["WashU"]["schedule"] = "https://washubears.com/sports/womens-basketball/schedule"
     schools["Principia"]["schedule"] = "https://principiaathletics.com/sports/womens-basketball/schedule"
+    schools["Messiah"]["schedule"] = "https://gomessiah.com/sports/womens-basketball/schedule"
     ranks = {"Hope": 6, "Illinois Wesleyan": 41}
     games = f.page_games(day, schools, pages, [], ranks, MEMBERS)
     assert [(g["home"], g["away"], g["neutral"], g["home_rank"], g["away_rank"], g["pregame_wp"]) for g in games] == \
