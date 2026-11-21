@@ -1,8 +1,9 @@
 {
- "fetched_at": "2026-11-21T05:58:17+00:00",
+ "fetched_at": "2026-11-21T06:48:06+00:00",
  "errors": [
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com",
-  "UC Santa Cruz at Willamette feed: not well-formed (invalid token): line 1, column 0"
+  "UC Santa Cruz at Willamette feed: not well-formed (invalid token): line 1, column 0",
+  "UC Santa Cruz at Willamette box score: HTTP Error 405: Not Allowed"
  ],
  "stale": {},
  "conferences": {
