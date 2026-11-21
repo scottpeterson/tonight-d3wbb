@@ -1,7 +1,8 @@
 {
- "fetched_at": "2026-11-21T02:06:43+00:00",
+ "fetched_at": "2026-11-21T02:08:04+00:00",
  "errors": [
-  "Keene St. at Colby box score: WAF challenge from d3hoops.com",
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "VTSU Johnson schedule: HTTP Error 404: Not Found",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
@@ -526,6 +527,7 @@
  },
  "notes": [
   "SUNY Oneonta at Eastern Connecticut St. 2026-11-20: both schedule pages list other opponents, left out",
-  "Trine at Wisconsin Lutheran 2026-11-20: neither schedule page lists a game that day, left out"
+  "Trine at Wisconsin Lutheran 2026-11-20: neither schedule page lists a game that day, left out",
+  "Regis at Mt. Holyoke 2026-11-21: neither schedule page lists a game that day, left out"
  ]
 }
