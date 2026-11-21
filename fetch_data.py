@@ -241,6 +241,19 @@ def team_names():
         return {r["team"]: r["names"].split("|") for r in csv.DictReader(f)}
 
 
+def other_d3_keys():
+    """Name keys of the Division III teams that play this season but do not count (data/other_d3_names.csv, from
+    tools/make_team_data.py). Hollins listed "Johnson & Wales University" at Decatur, Ga. on 2026-11-21, which
+    is Johnson & Wales Charlotte; the name alone read as Johnson & Wales Providence, which played Smith that day."""
+    path, keys = DATA / "other_d3_names.csv", set()
+    if path.exists():
+        with open(path, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                for name in r["names"].split("|"):
+                    keys |= name_keys(name) | name_keys(plain_name(name))
+    return keys
+
+
 def team_rosters():
     """{team: [player names]} from data/rosters.csv (tools/make_team_data.py)."""
     path, out = DATA / "rosters.csv", {}
@@ -910,10 +923,11 @@ def page_games(day, schools, pages, known, ranks, members):
 
 def opponent_resolver(schools, members):
     """A function from a schedule row to the D3 school its opponent names, or None: by the link's site, then by a
-    name that fits one D3 school and no Division I or II member. A placeholder row ("WashU Tournament" linking the
-    host's site), an undecided opponent ("Messiah or Gwynedd Mercy"), and a host's listing of another game
-    ("Benedictine (Ill.) vs. Central College") name no opponent."""
-    sites, keys, upper = team_sites(schools), d3_keys(schools), upper_sites(members)
+    name that fits one D3 school, no Division I or II member, and no Division III team that does not count. A
+    placeholder row ("WashU Tournament" linking the host's site), an undecided opponent ("Messiah or Gwynedd
+    Mercy"), and a host's listing of another game ("Benedictine (Ill.) vs. Central College") name no opponent."""
+    sites, keys, upper, others = team_sites(schools), d3_keys(schools), upper_sites(members), other_d3_keys()
+    written = d3_keys(schools, as_written=True)
     own = {}
 
     def own_sites(team):
@@ -933,9 +947,12 @@ def opponent_resolver(schools, members):
         if opp and r["neutral"] and not any(name_key(r["opponent"]) & name_key(n) for n in aliases(opp)):
             opp = None
         if not opp and site not in upper:
-            hits = {keys[k] for k in name_keys(opponent_name(r["opponent"])) | name_keys(plain_name(r["opponent"])) if k in keys}
+            row_keys = name_keys(opponent_name(r["opponent"])) | name_keys(plain_name(r["opponent"]))
+            hits = {keys[k] for k in row_keys if k in keys}
             above = [m for m in members["name"].get(name_key(r["opponent"]), []) if m["division"] in (1, 2)]
-            opp = hits.pop() if len(hits) == 1 and not above else None
+            # A name with its qualifier ("Johnson & Wales (RI)") still fits one team when the bare name does not.
+            exact = {written[k] for k in name_keys(r["opponent"] or "") if k in written}
+            opp = hits.pop() if len(hits) == 1 and not above and (len(exact) == 1 or not row_keys & others) else None
             # A link to another NCAA member's site names that member, whatever the name fits. NC Wesleyan listed
             # "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15; the name alone read as
             # Johnson & Wales Providence, and the site carried a game Providence never had.
@@ -1265,16 +1282,17 @@ def aliases(team):
     return [team, *(n for n in _aliases.get(team, []) if n != team)]
 
 
-def d3_keys(schools):
+def d3_keys(schools, as_written=False):
     """{name key: team} for D3 schools, from each school's name and the other names sources use for it, keeping
     only keys that fit one school. Mary Washington's page listed "The College of New Jersey" on 2026-11-14, which
     "TCNJ" alone never matched, so the Stat Lab's projected Mary Washington at DeSales pairing stayed on the page.
-    An alias keeps its "University" or "College": cut, "Colorado College" would claim a page's "Colorado"."""
+    An alias keeps its "University" or "College": cut, "Colorado College" would claim a page's "Colorado". With
+    as_written True, an alias also keeps its qualifier: "Johnson & Wales (RI)" gives no key for "Johnson & Wales"."""
     keys = {}
     for team, s in schools.items():
         if not s.get("extra"):
             for name in aliases(team):
-                for k in name_keys(name) | (name_keys(plain_name(name)) if name != team else set()):
+                for k in name_keys(name) | (name_keys(plain_name(name)) if name != team and not as_written else set()):
                     keys.setdefault(k, set()).add(team)
     return {k: next(iter(v)) for k, v in keys.items() if len(v) == 1}
 

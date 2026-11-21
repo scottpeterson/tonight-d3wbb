@@ -48,7 +48,7 @@ Albertus Magnus,Meleeya Robbins,JR
 Albertus Magnus,Mi'Yah Bostic,FR
 Albertus Magnus,Na'Miah Williams,FR
 Albertus Magnus,Natalia Fineza,FR
-Albertus Magnus,Phoebe Candy,
+Albertus Magnus,Phoebe Candy,FR
 Albertus Magnus,Serenity Salinas,FR
 Albertus Magnus,Skylar Gage,FR
 Albertus Magnus,Symber Sutton,FR
@@ -512,7 +512,6 @@ Bethany,Addy Blazer,JR
 Bethany,Akayla Coolidge,FR
 Bethany,Alyssa Ott,SR
 Bethany,Dekotah Barnes,SO
-Bethany,Ella Simpson,JR
 Bethany,Emma Smith,FR
 Bethany,Jacey Klingensmith,FR
 Bethany,Jaelyn Gorham,FR
@@ -1047,7 +1046,7 @@ Chatham,Jayla Rosario,FR
 Chatham,Jordyn Miller,SO
 Chatham,Jordyn Wolfe,SO
 Chatham,Lainie Harrington,SO
-Chatham,Lauren Marron,
+Chatham,Lauren Marron,FR
 Chatham,Layla Lammert,SR
 Chatham,Michelle McGee,SR
 Chatham,Paige Gratto,JR
@@ -1659,7 +1658,7 @@ Elmira,Piper Walnicki,SO
 Elmira,Sasha Bellamy,FR
 Elmira,Sophia Ward,SR
 Elms,Aniah Glover,SO
-Elms,Devynn Watford,FR
+Elms,Devynn Watford,SO
 Elms,Gabby Wasiewicz,JR
 Elms,Izzy Encarnacion,FR
 Elms,Kyana Summers,FR
@@ -1927,7 +1926,7 @@ George Fox,D'aye Davidson,FR
 George Fox,Elli Nugent,FR
 George Fox,Emma Boehm,SR
 George Fox,Emma Burlison,FR
-George Fox,Hanne Hopkins,SR
+George Fox,Hanne Hopkins,GR
 George Fox,Leiana Riveira,FR
 George Fox,Reese Weygandt,FR
 George Fox,Rylee Stupnik,FR
@@ -2239,6 +2238,7 @@ Hendrix,Taysie Trejo,SR
 Hilbert,A'Jonay Hawkins,FR
 Hilbert,Amarie Berrios,SO
 Hilbert,Bianca Iten,SO
+Hilbert,Brooke Codr,FR
 Hilbert,Cianna Tobia,JR
 Hilbert,Hailey Alba,SO
 Hilbert,Jayla Jackson,SO
@@ -2655,6 +2655,7 @@ King's,Lilian Crabbs,FR
 King's,Liz Wilson,SO
 King's,Taylor Hough,SO
 King's,Tiffany Pecorella,JR
+Knox,Analeis Ming,FR
 Knox,Bri Holland,JR
 Knox,Cheyanne Merkel,SR
 Knox,De'Mya Robinson,FR
@@ -2663,6 +2664,7 @@ Knox,Jaylani Ozuna,FR
 Knox,Kendell Lade,SR
 Knox,Lucy Lawrence,SO
 Knox,Nayeli Nidez Acuña,JR
+Knox,Reagan Toney,FR
 Knox,Sarah Finley,SR
 La Roche,Addison Odille,SO
 La Roche,Catherine Kelly,JR
@@ -2835,6 +2837,7 @@ Lehman,Angelina Dietz,JR
 Lehman,Cheyenne Hoxie,SR
 Lehman,Gracie Cruz,JR
 Lehman,Isabela Araujo,SO
+Lehman,Jaya Mendez,FR
 Lehman,Jazel Matias,SO
 Lehman,Julia Koprowski,JR
 Lehman,Justinna Boatwright,SR
@@ -3193,7 +3196,7 @@ Martin Luther,Nora Grace Otto,FR
 Martin Luther,Payton Holub,FR
 Martin Luther,Wilhelmina Wenz,JR
 Mary Baldwin,Analise Moore,JR
-Mary Baldwin,Bailey Talley,FR
+Mary Baldwin,Bailey Talley,JR
 Mary Baldwin,Hannah Coffman,FR
 Mary Baldwin,Jakayla Johnson,JR
 Mary Baldwin,Jordyn Waters,FR
@@ -3277,7 +3280,7 @@ Maryville,Maddie Galuski,SO
 Maryville,Niles Daniel,SR
 Maryville,Norah Walkup,JR
 Maryville,Tinsley Walker,SO
-Marywood,Allie Metzgar,FR
+Marywood,Allie Metzgar,JR
 Marywood,Anyah Ortiz,SR
 Marywood,Carlee Dropp,FR
 Marywood,Chloe Mendicino,SO
@@ -3615,7 +3618,7 @@ Mt. St. Vincent,Caily Salon,SO
 Mt. St. Vincent,Casey Mulvey,SR
 Mt. St. Vincent,Grace Giacinto,SO
 Mt. St. Vincent,Grace Kennedy,JR
-Mt. St. Vincent,Hailey Shalor,JR
+Mt. St. Vincent,Hailey Shalor,SR
 Mt. St. Vincent,Hayden Team Impact,SO
 Mt. St. Vincent,Jadamarie Henry,SO
 Mt. St. Vincent,Jaya Oliva,FR
@@ -4235,6 +4238,7 @@ Pitt-Bradford,Mariah Nelson,FR
 Pitt-Bradford,Molly Cady,JR
 Pitt-Bradford,Taylor Kenney,FR
 Pitt-Greensburg,Addison Musto,SO
+Pitt-Greensburg,Anika Vanwyc,FR
 Pitt-Greensburg,Ava Melendez,FR
 Pitt-Greensburg,Ca'Mari Walden,JR
 Pitt-Greensburg,Elaina Funk,FR
@@ -4620,10 +4624,11 @@ Rutgers-Camden,Zairra Galloway,SO
 Rutgers-Newark,Arlenny Medina,SR
 Rutgers-Newark,Bella Togias,FR
 Rutgers-Newark,Blessing Harper,SO
-Rutgers-Newark,Cyan Long,
+Rutgers-Newark,Cyan Long,SO
 Rutgers-Newark,Emily Leiras,GR
 Rutgers-Newark,Imani Mckenzie,SO
-Rutgers-Newark,Kelly Perez,
+Rutgers-Newark,Kamara Smith,FR
+Rutgers-Newark,Kelly Perez,SO
 Rutgers-Newark,Kyala Askew,SR
 Rutgers-Newark,Mariam Dosouki Mohamed,SO
 Rutgers-Newark,Maura Chawner,SO
@@ -4734,21 +4739,27 @@ SUNY Morrisville,Madelyne Reid,FR
 SUNY Morrisville,Mallory Brown,FR
 SUNY Morrisville,Mia Kaltenbach,SO
 SUNY Morrisville,Ryan Vail,FR
-SUNY New Paltz,Deanna Barry,SO
+SUNY New Paltz,Allie Ziemak,GR
+SUNY New Paltz,Caitlin Mullen,JR
 SUNY New Paltz,Grace Koehler,JR
+SUNY New Paltz,Izzy Montalvo,FR
+SUNY New Paltz,Kaia Pomeranc,FR
 SUNY New Paltz,Kamryn Hoyt,JR
 SUNY New Paltz,Kayden Cornell,SO
+SUNY New Paltz,Kelsey O'Brien,GR
+SUNY New Paltz,Layla Greene,SR
 SUNY New Paltz,Macie Perry,SO
+SUNY New Paltz,Meaghan Doherty,JR
 SUNY New Paltz,Sierra Carter,JR
+SUNY New Paltz,Sophia Brondo,JR
 SUNY New Paltz,Summer Perry,SO
 SUNY Old Westbury,Aissata Kone,SO
+SUNY Old Westbury,Anaiya Ryner,FR
 SUNY Old Westbury,Caragh Doyle,SO
 SUNY Old Westbury,Dianna Ceaser,FR
-SUNY Old Westbury,Endya Greene,SR
-SUNY Old Westbury,Kayla Chappelle,SO
 SUNY Old Westbury,Korrina Plair,SR
+SUNY Old Westbury,Makaylah Frazier,SR
 SUNY Old Westbury,Mikayla D'Ambrosio,SO
-SUNY Old Westbury,Moneasia McCloud,SO
 SUNY Old Westbury,Sakhmet Lewis,JR
 SUNY Old Westbury,Sonasia Walker,SO
 SUNY Old Westbury,Thalia Fowler,SO
@@ -5039,7 +5050,9 @@ Southern Maine,Paolla Uwase,FR
 Southern Virginia,Ambria Blalock,FR
 Southern Virginia,Emma Openshaw,JR
 Southern Virginia,Emma Sabin,FR
+Southern Virginia,Karlie Christensen,FR
 Southern Virginia,Kate Marker,FR
+Southern Virginia,Kennedi Hamner,FR
 Southern Virginia,Kensey Peterson,SO
 Southern Virginia,Kiara Zwonitzer,FR
 Southern Virginia,Lyla Seneca,SO
@@ -5088,6 +5101,7 @@ Springfield,Madi Lopez,JR
 Springfield,Maeve Dolan,SO
 Springfield,Natalie Lucas,SR
 Springfield,Perry Blasetti,GR
+Springfield,Reese Croutworst,FR
 Springfield,Ruth Boles,JR
 St. Benedict,Alyssa Sadlovsky,JR
 St. Benedict,Annika Schafer,SO
@@ -5904,11 +5918,13 @@ VTSU Johnson,Sepphyre Lepaga-Telona,SO
 VTSU Lyndon,Chloe Murphy,SO
 VTSU Lyndon,Cori Carrier,FR
 VTSU Lyndon,Diana Tafoya,FR
+VTSU Lyndon,Emily Clark,FR
 VTSU Lyndon,Hawa Mubarak,FR
 VTSU Lyndon,Haylee Walker,SR
 VTSU Lyndon,Kaitlyn Frydenlund,JR
 VTSU Lyndon,Keira Quintal,SO
 VTSU Lyndon,Nei'Shae Clegg,SR
+VTSU Lyndon,Neissah Jacques,FR
 VTSU Lyndon,Skylar Begay,JR
 VTSU Lyndon,Taliyah Carter,SO
 Vassar,Daniella Kalil,FR
@@ -5955,6 +5971,7 @@ Warren Wilson,Natalie Orellana-Galdamez,FR
 Warren Wilson,Nesha Oliver,SO
 Warren Wilson,Olivia Winiecki,FR
 Warren Wilson,Sadè Lawrence,SR
+Warren Wilson,Winter Flynn,FR
 Wartburg,Addy Tupa,SO
 Wartburg,Ally Poegel,SO
 Wartburg,Ann Schaefer,SO

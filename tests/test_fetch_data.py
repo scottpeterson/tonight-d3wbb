@@ -1490,9 +1490,15 @@ def test_a_link_to_another_members_site_overrules_the_name_match():
     charlotte = f.row(day, (15, 15, "America/New_York"), True, False, "Johnson & Wales (N.C.)", {}, "", "",
                       "https://charlotte.jwuathletics.com/landing/index")
     assert resolve(charlotte) is None
-    # The same name linking Providence's own site, or no site at all, still resolves.
+    # The same name linking Providence's own site still resolves.
     assert resolve(f.row(day, None, True, False, "Johnson & Wales (N.C.)", {}, "", "", "https://providence.jwuathletics.com/")) == "Johnson & Wales Providence"
-    assert resolve(f.row(day, None, True, False, "Johnson & Wales", {}, "", "")) == "Johnson & Wales Providence"
+    # A name that fits Johnson & Wales Charlotte too (data/other_d3_names.csv) names no one. Hollins listed
+    # "Johnson & Wales University" at Decatur, Ga. on 2026-11-21, linking jwuathletics.com; Providence played Smith.
+    assert resolve(f.row(day, None, True, False, "Johnson & Wales", {}, "", "")) is None
+    assert resolve(f.row(day, None, True, False, "Johnson & Wales University", {}, "", "", "http://www.jwuathletics.com")) is None
+    # Providence's own qualified names still fit only Providence.
+    assert resolve(f.row(day, None, True, False, "Johnson & Wales (RI)", {}, "", "")) == "Johnson & Wales Providence"
+    assert resolve(f.row(day, None, True, False, "JWU Providence", {}, "", "")) == "Johnson & Wales Providence"
     # A member site that differs from the schedule site is still the team's own (Alvernia).
     schools["Alvernia"] = {"team": "Alvernia", "type": "Sidearm", "schedule": "https://alverniaathletics.com/sports/womens-basketball/schedule", "tz": "America/New_York"}
     resolve = f.opponent_resolver(schools, members)
