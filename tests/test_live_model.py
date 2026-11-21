@@ -380,10 +380,13 @@ def test_sibling_feeds_name_the_hosts_other_courts():
 
 
 def test_a_win_by_a_near_even_team_is_no_upset():
-    # William Peace (41% at Roanoke) won 62-59 on 2026-11-07 and the card said upset. The bar is 35%.
-    roanoke = json.dumps(dict(GAME, home="Roanoke", away="William Peace", pregame_wp=0.59, pregame_margin=2.5))
-    assert "upset" not in run(f"tags({roanoke},{{final:true,wp:0}})")
-    assert "upset" not in run(f"tags({roanoke},{{live:true,wp:0.2}})")
+    # The bar is 42% (Scott, 2026-11-20). Bates (46.6%) beat Babson 45-42 that night: no upset. Colby (40.2%) beat
+    # Keene St. 71-45: an upset.
+    babson = json.dumps(dict(GAME, home="Babson", away="Bates", pregame_wp=0.534, pregame_margin=0.9))
+    assert "upset" not in run(f"tags({babson},{{final:true,wp:0}})")
+    assert "upset" not in run(f"tags({babson},{{live:true,wp:0.2}})")
+    colby = json.dumps(dict(GAME, home="Colby", away="Keene St.", pregame_wp=0.402, pregame_margin=-2.7))
+    assert "upset" in run(f"tags({colby},{{final:true,wp:1}})")
     dog = json.dumps(dict(GAME, pregame_wp=0.7, pregame_margin=5.8))
     assert "upset" in run(f"tags({dog},{{final:true,wp:0}})")
     assert "upset alert" in run(f"tags({dog},{{live:true,wp:0.25}})")

@@ -198,7 +198,7 @@ dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2
 <ul>
 <li><b>Red:</b> a game in progress. The dot and the clock are red. Nothing else on the page is red.</li>
 <li><b>Green:</b> the winner of a finished game.</li>
-<li><b>Amber:</b> an upset. The team won after the model gave it 35% or less before tipoff. During play, its win probability is more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag.</li>
+<li><b>Amber:</b> an upset. The team won after the model gave it 42% or less before tipoff. During play, its win probability is more than 20 points above its pregame chance. A game the model has no line for (one the schedule pages added) gets no upset tag.</li>
 <li><b>Gray:</b> a game with nothing left to decide.</li>
 </ul>
 </dd>
@@ -351,8 +351,9 @@ function tipMs(g){return g.tip?new Date(g.tip).getTime():null;}
 // or not at all. Checks stop there.
 const GIVE_UP_MS=45*60000,RETRY_MS=10*60000,EARLY_RETRY_MS=5*60000,LAST_LOOK_MS=4*3600000,FINAL_EARLIEST_MS=45*60000;
 const SIBLING_FEEDS=2;
-// A win by a team given more than this before tipoff is no upset: William Peace (41%) won at Roanoke, 2026-11-07.
-const UPSET_MAX_DOG=0.35;
+// A win by a team given more than this before tipoff is no upset. Scott set 42% on 2026-11-20, so Colby's win over
+// Keene St. at 40.2% counts and Bates over Babson at 46.6% does not.
+const UPSET_MAX_DOG=0.42;
 // A game with a pregame line: the Stat Lab's games. One the schedule pages added sits at 50% with no line.
 function modeled(g){return !g.division&&g.modeled!==false;}
 function dogChance(g){return Math.min(g.pregame_wp,1-g.pregame_wp);}
