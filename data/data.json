@@ -1,15 +1,9 @@
 {
- "fetched_at": "2026-11-21T18:41:22+00:00",
+ "fetched_at": "2026-11-21T19:10:02+00:00",
  "errors": [
-  "St. Joseph's (ME) at Endicott box score: HTTP Error 405: Not Allowed",
-  "New England College at Fitchburg St. box score: HTTP Error 405: Not Allowed",
-  "Pitt-Greensburg at Muskingum box score: HTTP Error 405: Not Allowed",
-  "MCLA at SUNY Delhi box score: HTTP Error 405: Not Allowed",
-  "St. Joseph (CT) at Sage box score: HTTP Error 405: Not Allowed",
-  "Salem St. at Suffolk box score: HTTP Error 405: Not Allowed",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com",
-  "Elms at Wentworth box score: HTTP Error 405: Not Allowed",
-  "Brandeis at Worcester St. box score: HTTP Error 405: Not Allowed",
+  "Wellesley at Westfield St. box score: HTTP Error 405: Not Allowed",
+  "UMass Boston at Wheaton (MA) feed: HTTP Error 500: Internal Server Error",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
