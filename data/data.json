@@ -1,7 +1,8 @@
 {
- "fetched_at": "2026-11-21T21:31:45+00:00",
+ "fetched_at": "2026-11-21T21:59:57+00:00",
  "errors": [
   "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "Ohio Wesleyan at Maryville feed: Remote end closed connection without response",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
