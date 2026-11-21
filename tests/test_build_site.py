@@ -31,9 +31,10 @@ def write_slates(tmp_path):
         (tmp_path / f"{s['date']}.json").write_text(json.dumps(s))
 
 
-def test_season_lists_rank_by_adjusted_score_keep_fifteen_and_fill_in_the_class(tmp_path, monkeypatch):
+def test_season_lists_rank_by_adjusted_score_keep_season_n_and_fill_in_the_class(tmp_path, monkeypatch):
     write_slates(tmp_path)
     monkeypatch.setattr(b, "SLATES", tmp_path)
+    monkeypatch.setattr(b, "SEASON_N", 15)  # the fixture offers 20 lines, so a list of 15 shows the cut
     rosters = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR"), ("Smith", "Cara Perry", "SO")])
     monkeypatch.setattr(b, "roster_classes", lambda rows=None: rosters)
     s = b.season_lines()

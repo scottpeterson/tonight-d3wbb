@@ -71,7 +71,7 @@ The section sits above the scoreboard, lists player, team, reason (freshman, tra
 
 ## Key players with no minutes
 
-A regular is one of a team's 8 players with the most 2026-27 minutes per game (`regulars.json`). The section lists the 25 regulars with the most minutes per game whose team's box score on the night shows them with 0 minutes or does not list them. The finals pass stores each game's list as `sat`; the page adds a live game at halftime when its feed has box lines. A side with fewer than 5 players on the floor lists no one, and a played line that matches no roster player keeps regulars with its last name off the list. The rank buttons apply.
+A regular is one of a team's 8 players with the most 2026-27 minutes per game (`regulars.json`). The section lists the 35 regulars with the most minutes per game whose team's box score on the night shows them with 0 minutes or does not list them. Under each name is her count of team games in a row with no minutes: `with_streaks()` counts the earlier ones from the stored slates when the slate is built, and stops at a game whose box score was never read. The finals pass stores each game's list as `sat`; the page adds a live game at halftime when its feed has box lines. A side with fewer than 5 players on the floor lists no one, and a played line that matches no roster player keeps regulars with its last name off the list. The rank buttons apply.
 
 ## Saved page settings
 

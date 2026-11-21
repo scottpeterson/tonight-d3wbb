@@ -300,6 +300,34 @@ def regulars_by_team():
     return out
 
 
+def team_history(day):
+    """{team: [(box read, {the regulars who sat out, by norm(name)}), ...]} for the team's games before `day`, newest
+    first, from the stored slates. A game with no final never happened (or not yet) and is left out."""
+    games = []
+    for path in SLATES.glob("*.json"):
+        if path.stem < day.isoformat():
+            games += [g for g in read_json(path, {}).get("games", []) if g.get("final") and not g.get("off")]
+    out = {}
+    for g in sorted(games, key=lambda g: (g["date"], g.get("tip") or ""), reverse=True):
+        for team in (g["home"], g["away"]):
+            sat = {norm(p["name"]) for p in g.get("sat") or [] if p.get("team") == team}
+            out.setdefault(team, []).append((bool(g.get("box_read")), sat))
+    return out
+
+
+def with_streaks(regulars, history):
+    """Each regular with `out`: her team's games in a row before this night in which she had no minutes. The count
+    stops at a game whose box score was never read, so it can be short but never too long."""
+    def streak(name, games):
+        n = 0
+        for read, sat in games:
+            if not read or norm(name) not in sat:
+                break
+            n += 1
+        return n
+    return {team: [{**r, "out": streak(r["name"], history.get(team, []))} for r in regs] for team, regs in regulars.items()}
+
+
 # ---------------------------------------------------------------- schedule pages
 
 def parse_month_day(label):
@@ -2213,7 +2241,7 @@ def collect(previous):
         path = SLATES / f"{d.isoformat()}.json"
         slate = build_slate(d, known + added, schools, pages, tourn, newcomers, read_json(path),
                             extra.get("links"), hub, (), upper_sites(members), names, rosters, host_listings(d, pages, schools), classes,
-                            regulars)
+                            with_streaks(regulars, team_history(d)))
         for g in slate["games"]:
             g["home_def"], g["away_def"] = defense.get(g["home"]), defense.get(g["away"])
         path.write_text(json.dumps(slate, separators=(",", ":")))

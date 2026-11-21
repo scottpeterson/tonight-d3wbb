@@ -291,7 +291,7 @@ def load_slate(day):
     return fill_classes(json.loads(path.read_text()), roster_classes()) if path.exists() else None
 
 
-SEASON_N = 15
+SEASON_N = 20
 NC_HEADERS = ["Player", "Team", "Class", "Points", "Rebounds", "Assists", "Steals plus blocks", "Field goals", "Game score", "Adjusted game score", "Game"]
 
 
@@ -395,11 +395,11 @@ def season_sections():
     season = season_lines()
     tail = ' Ranked by adjusted game score. The list updates at each rebuild, so a game still going joins after its final is recorded.</p>'
     return "\n".join((
-        twisty("Top 15 game scores this season", '<p class="small">The 15 best adjusted game scores since opening night by any player, from every recorded box score.' + tail
+        twisty(f"Top {SEASON_N} game scores this season", f'<p class="small">The {SEASON_N} best adjusted game scores since opening night by any player, from every recorded box score.' + tail
                + nc_table(season["top"], "No box score has been recorded yet."), count=len(season["top"]), open_=False, id_="s-top"),
-        twisty("Top 15 newcomer game scores this season", '<p class="small">The 15 best adjusted game scores since opening night by first-years, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
+        twisty(f"Top {SEASON_N} newcomer game scores this season", f'<p class="small">The {SEASON_N} best adjusted game scores since opening night by first-years, transfers, and players with no 2025-26 minutes or under 30 minutes.' + tail
                + nc_table(season["nc"], "No newcomer line has been recorded yet."), count=len(season["nc"]), open_=False, id_="s-nc"),
-        twisty("Top 15 first-year game scores this season", '<p class="small">The 15 best adjusted game scores since opening night by first-years.' + tail
+        twisty(f"Top {SEASON_N} first-year game scores this season", f'<p class="small">The {SEASON_N} best adjusted game scores since opening night by first-years.' + tail
                + nc_table(season["fr"], "No first-year line has been recorded yet."), count=len(season["fr"]), open_=False, id_="s-fr")))
 
 
@@ -441,7 +441,7 @@ def sections():
                        'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("nc") + '<div id="newcomers"></div>', count="", open_=False, id_="nc")
     topgames = twisty("Top 15 game scores", '<p class="small">The 15 best adjusted game scores on this night by any player, in every game with a live stats feed. '
                       'Lines arrive when a game ends, or during play when its feed includes box lines (Presto feeds do, Sidearm feeds do not).</p>' + rank_bar("top") + '<div id="topgames"></div>', count="", open_=False, id_="top")
-    sat = twisty("Key players with no minutes", '<p class="small">The 25 players with the most 2026-27 minutes per game whose box score on this night shows no minutes. '
+    sat = twisty("Key players with no minutes", '<p class="small">The 35 players with the most 2026-27 minutes per game whose box score on this night shows no minutes. '
                  'Minutes, points, rebounds, and assists are 2026-27 averages per game from the last stats update before this night. A game joins when it ends, or at halftime when its feed includes box lines.</p>'
                  + rank_bar("sat") + '<div id="satlist"></div>', count="", open_=False, id_="sat")
     sort = ('<div class="sortbar ctl"><span class="seglabel caption"><span id="lbl-sort">Sort</span><span class="checked" id="checked"></span></span>'
@@ -590,10 +590,11 @@ HOW = f"""<dl class="terms">
 <p>The lists rank players by <b>adjusted game score</b>: game score times the cube of the Division III average adjusted defense divided by the opponent's. A line against a team that allows 10% more points than average counts about 25% less. Game score is a net stat, so it swings further than points allowed. A fit of this season's lines measured the swing at about three times the plain ratio. The cube matches it. An opponent outside Division III counts as average.</p>
 </dd>
 <dt>Key players with no minutes</dt><dd>
-<p>Each team's 8 players with the most 2026-27 minutes per game are its regulars. A team's games are its players' total minutes divided by 200. A regular joins the list when her team's box score on this night shows her with no minutes or does not list her. The list sorts by minutes per game and shows 25.</p>
+<p>Each team's 8 players with the most 2026-27 minutes per game are its regulars. A team's games are its players' total minutes divided by 200. A regular joins the list when her team's box score on this night shows her with no minutes or does not list her. The list sorts by minutes per game and shows 35.</p>
+<p>Under each name is her count of team games in a row with no minutes, this night included. The count goes back only through games whose box score this site read, so it can be short.</p>
 <p>A box score with fewer than 5 players on the floor for a team lists no one from that team. A box line can spell a regular's name another way. So when a line with her last name matches no roster player, she stays off the list.</p>
 </dd>
-<dt>Season top 15 lists</dt><dd>
+<dt>Season top {SEASON_N} lists</dt><dd>
 <p>Three lists under the games hold the best adjusted game scores since opening night: by any player, by newcomers, and by first-years. They come from every recorded box score. A player with more than one line in a list shows the count beside her name.</p>
 <p>They update at each rebuild. Rebuilds run a few times a day, plus every 20 minutes on game nights. A game still going joins after its final is recorded.</p>
 </dd>
@@ -1281,7 +1282,9 @@ function renderNewcomers(){
   renderSat();
 }
 // The SAT_N regulars with the most minutes per game who did not play on this night, under the same rank cut.
-const SAT_N=25;
+const SAT_N=35;
+// Games in a row with no minutes, this night included: `out` counts the earlier ones (with_streaks() in fetch_data.py).
+function satRun(x){const n=(+x.out||0)+1;return n===1?'1 game with no minutes':n+' games in a row with no minutes';}
 const SAT_HEAD='<thead><tr>'+['Player','Team','Class','Minutes','Points','Rebounds','Assists','Game'].map((h,i)=>'<th'+(i<2||i===7?' class="lead"':i===2?'':' class="num"')+' role="button" tabindex="0" aria-sort="none">'+h+'</th>').join('')+'</tr></thead>';
 function renderSat(){
   let list=[],empty='Players appear here once box scores for this night come in.';
@@ -1292,7 +1295,7 @@ function renderSat(){
   if(!list.length){$('#satlist').innerHTML='<p class="empty">'+empty+'</p>';return;}
   const f=v=>(+v).toFixed(1);
   const rows=list.map(x=>{const g=x.game;
-    return '<tr><td class="lead p">'+esc(x.name)+'</td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td><td class="gs num">'+f(x.mpg)+'</td>'+
+    return '<tr><td class="lead p">'+esc(x.name)+'<span class="reason">'+satRun(x)+'</span></td><td class="lead t">'+esc(x.team)+(x.class?'<span class="cls"> · '+esc(x.class)+'</span>':'')+'</td><td class="n">'+esc(x.class||'')+'</td><td class="gs num">'+f(x.mpg)+'</td>'+
       '<td class="n num">'+f(x.ppg)+'</td><td class="n num">'+f(x.rpg)+'</td><td class="n num">'+f(x.apg)+'</td>'+
       `<td class="m">${f(x.ppg)} PTS · ${f(x.rpg)} REB · ${f(x.apg)} AST per game</td>`+
       '<td class="lead gm">'+esc(g.away)+' at '+esc(g.home)+'<span class="reason">'+(x.when==='live'?'Live, '+esc(g.st.status||''):'Final')+'</span></td></tr>';}).join('');

@@ -1566,3 +1566,23 @@ def test_box_result_lists_each_teams_regulars_who_sat_out():
     sides = {"H": {"name": "Babson", "id": "BAB"}, "V": {"name": "Rhodes", "id": "RHO"}}
     sat = f.box_result(game, 70, 60, sides, lines)["sat"]
     assert [(p["team"], p["name"]) for p in sat] == [("Babson", home[9])]
+
+
+def test_a_streak_counts_earlier_games_with_no_minutes_and_stops_at_an_unread_box(tmp_path, monkeypatch):
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+
+    def night(day, read, sat, final=(60, 50)):
+        game = {"date": day, "home": "Hope", "away": "Calvin", "final": list(final) if final else None, "box_read": read,
+                "sat": [{"team": "Hope", "name": n} for n in sat]}
+        (tmp_path / f"{day}.json").write_text(json.dumps({"games": [game]}))
+    night("2026-11-10", True, ["Ana Boyd"])
+    night("2026-11-12", False, [])                   # unread box: the count stops here
+    night("2026-11-14", True, ["Ana Boyd", "Bea Cole"])
+    night("2026-11-15", False, [], final=None)       # never played: left out
+    night("2026-11-16", True, ["Ana Boyd"])
+    night("2026-11-20", True, ["Ana Boyd"])          # this night and later: not history
+    history = f.team_history(date(2026, 11, 20))
+    regs = {"Hope": [regular("Ana Boyd", 30.0), regular("Bea Cole", 25.0), regular("Cam Dunn", 20.0)]}
+    out = {r["name"]: r["out"] for r in f.with_streaks(regs, history)["Hope"]}
+    assert out == {"Ana Boyd": 2, "Bea Cole": 0, "Cam Dunn": 0}
+    assert [len(s) for _, s in history["Calvin"]] == [0, 0, 0, 0]
