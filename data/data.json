@@ -1,12 +1,12 @@
 {
- "fetched_at": "2026-11-21T17:43:27+00:00",
+ "fetched_at": "2026-11-21T17:57:03+00:00",
  "errors": [
-  "Connecticut College at Coast Guard feed: IncompleteRead(16034 bytes read, 130166 more expected)",
-  "New England College at Fitchburg St. box score: HTTP Error 405: Not Allowed",
-  "Salem St. at Suffolk box score: HTTP Error 405: Not Allowed",
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "New England College at Fitchburg St. box score: WAF challenge from fitchburgfalcons.com",
+  "Salem St. at Suffolk box score: WAF challenge from gosuffolkrams.com",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com",
-  "Elms at Wentworth box score: HTTP Error 405: Not Allowed",
-  "Brandeis at Worcester St. box score: HTTP Error 405: Not Allowed",
+  "Elms at Wentworth box score: WAF challenge from wentworthathletics.com",
+  "Brandeis at Worcester St. box score: WAF challenge from wsulancers.com",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
