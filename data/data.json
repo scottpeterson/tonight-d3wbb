@@ -1,9 +1,9 @@
 {
- "fetched_at": "2026-11-21T01:10:05+00:00",
+ "fetched_at": "2026-11-21T01:38:24+00:00",
  "errors": [
   "Keene St. at Colby box score: WAF challenge from d3hoops.com",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com",
-  "SUNY New Paltz at Vassar feed: HTTP Error 500: Internal Server Error"
+  "Gettysburg at SUNY Cortland feed: HTTP Error 500: Internal Server Error"
  ],
  "stale": {},
  "conferences": {
