@@ -1,8 +1,19 @@
 {
- "fetched_at": "2026-11-21T16:45:35+00:00",
+ "fetched_at": "2026-11-21T17:14:19+00:00",
  "errors": [
-  "Wellesley at Hunter box score: WAF challenge from d3hoops.com",
-  "UC Santa Cruz at Willamette feed: not well-formed (invalid token): line 1, column 0"
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
+  "LeTourneau at Berry feed: Remote end closed connection without response",
+  "Connecticut College at Coast Guard feed: IncompleteRead(16035 bytes read, 81374 more expected)",
+  "SUNY Oneonta at Eastern Connecticut St. feed: IncompleteRead(16034 bytes read, 89802 more expected)",
+  "New England College at Fitchburg St. box score: WAF challenge from fitchburgfalcons.com",
+  "Mt. St. Mary at Mt. St. Vincent feed: IncompleteRead(32418 bytes read, 37263 more expected)",
+  "Salve Regina at Plattsburgh St. feed: Remote end closed connection without response",
+  "Purchase at Sarah Lawrence feed: Remote end closed connection without response",
+  "Salem St. at Suffolk box score: WAF challenge from gosuffolkrams.com",
+  "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com",
+  "Elms at Wentworth box score: WAF challenge from wentworthathletics.com",
+  "Brandeis at Worcester St. box score: WAF challenge from wsulancers.com",
+  "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
  "conferences": {
