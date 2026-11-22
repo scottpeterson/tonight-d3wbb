@@ -718,6 +718,26 @@ def test_is_over(monkeypatch):
     assert f.is_over({"date": "2025-11-06"}, date(2025, 11, 7)) and not f.is_over({"date": "2025-11-07"}, date(2025, 11, 7))
 
 
+def test_a_posted_final_reads_the_box_score_page_before_box_page_after(monkeypatch, tmp_path):
+    # UW-Oshkosh vs Calvin at UW-Platteville, 2026-11-21: the pages posted the final an hour before BOX_PAGE_AFTER,
+    # and the host's feed had moved to its next game. The box score page is read once a page posts the score.
+    monkeypatch.setattr(f, "SLATES", tmp_path)
+    monkeypatch.setattr(f, "now", lambda: datetime(2025, 11, 8, 2, 0, tzinfo=timezone.utc))   # 2 hours past tipoff
+    assert not f.is_over(BOX_GAME, date(2025, 11, 7))
+    (tmp_path / "2025-11-07.json").write_text(json.dumps({"date": "2025-11-07", "games": [{**BOX_GAME, "id": "g"}]}))
+    monkeypatch.setattr(f, "get", lambda *a, **k: box_page())
+    row = {"day": date(2025, 11, 7), "exhibition": False, "opponent": "Fredonia", "result": "L, 44-71",
+           "links": {"boxscore": "https://thiel.example/boxscore/1"}}
+    f.record_finals({"errors": []}, date(2025, 11, 7), {"Thiel": [row]})
+    g = json.loads((tmp_path / "2025-11-07.json").read_text())["games"][0]
+    assert g["final"] == [71, 44] and g["box_read"] and [n["name"] for n in g["newcomer_games"]] == ["Issy Green"]
+    # With no posted score, the page waits for BOX_PAGE_AFTER.
+    (tmp_path / "2025-11-07.json").write_text(json.dumps({"date": "2025-11-07", "games": [{**BOX_GAME, "id": "g"}]}))
+    f.record_finals({"errors": []}, date(2025, 11, 7), {"Thiel": [{**row, "result": ""}]})
+    g = json.loads((tmp_path / "2025-11-07.json").read_text())["games"][0]
+    assert not g.get("box_read") and not g.get("final")
+
+
 def test_result_score_reads_the_page_teams_side_from_w_or_l():
     # Centenary's page at ULM, 2026-11-05: winner's score first.
     assert f.result_score({"result": "L , 106-26"}, False) == (106, 26)

@@ -23,9 +23,10 @@ Each run does three things:
 3. For the last three days, reads each game that has no box score yet. With
    --finals (the game-night run every 20 minutes), the run does only this step
    and reads only the schedule pages those games need. The live
-   feed comes first. Once a game is 2.5 hours past tipoff and its feed has no
-   complete box score (crews reuse a feed for their next game), the fetcher reads
-   the Box Score link on either team's schedule page instead: Sidearm HTML or
+   feed comes first. Once a game is 2.5 hours past tipoff, or a schedule page
+   posts its final score, and its feed has no complete box score (crews reuse a
+   feed for their next game), the fetcher reads the Box Score link on either
+   team's schedule page instead: Sidearm HTML or
    Presto StatCrew XML. It stores the final score, the line of every newcomer
    who played, and the game's 15 best lines by any player. A score a schedule
    page posts outranks the feed's. A game with no feed the browser can read but
@@ -2115,7 +2116,11 @@ def record_finals(out, today, pages, links=None):
                     result = box_result(g, box["score"]["H"], box["score"]["V"], box["sides"], box["lines"])
                 elif box:
                     snap = snapshot(g, box)
-            if not result and link and is_over(g, today):
+            # A schedule page that posts the final score has a finished box score behind it. UW-Oshkosh vs Calvin
+            # at UW-Platteville, 2026-11-21: both pages posted 67-58 by 22:28 UTC, but the host's feed had moved to
+            # its next game, and the box score waited for BOX_PAGE_AFTER (23:00), so Sammi Beyer's second game in a
+            # row with no minutes reached the page an hour late.
+            if not result and link and (posted or is_over(g, today)):
                 result = read_box_page(g, link)
         except FETCH_ERRORS as exc:
             errors.append(f'{g["away"]} at {g["home"]} box score: {exc}')
