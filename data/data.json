@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-21T23:53:07+00:00",
+ "fetched_at": "2026-11-22T00:21:18+00:00",
  "errors": [
+  "Millsaps at MUW feed: IncompleteRead(16034 bytes read, 288931 more expected)",
+  "Central at UW-Platteville feed: IncompleteRead(16033 bytes read, 245789 more expected)",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
