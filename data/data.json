@@ -1,8 +1,7 @@
 {
- "fetched_at": "2026-11-22T11:17:49+00:00",
+ "fetched_at": "2026-11-22T13:08:18+00:00",
  "errors": [
   "Concordia (WI) schedule: HTTP Error 500: Internal Server Error",
-  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com",
   "Wellesley at Hunter box score: WAF challenge from d3hoops.com"
  ],
@@ -435,7 +434,7 @@
   "2026-11-17": 44,
   "2026-11-18": 71,
   "2026-11-19": 20,
-  "2026-11-20": 58,
+  "2026-11-20": 56,
   "2026-11-21": 141,
   "2026-11-22": 18,
   "2026-11-23": 13,
