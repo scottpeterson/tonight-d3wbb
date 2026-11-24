@@ -1,6 +1,7 @@
 {
- "fetched_at": "2026-11-24T06:35:14+00:00",
+ "fetched_at": "2026-11-24T07:16:00+00:00",
  "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
@@ -524,6 +525,7 @@
   "2026-10-27": 1
  },
  "notes": [
-  "McMurry at Hendrix 2026-11-24: neither schedule page lists a game that day, left out"
+  "McMurry at Hendrix 2026-11-24: neither schedule page lists a game that day, left out",
+  "Randolph at Meredith 2026-11-25: neither schedule page lists a game that day, left out"
  ]
 }
