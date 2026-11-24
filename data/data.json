@@ -1,6 +1,7 @@
 {
- "fetched_at": "2026-11-24T09:34:12+00:00",
+ "fetched_at": "2026-11-24T11:24:58+00:00",
  "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
