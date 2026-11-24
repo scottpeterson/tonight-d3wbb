@@ -1109,6 +1109,9 @@ async function refreshSlate(){
     // A feed this page has seen the game on stays, even when the slate still names the host's other court.
     ['feed','link','alt_feeds'].forEach(k=>{if(x[k]&&!g.st.seen)g[k]=x[k];});
     ['boxscore','snapshot'].forEach(k=>{if(x[k])g[k]=x[k];});
+    // A tipoff the fetcher learned after this page loaded (Capital at Wooster went from TBA to 6 PM on 2026-11-24)
+    // replaces "Time TBA" without a reload. The fetcher never clears a known tip, so only a set tip is copied.
+    if(x.tip&&x.tip!==g.tip){g.tip=x.tip;g.tbd=false;}
     if(x.off&&!g.off){g.off=x.off;g.st=initState(g);g.st.nextAt=null;}
     if(x.final){
       Object.assign(g,{final:x.final,box_read:x.box_read,top_lines:x.top_lines||[],newcomer_games:x.newcomer_games||[],sat:x.sat||[]});
