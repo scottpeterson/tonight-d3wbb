@@ -551,6 +551,7 @@ HOW = f"""<dl class="terms">
 <li>A tournament host runs one Sidearm feed per court. If a feed shows another game after tipoff, the page also tries the host's other feeds and every other feed the schedule pages gave.</li>
 <li>A feed that does not show its game yet gets a look every 5 minutes for 45 minutes after tipoff, whatever the game's interest. If it still does not show the game, the page stops checking and the game shows "no live stats".</li>
 <li>A game whose stats link goes to StatBroadcast, which the page cannot read, shows "stats on StatBroadcast" from the start. The team names link to that page.</li>
+<li>A game whose only stats link is a Presto box score page, which the page cannot read, shows "stats on Presto" until its score arrives from the next update. The team names link to that page.</li>
 </ul>
 </dd>
 <dt>Colors</dt><dd>
@@ -751,6 +752,10 @@ function canBeFinal(g){const t=tipMs(g);return t?Date.now()>=t+FINAL_EARLIEST_MS
 function statsLabel(g,st){
   if(st.seen||st.final||st.ended||st.snap||g.off)return null;
   if(/statbroadcast\.com/i.test(g.link||''))return 'stats on StatBroadcast';
+  // A Presto box score page (or a Presto short link the Mac has not resolved yet) has no CORS, so the browser cannot
+  // read it; its score arrives as a snapshot from the Mac's run, which clears this label. A Presto game with a
+  // prestolivestats.com feed has g.feed and is read live, so it never gets here.
+  if(!g.feed&&/\/sports\/wbkb\/[^/]+\/boxscores\/|^https?:\/\/[^/]+\/links\/[A-Za-z0-9]+\/?$/i.test(g.link||''))return 'stats on Presto';
   return !g.feed||st.noStats?'no live stats':null;
 }
 function nextCheck(g,st,now){

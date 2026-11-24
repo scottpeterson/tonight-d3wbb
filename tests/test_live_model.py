@@ -498,6 +498,17 @@ def test_a_statbroadcast_link_is_labeled_from_the_start_and_an_unseen_feed_after
     assert run(f"statsLabel({json.dumps(dict(GAME, feed=None))},{{snap:{{home:1,away:0}}}})") is None
 
 
+def test_a_presto_box_score_link_without_a_feed_says_stats_on_presto():
+    box = json.dumps(dict(GAME, feed=None, link="https://blufftonbeavers.com/sports/wbkb/2026-27/boxscores/20261124_ft9y.xml"))
+    assert run(f"statsLabel({box},{{}})") == "stats on Presto"
+    assert run(f"statsLabel({box},{{snap:{{home:1,away:0}}}})") is None
+    short = json.dumps(dict(GAME, feed=None, link="https://gocobbers.com/links/rsensu"))
+    assert run(f"statsLabel({short},{{}})") == "stats on Presto"
+    # A Presto game with a prestolivestats.com feed is read live, so its link does not set the label.
+    fed = json.dumps(dict(GAME, link="https://blufftonbeavers.com/sports/wbkb/2026-27/boxscores/20261124_ft9y.xml"))
+    assert run(f"statsLabel({fed},{{}})") is None
+
+
 def test_a_reload_keeps_the_last_live_score_and_a_moved_on_feed_then_means_final_pending():
     # The browser's own last read is newer than the slate's snapshot, so it wins; the game stays in the Live group.
     now = "new Date().toISOString()"
