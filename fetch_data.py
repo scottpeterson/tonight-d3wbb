@@ -89,7 +89,10 @@ TODAY = os.environ.get("TONIGHT_TODAY")
 ZONES = {"ET": "America/New_York", "EST": "America/New_York", "EDT": "America/New_York",
          "CT": "America/Chicago", "CST": "America/Chicago", "CDT": "America/Chicago",
          "MT": "America/Denver", "MST": "America/Denver", "MDT": "America/Denver",
-         "PT": "America/Los_Angeles", "PST": "America/Los_Angeles", "PDT": "America/Los_Angeles"}
+         "PT": "America/Los_Angeles", "PST": "America/Los_Angeles", "PDT": "America/Los_Angeles",
+         # Some pages spell the zone out: Hope's "5:00 PM Central" for its game at Carthage (2026-11-24).
+         "EASTERN": "America/New_York", "CENTRAL": "America/Chicago", "MOUNTAIN": "America/Denver",
+         "PACIFIC": "America/Los_Angeles"}
 MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 SEASON_START_YEAR = 2026
 SLATE_DAYS_AHEAD = 1  # today and tomorrow
@@ -355,7 +358,9 @@ def parse_month_day(label):
 
 def parse_time(label, home_tz):
     """'7 PM (CT)', '7:30 PM EST', '12 PM' -> (hour, minute, zone). None when the time is TBA."""
-    m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*([AP])\.?M\.?(?:\s*\(?([A-Z]{2,3})\)?)?", label or "", re.I)
+    # Full zone names come first in the alternation: with re.I, [A-Z]{2,3} alone reads "Central" as "Cen".
+    m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*([AP])\.?M\.?(?:\s*\(?(Eastern|Central|Mountain|Pacific|[A-Z]{2,3})\b\)?)?",
+                  label or "", re.I)
     if not m:
         return None
     hour = int(m.group(1)) % 12 + (12 if m.group(3).upper() == "P" else 0)
@@ -454,9 +459,14 @@ def sidearm_rows(url, tz):
         note_m = re.search(r'sidearm-schedule-game-tournament[^>]*>(.*?)</div>', b, re.S)
         # "Exhibition" and "Scrimmage" sometimes sit in the promotion line instead.
         promo_m = re.search(r'sidearm-schedule-game-promotion-name[^>]*>(.*?)</span>', b, re.S)
+        # The list layout puts the date and the time in sibling spans with a "/" span between them
+        # (Wooster, Hope, Carthage, Capital, 2026-11-24), so the date region's second span is the "/"; read the time
+        # from its own element and keep the second span for pages without one.
+        time_m = re.search(r'sidearm-schedule-game-time[^>]*>(.*?)</span>', b, re.S)
+        label = text(time_m.group(1)) if time_m else (spans[1] if len(spans) > 1 else "")
         day = parse_month_day(spans[0] if spans else "")
         if day:
-            out.append(row(day, parse_time(spans[1] if len(spans) > 1 else "", tz), "sidearm-schedule-home-game" in cls,
+            out.append(row(day, parse_time(label, tz), "sidearm-schedule-home-game" in cls,
                            "sidearm-schedule-neutral-game" in cls, text(opp_m.group(1)) if opp_m else "", links_in(b, url),
                            text(result_m.group(1)) if result_m else "", " ".join(text(m.group(1)) for m in (note_m, promo_m) if m),
                            opponent_link(opp_m.group(1)) if opp_m else ""))

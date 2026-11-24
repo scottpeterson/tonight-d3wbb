@@ -25,6 +25,9 @@ def rows_from(monkeypatch, reader, fixture, url, tz):
     ("6:00 P.M.", (18, 0, "America/Chicago")),
     ("12 PM (PT)", (12, 0, "America/Los_Angeles")),
     ("12:15 AM", (0, 15, "America/Chicago")),
+    ("5:00 PM Central", (17, 0, "America/Chicago")),
+    ("7 PM Eastern", (19, 0, "America/New_York")),
+    ("5 p.m.", (17, 0, "America/Chicago")),
     ("TBA", None),
 ])
 def test_parse_time(label, expected):
@@ -51,6 +54,8 @@ def test_sidearm_list_page(monkeypatch):
     first = rows[0]
     assert first["day"] == date(2026, 11, 6)
     assert first["home"] and not first["neutral"]
+    # The time sits in its own span after a "/" span, outside the date span.
+    assert first["time"] == (17, 30, "America/New_York")
     assert first["opponent"] == "University of Wisconsin-Platteville"
     assert first["links"]["live_stats"] == "https://athletics.hope.edu/sidearmstats/wbball/summary"
     assert first["links"]["video"] == "https://youtube.com/hopeathletics"
