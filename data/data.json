@@ -1,6 +1,9 @@
 {
- "fetched_at": "2026-11-25T02:55:29+00:00",
+ "fetched_at": "2026-11-25T03:04:19+00:00",
  "errors": [
+  "Minnesota Morris at Pacific Lutheran feed: Remote end closed connection without response",
+  "Yeshiva at Purchase feed: Remote end closed connection without response",
+  "St. Joseph's Brooklyn at Sarah Lawrence feed: Remote end closed connection without response",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
