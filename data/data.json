@@ -1,10 +1,6 @@
 {
- "fetched_at": "2026-11-25T01:15:58+00:00",
+ "fetched_at": "2026-11-25T01:24:14+00:00",
  "errors": [
-  "St. Norbert at UW-Eau Claire feed: Remote end closed connection without response",
-  "Macalester at UW-Superior feed: Remote end closed connection without response",
-  "Blackburn at Webster feed: Remote end closed connection without response",
-  "Wentworth at Wellesley feed: Remote end closed connection without response",
   "Hunter at VTSU Castleton box score: WAF challenge from d3hoops.com"
  ],
  "stale": {},
