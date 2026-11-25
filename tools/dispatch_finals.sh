@@ -1,11 +1,11 @@
 #!/bin/bash
-# Start the site's update runs on GitHub Actions from the Mac. launchd runs this every 10 minutes
+# Start the site's update runs on GitHub Actions from the Mac. launchd runs this every 5 minutes
 # (com.scottpeterson.tonight-d3wbb-finals). GitHub's own cron starts hours late or not at all on busy days
 # (the 6 a.m. Eastern run never started on 2026-11-07), and a dispatched run starts within seconds.
 #
 # - A full run (slates for today and tomorrow) once in each of the workflow's daily hours: 11, 17, and 21 UTC,
 #   plus 7 UTC from November to March. A marker file keeps it to one per hour.
-# - A finals pass every 10 minutes from 23:00 to 05:59 UTC, November to March, the game-night window, and at any
+# - A finals pass every 5 minutes from 23:00 to 05:59 UTC, November to March, the game-night window, and at any
 #   other time while a game in the live slates tipped off 30 minutes to 4 hours ago and has no final yet
 #   (Saturday afternoon tournaments, 2026-11-07).
 # - Before each run, the runner clone (~/projects/tonight-d3wbb-runner) reads the Presto pages that Presto's
@@ -87,16 +87,32 @@ push_cache() {
 # The Mac's copy of the Presto pages that Presto's CloudFront refuses GitHub's runners. Two passes, so no game in
 # progress goes more than 18 minutes between updates (Scott, 2026-11-24): the live pass reads only the box scores
 # of games under way (up to 20 requests, about 3 minutes), pushes, and dispatches the run at once; the full pass
-# then reads the schedule pages (up to 30 requests, 5 minutes) and pushes for the next run. Worst case for a live
-# game: 10 minutes to the next cycle, 3 for the live pass, about 3 for the run and the Pages deploy.
+# then reads the schedule pages (up to 20 requests, 3.5 minutes) and pushes for the next run. Worst case for a live
+# game: 3 minutes of live pass, 3.5 of full pass, 5 to the next start, 3 more of live pass, and about 3 for the
+# run and the Pages deploy, about 17.5 minutes; a cycle without the full pass takes about 14.
+#
+# launchd starts this every 5 minutes, but it counts the interval from the end of the last run, so a run that
+# took 8.5 minutes made an 18.5-minute cycle (2026-11-24). The full pass therefore runs only when the last one
+# ended 15 or more minutes ago, and the lock directory skips a start while a run is still going.
+LOCK="$(dirname "$0")/../logs/dispatch.lock"
+FULL_MARK="$(dirname "$0")/../logs/last_presto_full"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +30)" ]; then rmdir "$LOCK"; mkdir "$LOCK"; else exit 0; fi
+fi
+trap 'rmdir "$LOCK"' EXIT
 if [ -d "$RUNNER/.git" ]; then
+  FULL_MARK="$(cd "$(dirname "$FULL_MARK")" && pwd)/$(basename "$FULL_MARK")"
   cd "$RUNNER" || exit 1
   git pull -q --rebase origin main || { echo "$(date -u '+%F %T') runner clone: pull failed"; exit 1; }
   "$UV" run --quiet --with beautifulsoup4 python3 fetch_data.py --presto-live 2>&1 | tail -3
   push_cache " (live)"
   dispatch
-  "$UV" run --quiet --with beautifulsoup4 python3 fetch_data.py --presto 2>&1 | tail -3
-  push_cache ""
+  last_full=$(cat "$FULL_MARK" 2>/dev/null || echo 0)
+  if [ $(( $(date +%s) - last_full )) -ge 900 ]; then
+    "$UV" run --quiet --with beautifulsoup4 python3 fetch_data.py --presto 2>&1 | tail -3
+    push_cache ""
+    date +%s > "$FULL_MARK"
+  fi
 else
   dispatch
 fi

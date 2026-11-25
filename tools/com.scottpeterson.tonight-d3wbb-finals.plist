@@ -10,7 +10,7 @@
         <string>/Users/scottpeterson/projects/tonight-d3wbb/tools/dispatch_finals.sh</string>
     </array>
     <key>StartInterval</key>
-    <integer>600</integer>
+    <integer>300</integer>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>

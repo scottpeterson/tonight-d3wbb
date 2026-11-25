@@ -72,7 +72,7 @@ PRESTO_CACHE = DATA / "presto_cache.json"
 PRESTO_CACHE_LIVE = timedelta(hours=2)
 PRESTO_LIVE_BUDGET = 20  # requests in the live pass (`--presto-live`): box scores of games under way only
 PRESTO_PACE = 10  # seconds between Presto requests: about six a minute from one address trip the WAF challenge
-PRESTO_BUDGET = 30  # Presto requests in the full pass; with the live pass first, a run ends inside the dispatcher's 10-minute cycle  # a cached in-progress box score older than this is no snapshot
+PRESTO_BUDGET = 20  # Presto requests in the full pass, which runs every 15 minutes after the live pass (tools/dispatch_finals.sh)  # a cached in-progress box score older than this is no snapshot
 MEMBERS = DATA / "ncaa_members.csv"
 SITE = json.loads((BASE / "site.json").read_text())
 # The bare domain: ESPN answers 403 to this user agent when it names www.tonightind3wbb.com.
