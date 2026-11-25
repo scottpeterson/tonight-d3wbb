@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-25T20:58:56+00:00",
- "errors": [],
+ "fetched_at": "2026-11-25T21:04:04+00:00",
+ "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed"
+ ],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
