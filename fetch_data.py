@@ -70,8 +70,9 @@ EXTRA = DATA / "extra_games.json"
 # The Mac's copy of what Presto sites refuse the runner; tools/dispatch_finals.sh runs `fetch_data.py --presto` to write it.
 PRESTO_CACHE = DATA / "presto_cache.json"
 PRESTO_CACHE_LIVE = timedelta(hours=2)
+PRESTO_LIVE_BUDGET = 20  # requests in the live pass (`--presto-live`): box scores of games under way only
 PRESTO_PACE = 10  # seconds between Presto requests: about six a minute from one address trip the WAF challenge
-PRESTO_BUDGET = 45  # Presto requests per Mac run, so a run ends inside the dispatcher's 20-minute cycle  # a cached in-progress box score older than this is no snapshot
+PRESTO_BUDGET = 30  # Presto requests in the full pass; with the live pass first, a run ends inside the dispatcher's 10-minute cycle  # a cached in-progress box score older than this is no snapshot
 MEMBERS = DATA / "ncaa_members.csv"
 SITE = json.loads((BASE / "site.json").read_text())
 # The bare domain: ESPN answers 403 to this user agent when it names www.tonightind3wbb.com.
@@ -707,7 +708,7 @@ def cached_box(url):
     return entry["box"]
 
 
-def presto_snapshot(previous=None):
+def presto_snapshot(previous=None, live_only=False):
     """The Mac's run (`fetch_data.py --presto`): read Presto pages one at a time, PRESTO_PACE seconds apart, and
     write data/presto_cache.json for the runner, which Presto's CloudFront refuses. Order, up to PRESTO_BUDGET
     requests: the box score pages already known for games past tipoff, the schedule pages of Presto schools with a
@@ -716,7 +717,12 @@ def presto_snapshot(previous=None):
     PRESTO_BUDGET Presto schools in the window, and the schedule pages used up every request before any live box
     score (2026-11-21: one of today's box scores read by 18:41 UTC). A game before tipoff has no box score to read.
     A page that fails or comes back empty keeps its last copy. Twelve parallel reads tripped the WAF challenge on
-    every box score page (2026-11-08)."""
+    every box score page (2026-11-08).
+
+    With live_only (`--presto-live`), the run reads only the box scores of games past tipoff, up to
+    PRESTO_LIVE_BUDGET requests, and writes the cache at once. The dispatcher publishes that before it reads the
+    schedule pages, because a full run took 8 minutes and Presto scores reached the site 29 minutes old
+    (2026-11-24). Scott set the limit: no game in progress goes more than 18 minutes between updates."""
     out = {"fetched_at": now().isoformat(timespec="seconds"), "errors": []}
     schools = load_schools()
     extra = read_json(EXTRA, {"schools": {}})
@@ -738,12 +744,13 @@ def presto_snapshot(previous=None):
 
     pages = dict(old.get("pages", {}))
     boxes = dict(old.get("boxes", {}))
-    budget = [PRESTO_BUDGET]
+    limit = PRESTO_LIVE_BUDGET if live_only else PRESTO_BUDGET
+    budget = [limit]
 
     def paced(fn, *args):
         if budget[0] <= 0:
             return
-        if budget[0] < PRESTO_BUDGET:
+        if budget[0] < limit:
             time.sleep(PRESTO_PACE)
         budget[0] -= 1
         fn(*args)
@@ -767,7 +774,7 @@ def presto_snapshot(previous=None):
             out["errors"].append(f"{url}: {exc}")
             return
         if box:
-            boxes[url] = {"at": out["fetched_at"], "box": box}
+            boxes[url] = {"at": now().isoformat(timespec="seconds"), "box": box}
         else:
             live = pt3_source(page, url)
             if live:
@@ -780,7 +787,7 @@ def presto_snapshot(previous=None):
             out["errors"].append(f"{live}: {exc}")
             return
         if box["sides"]:
-            boxes[url] = {"at": out["fetched_at"], "box": box}
+            boxes[url] = {"at": now().isoformat(timespec="seconds"), "box": box}
 
     links = dict(old.get("links", {}))
     done = set()
@@ -793,7 +800,11 @@ def presto_snapshot(previous=None):
             link, _ = box_link(g, rows)
             candidates = [link, g.get("boxscore"), g.get("link"), *stats_links(g)]
             urls.update(u for u in (links.get(c, c) for c in candidates) if presto_box_date(u))
-        for url in sorted(urls - done, key=lambda u: (presto_box_date(u) != today, u)):
+        # The full pass skips a box score the live pass read in the last 5 minutes, so its budget goes to the
+        # schedule pages.
+        fresh = {u for u in urls if not live_only and u in boxes
+                 and now() - datetime.fromisoformat(boxes[u]["at"]) < timedelta(minutes=5)}
+        for url in sorted(urls - done - fresh, key=lambda u: (presto_box_date(u) != today, u)):
             done.add(url)
             paced(read, url)
         while followups:
@@ -803,6 +814,10 @@ def presto_snapshot(previous=None):
         return [r["links"].get("live_stats") for t in (g["home"], g["away"]) for r in pages.get(t, []) if r.get("day") == g["date"]]
 
     read_boxes()
+    if live_only:
+        PRESTO_CACHE.write_text(json.dumps({"fetched_at": out["fetched_at"], "pages": pages, "boxes": boxes, "links": links}, separators=(",", ":")))
+        out["pages"], out["boxes"], out["requests"] = len(pages), len(boxes), limit - budget[0]
+        return out
     for team in playing:
         paced(load, team)
 
@@ -828,7 +843,7 @@ def presto_snapshot(previous=None):
         paced(load, team)
 
     PRESTO_CACHE.write_text(json.dumps({"fetched_at": out["fetched_at"], "pages": pages, "boxes": boxes, "links": links}, separators=(",", ":")))
-    out["pages"], out["boxes"], out["requests"] = len(pages), len(boxes), PRESTO_BUDGET - budget[0]
+    out["pages"], out["boxes"], out["requests"] = len(pages), len(boxes), limit - budget[0]
     return out
 
 
@@ -2305,8 +2320,8 @@ def collect(previous):
 
 def main():
     DATA.mkdir(exist_ok=True)
-    if "--presto" in sys.argv[1:]:
-        out = presto_snapshot()
+    if "--presto" in sys.argv[1:] or "--presto-live" in sys.argv[1:]:
+        out = presto_snapshot(live_only="--presto-live" in sys.argv[1:])
         print(f"[{now():%Y-%m-%d %H:%M} UTC] wrote {PRESTO_CACHE.relative_to(BASE)}: {out['pages']} schedule pages, {out['boxes']} box scores, {out['requests']} requests")
     else:
         previous = read_json(OUT, {})

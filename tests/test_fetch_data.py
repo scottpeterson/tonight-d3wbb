@@ -1463,6 +1463,18 @@ def test_presto_snapshot_resolves_the_short_links_of_games_in_the_window_once(mo
     monkeypatch.setattr(f, "_presto_cache", None)
     assert f.unshorten(SHORT) == SHORT_TARGET and f.cached_box(SHORT_TARGET)["complete"] is True
     seen.clear()
+    # The box score is under 5 minutes old, so the full pass reads only the schedule page (2026-11-24).
+    assert f.presto_snapshot()["requests"] == 1 and seen == []
+    # The live pass reads the box score of a game under way and nothing else.
+    seen.clear()
+    out = f.presto_snapshot(live_only=True)
+    assert out["requests"] == 1 and seen == [SHORT_TARGET]
+    # An hour later the full pass reads the box score again.
+    cache = json.loads((tmp_path / "presto_cache.json").read_text())
+    cache["boxes"][SHORT_TARGET]["at"] = "2026-11-11T00:00:00+00:00"
+    (tmp_path / "presto_cache.json").write_text(json.dumps(cache))
+    monkeypatch.setattr(f, "_presto_cache", None)
+    seen.clear()
     assert f.presto_snapshot()["requests"] == 2 and seen == [SHORT_TARGET]
 
 
