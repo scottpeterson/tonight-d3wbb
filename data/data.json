@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-26T02:20:42+00:00",
- "errors": [],
+ "fetched_at": "2026-11-26T02:25:54+00:00",
+ "errors": [
+  "Mary Hardin-Baylor at George Fox feed: IncompleteRead(16033 bytes read, 219574 more expected)"
+ ],
  "stale": {},
  "conferences": {
   "NYU": "UAA",
