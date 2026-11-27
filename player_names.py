@@ -1,8 +1,8 @@
 """Map a box score line to the roster player it belongs to.
 
-The roster name is canonical. A box score or play-by-play spelling that differs maps to it ("Judith Vila Marti"
-is "Judith Vila", "Jean Sierra" is "Sierra Jean", "B. BATCHELOR" is "Brooke Batchelor"), and a name the roster
-lacks stands as written until the roster lists it. fetch_data.py and build_site.py share this module.
+The roster name is canonical. A box score or play-by-play spelling that differs maps to it. So "Judith Vila
+Marti" is "Judith Vila", "Jean Sierra" is "Sierra Jean", and "B. BATCHELOR" is "Brooke Batchelor". A name that
+the roster lacks stays as written until the roster lists it. fetch_data.py and build_site.py share this module.
 """
 import re
 
@@ -18,8 +18,10 @@ def words(name):
 
 
 def line_words(line):
-    """A box line's name words when the feed gives a first name: from first and last, 'Last, First', or
-    'First Last'. [] when it gives an initial ('F. Last'), which match_player handles by initial and last name."""
+    """A box line's name words when the feed gives a first name. The words come from first and last, 'Last, First',
+    or 'First Last'. [] when it gives an initial ('F. Last'). match_player handles that case by initial and last
+    name.
+    """
     if line.get("first") and line.get("last"):
         return words(f'{line["first"]} {line["last"]}')
     abbr = str(line.get("abbr") or "")
@@ -32,9 +34,10 @@ def line_words(line):
 
 
 def match_player(line, roster):
-    """The roster player a box line belongs to, or None. In order: the same full name; the same words in another
-    order; one name's words inside the other's (both at least two words); the first initial plus the last name.
-    Each step counts only when exactly one roster player fits."""
+    """The roster player a box line belongs to, or None. In order: the same full name. The same words in another
+    order. One name's words inside the other's (both at least two words). Last, a match on the first initial and
+    the last name. Each step counts only when exactly one roster player fits.
+    """
     found = line_words(line)
     if found:
         full = "".join(found)

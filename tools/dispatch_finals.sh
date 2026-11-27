@@ -1,15 +1,15 @@
 #!/bin/bash
 # Start the site's update runs on GitHub Actions from the Mac. launchd runs this every 5 minutes
-# (com.scottpeterson.tonight-d3wbb-finals). GitHub's own cron starts hours late or not at all on busy days
-# (the 6 a.m. Eastern run never started on 2026-11-07), and a dispatched run starts within seconds.
+# (com.scottpeterson.tonight-d3wbb-finals). On busy days GitHub's own cron starts hours late or not at all.
+# The 6 a.m. Eastern run never started on 2026-11-07. A dispatched run starts within seconds.
 #
-# - A full run (slates for today and tomorrow) once in each of the workflow's daily hours: 11, 17, and 21 UTC,
-#   plus 7 UTC from November to March. A marker file keeps it to one per hour.
-# - A finals pass every 5 minutes from 23:00 to 05:59 UTC, November to March, the game-night window, and at any
-#   other time while a game in the live slates tipped off 30 minutes to 4 hours ago and has no final yet
-#   (Saturday afternoon tournaments, 2026-11-07).
+# - A full run (slates for today and tomorrow) once in each of the workflow's daily hours. The hours are 11, 17,
+#   and 21 UTC, plus 7 UTC from November to March. A marker file keeps it to one per hour.
+# - A finals pass every 5 minutes from 23:00 to 05:59 UTC, November to March. That is the game-night window.
+# - A finals pass at other times while a game in the live slates is 30 minutes to 4 hours past tipoff without a
+#   final. Saturday afternoon tournaments need it (2026-11-07).
 # - Before each run, the runner clone (~/projects/tonight-d3wbb-runner) reads the Presto pages that Presto's
-#   CloudFront refuses GitHub's runners (`fetch_data.py --presto`) and pushes data/presto_cache.json.
+#   CloudFront refuses to GitHub's runners (`fetch_data.py --presto`). Then it pushes data/presto_cache.json.
 set -u
 GH=/opt/homebrew/bin/gh
 UV=/Users/scottpeterson/.local/bin/uv
@@ -21,8 +21,8 @@ month=$((10#$(date -u +%m)))
 season=0
 case $month in 11|12|1|2|3) season=1 ;; esac
 
-# 0 when a game in today's or yesterday's live slate (Eastern dates) tipped off 30 minutes to 4 hours ago
-# with no final and no postponement.
+# Exit 0 when a game in today's or yesterday's live slate (Eastern dates) tipped off 30 minutes to 4 hours ago.
+# The game must also lack a final and a postponement.
 games_pending() {
   /usr/bin/python3 - <<'PY'
 import datetime, json, sys, urllib.request
@@ -57,9 +57,9 @@ if [ -z "$mode" ] && [ $season = 1 ]; then
 fi
 [ -z "$mode" ] && exit 0
 
-# The workflow takes one run at a time. A queued run checks out the repo when it starts, so it already gets the
-# cache pushed below; only then is a new dispatch redundant. A run in progress does not block the Presto reads or
-# the dispatch: until 2026-11-24 it skipped the whole cycle, and Presto scores reached the site 29 minutes old.
+# The workflow takes one run at a time. A queued run runs git checkout when it starts, so it already gets the
+# cache pushed below. Only then is a new dispatch redundant. A run in progress does not block the Presto reads or
+# the dispatch. Until 2026-11-24 it skipped the whole cycle. Presto scores then reached the site 29 minutes old.
 queued() {
   n=$("$GH" run list -R "$REPO" --workflow update.yml --limit 5 --json status \
     -q '[.[] | select(.status == "queued" or .status == "pending" or .status == "waiting")] | length')
@@ -84,16 +84,20 @@ push_cache() {
   fi
 }
 
-# The Mac's copy of the Presto pages that Presto's CloudFront refuses GitHub's runners. Two passes, so no game in
-# progress goes more than 18 minutes between updates (Scott, 2026-11-24): the live pass reads only the box scores
-# of games under way (up to 20 requests, about 3 minutes), pushes, and dispatches the run at once; the full pass
-# then reads the schedule pages (up to 20 requests, 3.5 minutes) and pushes for the next run. Worst case for a live
-# game: 3 minutes of live pass, 3.5 of full pass, 5 to the next start, 3 more of live pass, and about 3 for the
-# run and the Pages deploy, about 17.5 minutes; a cycle without the full pass takes about 14.
+# The Mac's copy of the Presto pages that Presto's CloudFront refuses to GitHub's runners. With two passes, no game
+# in progress goes more than 18 minutes between updates (Scott, 2026-11-24).
 #
-# launchd starts this every 5 minutes, but it counts the interval from the end of the last run, so a run that
-# took 8.5 minutes made an 18.5-minute cycle (2026-11-24). The full pass therefore runs only when the last one
-# ended 15 or more minutes ago, and the lock directory skips a start while a run is still going.
+# - The live pass reads only the box scores of games under way (up to 20 requests, about 3 minutes). It pushes and
+#   dispatches the run at once.
+# - The full pass then reads the schedule pages (up to 20 requests, 3.5 minutes). It pushes for the next run.
+#
+# The worst case for a live game is about 17.5 minutes. That is 3 minutes of live pass, 3.5 of full pass, and 5 to
+# the next start. Then come 3 more of live pass and about 3 for the run and the Pages deploy. A cycle without the
+# full pass takes about 14.
+#
+# launchd starts this every 5 minutes, but it counts the interval from the end of the last run. So a run that took
+# 8.5 minutes made an 18.5-minute cycle (2026-11-24). The full pass therefore runs only when the last one ended at
+# least 15 minutes ago. The lock directory skips a start while a run is still going.
 LOCK="$(dirname "$0")/../logs/dispatch.lock"
 FULL_MARK="$(dirname "$0")/../logs/last_presto_full"
 if ! mkdir "$LOCK" 2>/dev/null; then

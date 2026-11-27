@@ -49,9 +49,10 @@ DEAD = dict(GAME, home_rank=350, away_rank=360, home_lev=0, away_lev=0, home_tou
 
 
 def test_win_chance_at_tipoff_uses_the_pregame_margin():
-    # The line is a prior worth one game of evidence, so at tipoff the chance is phi(margin / sqrt(2) / SD).
+    # The line is a prior worth one game of evidence. So at tipoff, with the standard deviation (SD), the
+    # chance is phi(margin / sqrt(2) / SD).
     assert run(f"winProb({json.dumps(GAME)},0,0)") == pytest.approx(0.571, abs=0.002)
-    # #2 NYU (35.5-point line) up one after a quarter: 97%, not the 99.8% a certain line gives (2026-11-08).
+    # #2 NYU (35.5-point line) up one after a quarter: 97%. A certain line would give 99.8% (2026-11-08).
     nyu = json.dumps(dict(GAME, pregame_margin=35.5, pregame_wp=0.999))
     assert run(f"winProb({nyu},1,0.25)") == pytest.approx(0.971, abs=0.003)
     assert run(f"winProb({nyu},1,0.75)") < run(f"winProb({nyu},1,0.25)")
@@ -71,7 +72,8 @@ def test_interest_ranks_close_elite_game_above_blowout_and_dead_game():
 
 
 def test_interest_lifts_a_close_finish_between_good_teams_only():
-    # 2026-11-18: #159 Bethany Lutheran trailed #30 St. Mary's (MN) 67-65 with 3:07 left and ranked under games that had just started.
+    # 2026-11-18: #159 Bethany Lutheran trailed #30 St. Mary's (MN) 67-65 with 3:07 left. It ranked under games in their first
+    # minutes.
     bl = dict(GAME, home_rank=159, away_rank=30, pregame_wp=0.293, pregame_margin=-6.0, home_lev=4.76, away_lev=17.65)
     late = lambda g, score, left: run(f"(()=>{{const g={json.dumps(g)},P=1-{left}/2400;return interest(g,{{progress:P,wp:winProb(g,{score[0] - score[1]},P),score:{json.dumps(score)}}})}})()")
     close = late(bl, [65, 67], 187)
@@ -141,7 +143,7 @@ def test_line_rank_reads_the_players_team():
     g = "{home:'NYU',away:'Brandeis',home_rank:12,away_rank:250}"
     assert run(f"lineRank({{team:'NYU',game:{g}}})") == 12
     assert run(f"lineRank({{team:'Brandeis',game:{g}}})") == 250
-    # A Division I opponent has no rank, so every cut leaves it out.
+    # A Division I opponent has no rank, so every cut omits it.
     assert run("lineRank({team:'Army',game:{home:'Army',away:'NYU',home_rank:null,away_rank:12}})===Infinity") is True
 
 
@@ -149,9 +151,9 @@ def test_tags_mark_upsets_close_games_and_dead_games():
     g = json.dumps(dict(GAME, pregame_wp=0.9))
     upset = run(f"tags({g},{{live:true,wp:0.45}})")
     assert "upset alert" in upset and "close" in upset
-    # Decided needs the model (line and score) past 98% and the score and clock alone under a 20% comeback chance:
-    # a one-point game after a quarter stays open however lopsided the line, a 10-point halftime lead for a heavy
-    # favorite does not.
+    # Decided needs the model (line and score) past 98%. It also needs the score and clock alone to give under a
+    # 20% comeback chance. So a one-point game after a quarter stays open however lopsided the line. A heavy
+    # favorite's 10-point halftime lead is decided.
     assert "decided" not in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995,score:[21,20],progress:0.25}})")
     assert "decided" in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995,score:[45,35],progress:0.5}})")
     assert "decided" in run(f"tags({json.dumps(GAME)},{{live:true,wp:0.995,score:[70,50],progress:0.875}})")
@@ -297,8 +299,9 @@ STORE = ("(()=>{const m={};globalThis.KEY='t';globalThis.localStorage={getItem:k
 
 
 def test_two_top_25_teams_with_high_leverage_outrank_a_closer_mid_table_game():
-    # 2026-11-07: Concordia (MN) at Wartburg (22 at 13, leverage 23.21 and 4.43, home win probability 0.68) ranked below
-    # RIT at Rochester (39 at 54, leverage 10.31 and 12.93, 0.55) while quality was linear in rank.
+    # 2026-11-07: while quality was linear in rank, Concordia (MN) at Wartburg ranked below RIT at Rochester. Concordia
+    # at Wartburg was 22 at 13, with leverage 23.21 and 4.43 and home win probability 0.68. RIT at Rochester was 39 at
+    # 54, with leverage 10.31 and 12.93 and 0.55.
     wartburg = dict(GAME, home="Wartburg", away="Concordia (MN)", home_rank=13, away_rank=22, pregame_wp=0.68,
                     home_lev=4.43, away_lev=23.21, home_tourn=0.97, away_tourn=0.515)
     rochester = dict(GAME, home="Rochester", away="RIT", home_rank=54, away_rank=39, pregame_wp=0.55,
@@ -319,7 +322,7 @@ def test_a_final_read_from_the_feed_survives_a_reload():
 
 
 def test_no_final_counts_before_the_game_can_have_ended():
-    # UW-Stevens Point vs St. Scholastica, 2026-11-07: the slate carried a final from a 2026-10-27 build. A slate
+    # UW-Stevens Point vs St. Scholastica, 2026-11-07: the slate had a final from a 2026-10-27 build. A slate
     # final, a remembered final, and a feed read showing a complete game all wait until 45 minutes after tipoff.
     g = json.dumps(dict(GAME, id="2099-01-01-a-at-b", date="2099-01-01", tip="2099-01-01T19:00:00Z", final=[64, 53]))
     st = run(f"[{STORE},remember('2099-01-01-a-at-b',[64,53],'Final'),initState({g})][2]")
@@ -414,14 +417,14 @@ def test_a_close_upset_between_mid_table_teams_scores_below_a_close_game_between
               home_tourn=0.5, away_tourn=0.4, pregame_wp=0.55, pregame_margin=1.5)
     assert 30 < final_score(albright, [58, 57]) < 42
     assert final_score(albright, [58, 57]) < final_score(wj, [65, 59])
-    # The gate leaves a top game nearly where it was.
+    # A top game (#4 Smith) still scores above 50.
     smith = dict(GAME, home_rank=4, away_rank=57, home_tourn=0.9, away_tourn=0.1, home_lev=3, away_lev=0.4, pregame_wp=0.9, pregame_margin=14)
     assert final_score(smith, [56, 53]) > 50
 
 
 def test_a_hosts_feed_on_its_next_game_ends_ours():
     # St. John Fisher at Susquehanna, 2026-11-07: the host's one feed showed the 8 PM game, and the card sat under
-    # Not started with "no live stats". Seen live, the switch ends the game at once; unseen, at the expected end.
+    # Not started with "no live stats". Seen live, the switch ends the game at once. Unseen, at the expected end.
     g, tip = json.dumps(GAME), "Date.parse('2026-11-14T19:00:00Z')"
     assert run(f"feedMovedOn({g},{{other:true,seen:true,live:true}},{tip}+600000)") is True
     assert run(f"feedMovedOn({g},{{other:true}},{tip}+3600000)") is False
@@ -434,8 +437,8 @@ def test_a_hosts_feed_on_its_next_game_ends_ours():
 
 
 def test_a_feed_naming_our_teams_with_strangers_in_the_box_is_a_bad_read_not_the_hosts_next_game():
-    # York (PA)'s wbball feed, 2026-11-13: one read named York and Mary Washington but carried a 97-51 game with
-    # players on neither roster. The read is unusable, and the host has not moved on.
+    # York (PA)'s wbball feed, 2026-11-13: one read named York and Mary Washington but held a 97-51 game with
+    # players on neither roster. The read is unusable. The host did not move on to another game.
     york, umw = [f"Ann York{c}" for c in "abcdef"], [f"Bea Wash{c}" for c in "abcdef"]
     g = tourney("York (PA)", "Mary Washington", york, umw, ["York (PA)", "York"], ["Mary Washington"])
     strangers = {"sides": {"H": {"name": "York", "id": "BSU"}, "V": {"name": "Mary Washington", "id": "GROVE"}},
@@ -458,7 +461,7 @@ def test_probe_feeds_add_the_pages_other_feeds_after_the_hosts_courts():
 
 
 def test_a_fresh_presto_snapshot_puts_the_game_in_the_live_group_with_a_clock_based_win_chance():
-    # Bryn Mawr at SUNY Delhi, 2026-11-08: the card carried "45-41, 04:55 Q4" from the box score page but sat under Not started.
+    # Bryn Mawr at SUNY Delhi, 2026-11-08: the card showed "45-41, 04:55 Q4" from the box score page but was under Not started.
     at = "2026-11-08T19:47:00+00:00"
     now = "Date.parse('2026-11-08T20:00:00Z')"
     snap = json.dumps({"home": 45, "away": 41, "status": "04:55 Q4", "at": at})
@@ -476,8 +479,8 @@ def test_a_fresh_presto_snapshot_puts_the_game_in_the_live_group_with_a_clock_ba
 
 
 def test_a_game_between_two_low_ranked_teams_scores_below_a_decided_game_between_ranked_teams():
-    # #327 Curry led #254 Elmira 49-35 in the third quarter (an upset in progress, 2026-11-08) and scored 9, while
-    # #104 Carroll at #119 UW-Eau Claire, decided in the fourth, scored 1. The upset term alone carried it.
+    # #327 Curry led #254 Elmira 49-35 in the third quarter on 2026-11-08. That upset in progress scored 9. #104
+    # Carroll at #119 UW-Eau Claire, decided in the fourth, scored 1. The upset term alone made the difference.
     curry = {"home_rank": 327, "away_rank": 254, "home_lev": 0.2, "away_lev": 0, "home_tourn": 0, "away_tourn": 0.011, "pregame_wp": 0.392, "pregame_margin": -3.1, "modeled": True}
     uwec = {"home_rank": 119, "away_rank": 104, "home_lev": 2.4, "away_lev": 0, "home_tourn": 0.089, "away_tourn": 0.002, "pregame_wp": 0.576, "pregame_margin": 2.1, "modeled": True}
     live = lambda g, h, a, p: run(f"(g=>interest(g,{{progress:{p},wp:winProb(g,{h - a},{p}),live:true,score:[{h},{a}]}}))({json.dumps(g)})")
@@ -510,7 +513,7 @@ def test_a_presto_box_score_link_without_a_feed_says_stats_on_presto():
 
 
 def test_a_reload_keeps_the_last_live_score_and_a_moved_on_feed_then_means_final_pending():
-    # The browser's own last read is newer than the slate's snapshot, so it wins; the game stays in the Live group.
+    # The browser's own last read is newer than the slate's snapshot, so it wins. The game stays in the Live group.
     now = "new Date().toISOString()"
     older = "new Date(Date.now()-30*60000).toISOString()"
     game = dict(GAME, id="2026-11-08-cms-hsu", snapshot={"home": 20, "away": 18, "status": "05:00 Q2", "at": "OLDER"}, tip="2026-11-08T21:00:00Z")
@@ -541,8 +544,8 @@ def test_live_lines_carry_the_class_year_from_the_slate_roster():
     assert run(f"matchNewcomer({{first:'Jean',last:'Sierra',abbr:'J. SIERRA'}},{roster}).name") == "Sierra Jean"
     assert run(f"matchNewcomer({{first:'',last:'',abbr:'A. LEE'}},{roster})") is None
     assert run(f"newcomerLines({json.dumps(g)},{json.dumps(s)},'live').map(x=>[x.name,x.class])") == [["Zoe Park", "FR"]]
-    # Sisters on one roster, one of them a newcomer: the line names Jaydn in full, so Jazmine's newcomer entry does not
-    # take it (Maine Farmington, 2026-11-14). Without a roster the newcomer list is all there is.
+    # Sisters on one roster, one of them a newcomer. The line names Jaydn in full, so Jazmine's newcomer entry does not
+    # take it (Maine Farmington, 2026-11-14). Without a roster, the newcomer list is the only source.
     g = {"home": "Maine Farmington", "away": "Springfield", "home_classes": [{"name": "Jaydn Pingree", "class": "JR"}, {"name": "Jazmine Pingree", "class": "JR"}],
          "away_classes": [], "newcomers_home": [{"name": "Jazmine Pingree", "reason": "No 2025-26 minutes", "class": "JR"}], "newcomers_away": []}
     s = {"lines": {"H": [dict(line, abbr="Pingree, Jaydn"), dict(line, abbr="Pingree, Jazmine", min=10)], "V": []}}
@@ -559,8 +562,8 @@ def test_progress_sort_puts_the_game_furthest_along_first_then_the_earliest_tipo
 
 
 def test_upset_sort_puts_the_winner_with_the_lowest_pregame_chance_first():
-    # A 20% home team that won, a 70% home team that lost (the 30% visitor won), a 70% home team that won, and a
-    # game against a Division II team, which has no line and goes last.
+    # A 20% home team that won and a 70% home team that lost (the 30% visitor won). Then a 70% home team that
+    # won, and a game against a Division II team. The Division II game has no line and goes last.
     games = [{"id": "a", "pregame_wp": 0.2, "st": {"score": [60, 55], "interest": 50}}, {"id": "b", "pregame_wp": 0.7, "st": {"score": [55, 60], "interest": 40}},
              {"id": "c", "pregame_wp": 0.7, "st": {"score": [70, 50], "interest": 90}}, {"id": "d", "division": "II", "pregame_wp": 0.5, "st": {"score": [40, 80], "interest": 10}}]
     assert run(f"{json.dumps(games)}.sort((a,b)=>SORTS.upset(a,b)||b.st.interest-a.st.interest).map(g=>g.id)") == ["a", "b", "c", "d"]

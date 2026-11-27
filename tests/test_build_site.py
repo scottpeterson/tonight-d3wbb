@@ -38,12 +38,13 @@ def test_season_lists_rank_by_adjusted_score_keep_season_n_and_fill_in_the_class
     rosters = b.roster_classes([("Hope", "Ava Jones", "SR"), ("Smith", "Bianca Lee", "FR"), ("Smith", "Cara Perry", "SO")])
     monkeypatch.setattr(b, "roster_classes", lambda rows=None: rosters)
     s = b.season_lines()
-    # A line meets the opponent's defense: Ava's 30 at home against Smith (0.8) is 24.0, her 26 at Smith (1.2) is 31.2,
-    # and the freshman's 24 at Hope (1.0) ties the 24.0, where the raw score breaks the tie.
+    # A line meets the opponent's defense. Ava's 30 at home against Smith (0.8) is 24.0. Her 26 at Smith (1.2) is 31.2.
+    # The freshman's 24 at Hope (1.0) ties the 24.0. The raw score breaks that tie.
     assert [(x["name"], x["adj"], x["date"]) for x in s["top"][:3]] == [("Ava Jones", 31.2, "2026-11-07"), ("Ava Jones", 24.0, "2026-11-06"), ("Bianca Lee", 24.0, "2026-11-06")]
     # Twenty lines offered, fifteen kept: the cut falls at 11.0 and drops the five below it.
     assert len(s["top"]) == b.SEASON_N and s["top"][-1]["adj"] == 11.0
-    # Class: a full-name roster match, then first initial plus last name, and a stored class wins over the lookup.
+    # Class comes from a full-name roster match, then from first initial plus last name. The lookup never
+    # replaces a stored class.
     assert [x["class"] for x in s["top"][:3]] == ["SR", "SR", "FR"]
     # The roster name is canonical: "B. Lee" shows as Bianca Lee. A stored class keeps its stored name.
     assert [(x["name"], x["class"]) for x in s["nc"]] == [("Bianca Lee", "FR"), ("Cara Park", "JR")]
@@ -69,7 +70,7 @@ def test_season_table_matches_the_nightly_columns_and_sorts():
     assert html.count("<th ") == len(b.NC_HEADERS) and 'class="nc sortable"' in html and "aria-sort=none" in html
     assert '<td class="n">SR</td>' in html and '<span class="cls"> · SR</span>' in html and "Smith at Hope" in html and "Nov 6" in html
     assert b.nc_table([], "none") == '<p class="empty">none</p>'
-    # A player with more than one line in the list shows the count beside her name; a single line shows nothing.
+    # A player with more than one line in the list shows the count beside her name. A single line shows nothing.
     assert "times" not in html
     twice = b.nc_table([x, dict(x, adj=20.0, date="2026-11-07")], "none")
     assert twice.count('<span class="times"> · 2 lines</span>') == 2

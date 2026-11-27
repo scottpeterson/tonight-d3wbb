@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Write data/schools.csv: each school's schedule page, page type, and local time zone.
+"""Write data/schools.csv with each school's schedule page, page type, and local time zone.
 
-Reads ~/projects/d3-bball-npi (team_base_websites.csv for pages, school_demographics.csv
-for state and longitude, 2027/teams_mapping.txt for the teams that count this season).
-Rerun when a school changes its site or a team joins.
+Reads ~/projects/d3-bball-npi. team_base_websites.csv gives the pages, and
+school_demographics.csv gives state and longitude. 2027/teams_mapping.txt gives the
+teams that count this season. Rerun when a school changes its site or a team joins.
 Schedule pages print tipoff in local time, often with no zone label, so fetch_data.py
 needs each school's zone.
 """

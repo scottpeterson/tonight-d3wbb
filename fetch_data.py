@@ -1,44 +1,51 @@
 #!/usr/bin/env python3
 """Build each night's slate of NPI games into data/slates/YYYY-MM-DD.json.
 
-Rules this file enforces for every project built from the html-report template:
+Rules for every project built from the html-report template:
 
 - One summary file, data/data.json, with `fetched_at`, `errors`, and `stale`.
-  The builder reads it and the slate files, so a fetch failure can never blank the page.
-- A source that fails keeps its last good value (carry forward).
-- Exit 1 when any source failed, after writing the files, so the workflow log
-  shows it while the site still builds.
+  The builder reads it and the slate files. So a fetch failure can never blank the page.
+- A source that fails keeps its last good value.
+- Exit 1 when any source failed, after writing the files. The workflow log
+  then shows the failure while the site still builds.
 
-Each run does three things:
+Each run has these steps:
 
-1. Reads The D3 Stat Lab's gameLeverages.json (every scheduled game between two
-   teams that count for the NPI, with season efficiency ranks, pregame win probability,
-   and leverage), seasonSimulations.json (tournament chance), and newcomers.json.
-2. For today and tomorrow (Eastern), reads every D3 team's schedule page to find
-   tipoff and the live stats feed, and writes the slate. A page row against another
-   D3 team that gameLeverages.json lacks becomes a game too, with no win chance or
-   leverage until the next NPI update: a tournament's second-day game shows as TBA
-   on the pages until the first day ends. Games against Division I and II teams,
-   exhibitions, and games against NAIA and two-year schools do not appear.
-3. For the last three days, reads each game that has no box score yet. With
-   --finals (the game-night run every 20 minutes), the run does only this step
-   and reads only the schedule pages those games need. The live
-   feed comes first. Once a game is 2.5 hours past tipoff, or a schedule page
-   posts its final score, and its feed has no complete box score (crews reuse a
-   feed for their next game), the fetcher reads the Box Score link on either
-   team's schedule page instead: Sidearm HTML or
-   Presto StatCrew XML. It stores the final score, the line of every newcomer
-   who played, and the game's 15 best lines by any player. A score a schedule
-   page posts outranks the feed's. A game with no feed the browser can read but
-   a Presto box score page gets a snapshot of its score and period while it is
-   on; the page shows it with the time it was read. The page shows the night's top 15 game scores
-   from each list.
+1. Read The D3 Stat Lab's gameLeverages.json, seasonSimulations.json (tournament
+   chance), and newcomers.json. gameLeverages.json lists every scheduled game
+   between two teams that count for the NPI. It gives season efficiency ranks,
+   pregame win probability, and leverage.
+2. For today and tomorrow (Eastern), read every D3 team's schedule page to find
+   tipoff and the live stats feed. Then write the slate. A page row against another
+   D3 team that gameLeverages.json lacks becomes a game too. It has no win chance
+   or leverage until the next NPI update. An example is a tournament's second-day
+   game. The pages show it as TBA (to be announced) until the first day ends. Games against
+   Division I and II teams do not appear. Nor do exhibitions, or games against
+   National Association of Intercollegiate Athletics (NAIA) and two-year schools.
+3. For the last three days, read each game that has no box score yet. With
+   --finals (the game-night run every 20 minutes), the run does only this step.
+   It reads only the schedule pages those games need.
 
-4. `python fetch_data.py --presto`, on the Mac before each dispatched run: Presto's
-   CloudFront answers 405 to every GitHub runner, so the Mac reads every Presto
-   school's schedule page and the Presto box score page of every game still
-   without one, and writes data/presto_cache.json. The runner falls back to that
-   copy when a Presto page refuses it.
+   The live feed comes first. Crews reuse a feed for their next game, so a feed
+   can lack a complete box score. If the box score is missing 2.5 hours after
+   tipoff, the fetcher reads the Box Score link on either team's schedule page
+   instead. It does the same when a schedule page posts its final score. That page is Sidearm HTML or Presto
+   StatCrew XML.
+
+   The fetcher stores the final score and the line of every newcomer who played.
+   It also stores the game's 15 best lines by any player. A score that a schedule
+   page posts outranks the feed's.
+
+   Some games have no feed that the browser can read, only a Presto box score
+   page. Such a game gets a snapshot of its score and period while it is on. The
+   page shows the snapshot with the time it was read. The page shows the night's
+   top 15 game scores from each list.
+
+4. Run `python fetch_data.py --presto` on the Mac before each dispatched run.
+   Presto's CloudFront answers 405 to every GitHub runner. So the Mac reads every
+   Presto school's schedule page. It also reads the Presto box score page of every
+   game still without one. It writes data/presto_cache.json. When a Presto page
+   refuses the runner, the runner uses that copy.
 """
 import csv
 import html
@@ -67,7 +74,7 @@ DATA = BASE / "data"
 SLATES = DATA / "slates"
 OUT = DATA / "data.json"
 EXTRA = DATA / "extra_games.json"
-# The Mac's copy of what Presto sites refuse the runner; tools/dispatch_finals.sh runs `fetch_data.py --presto` to write it.
+# The Mac's copy of what Presto sites refuse the runner. Tools/dispatch_finals.sh runs `fetch_data.py --presto` to write it.
 PRESTO_CACHE = DATA / "presto_cache.json"
 PRESTO_CACHE_LIVE = timedelta(hours=2)
 PRESTO_LIVE_BUDGET = 20  # requests in the live pass (`--presto-live`): box scores of games under way only
@@ -79,7 +86,7 @@ SITE = json.loads((BASE / "site.json").read_text())
 UA = {"User-Agent": f"Mozilla/5.0 ({re.sub(r'^www\.', '', SITE.get('domain') or SITE['slug'])} page builder)",
       "Accept": "text/html,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"}
 TAG = re.compile(r"<[^>]+>")
-# HTTPException covers a body cut off partway (IncompleteRead) and a dropped connection; OSError covers resets.
+# HTTPException covers a body cut off partway (IncompleteRead) and a dropped connection. OSError covers resets.
 FETCH_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError, TimeoutError, ValueError, KeyError, IndexError,
                 ET.ParseError)
 EASTERN = ZoneInfo("America/New_York")
@@ -110,9 +117,10 @@ WAF_CHALLENGE = re.compile(rb"awswaf|challenge\.js|gokuProps", re.I)
 
 
 def waf_challenged(resp, body):
-    """True when AWS WAF answered with its JavaScript challenge instead of the page (Presto's CloudFront, after
-    about six requests a minute from one address): status 202, an x-amzn-waf-action header, or a short page that
-    loads the challenge script."""
+    """True when AWS WAF answered with its JavaScript challenge instead of the page. Presto's CloudFront does this
+    after about six requests a minute from one address. The challenge shows as status 202, an x-amzn-waf-action
+    header, or a short page that loads the challenge script.
+    """
     return resp.status == 202 or bool(resp.headers.get("x-amzn-waf-action")) or (len(body) < 5000 and bool(WAF_CHALLENGE.search(body)))
 
 
@@ -127,7 +135,8 @@ def get(url, as_json=False, timeout=30):
                     raise http.client.HTTPException(f"WAF challenge from {site_of(url)}")
             break
         except (TimeoutError, urllib.error.URLError) as exc:
-            # One retry for a timeout; HTTP errors (404, 500) are answers, not hiccups.
+            # Retry a timeout once. An HTTP error (404, 500) is an answer, so it gets
+            # no retry.
             if attempt == 2 or isinstance(exc, urllib.error.HTTPError):
                 raise
     text = body.decode("utf-8", "replace")
@@ -147,7 +156,9 @@ def name_tokens(name):
 
 
 def code_hit(code, team):
-    """True when a feed's team code names the team: a word of it (MEDGAR), its initials (SJLI), or its start."""
+    """True when a feed's team code names the team. The code can be a word of the name (MEDGAR), its initials
+    (SJLI), or its start.
+    """
     c = re.sub(r"[^a-z]", "", (code or "").lower())
     t = re.sub(r"[^a-z]", "", (team or "").lower())
     initials = "".join(w[0] for w in re.findall(r"[a-z]+", re.sub(r"['\u2019]", "", (team or "").lower())))
@@ -164,7 +175,9 @@ def name_words(name):
 
 
 def line_last(line):
-    """A box line's last name, letters only: from 'last', else 'Last, First', else 'F. Last'."""
+    """A box line's last name, letters only. It comes from 'last', else 'Last, First', else 'F.
+    Last'.
+    """
     abbr = (line.get("abbr") or "").strip()
     last = (line.get("last") or "").strip() or (abbr.split(",")[0] if "," in abbr else (abbr.split() or [""])[-1])
     return norm(last)
@@ -213,7 +226,8 @@ def feed_is_game(game, sides, lines):
 
 
 def side_fit(side, game, t, lines):
-    """Evidence that a feed side is this team: its players most, then its code, then its typed name."""
+    """Evidence that a feed side is this team. Its players count most, then its code, then its typed name.
+    """
     roster = roster_of(game, t)
     players = roster_hits(lines, roster) if roster else sum(1 for line in lines if match_newcomer(line, game.get("newcomers_" + t) or []))
     names = game.get(t + "_names") or [game[t]]
@@ -247,9 +261,11 @@ def team_names():
 
 
 def other_d3_keys():
-    """Name keys of the Division III teams that play this season but do not count (data/other_d3_names.csv, from
-    tools/make_team_data.py). Hollins listed "Johnson & Wales University" at Decatur, Ga. on 2026-11-21, which
-    is Johnson & Wales Charlotte; the name alone read as Johnson & Wales Providence, which played Smith that day."""
+    """Name keys of the Division III teams that play this season but do not count. They come from
+    data/other_d3_names.csv, which tools/make_team_data.py writes. Hollins listed "Johnson & Wales University" at
+    Decatur, Ga. on 2026-11-21, which is Johnson & Wales Charlotte. The name alone read as Johnson & Wales
+    Providence, which played Smith that day.
+    """
     path, keys = DATA / "other_d3_names.csv", set()
     if path.exists():
         with open(path, newline="", encoding="utf-8") as f:
@@ -294,7 +310,8 @@ def tournament_chance(rows):
 
 
 def conferences(rows):
-    """Team -> conference, from seasonSimulations.json rows. The page's conference filter reads it."""
+    """Team -> conference, for the page's conference filter. The rows come from seasonSimulations.json.
+    """
     return {r["Team"]: r["Conf"] for r in rows if r.get("Conf")}
 
 
@@ -306,9 +323,10 @@ def newcomers_by_team():
 
 
 def regulars_by_team():
-    """{team: [each of the team's top 8 players by 2026-27 minutes per game, plus its All-American and All-Region
-    honorees with their `honors` list, with per-game stats]} from regulars.json.
-    {} when The D3 Stat Lab has not published the file, so the rest of the page still builds."""
+    """{team: [player, ...]} from regulars.json. Each team's list has its top 8 players by 2026-27 minutes per game,
+    plus its All-American and All-Region honorees with their `honors` list. Each player has per-game stats. If The
+    D3 Stat Lab did not publish the file yet, the result is {}, so the rest of the page still builds.
+    """
     try:
         players = statlab("regulars.json")["players"]
     except FETCH_ERRORS:
@@ -320,8 +338,10 @@ def regulars_by_team():
 
 
 def team_history(day):
-    """{team: [(box read, {the regulars who sat out, by norm(name)}), ...]} for the team's games before `day`, newest
-    first, from the stored slates. A game with no final never happened (or not yet) and is left out."""
+    """{team: [(box read, {the regulars who sat out, by norm(name)}), ...]} for the team's games before `day`. The list
+    is newest first, from the stored slates. A game with no final did not happen (or not yet), so the result omits
+    it.
+    """
     games = []
     for path in SLATES.glob("*.json"):
         if path.stem < day.isoformat():
@@ -389,23 +409,23 @@ LINK_KEYS = {"live stats": "live_stats", "live stats live stats": "live_stats", 
              "watch (s)": "video"}
 
 
-# A Presto site's "Live Stats" link is often a short link on the school's own site (gocobbers.com/links/rsensu,
-# Concordia (MN) vs Minnesota Morris, 2026-11-11) that redirects to the stats page. Presto refuses the runner, so
-# the Mac's run asks the site where each short link of a game in its window goes and stores the answer in the
-# cache's "links" map; every reader of a link looks the short link up there.
+# A Presto site's "Live Stats" link is often a short link on the school's own site. It redirects to the stats
+# page (gocobbers.com/links/rsensu, Concordia (MN) vs Minnesota Morris, 2026-11-11). Presto refuses the runner.
+# So the Mac's run asks the site where each short link of a game in its window goes. It stores the answer in the
+# cache's "links" map. Every reader of a link looks the short link up there.
 SHORT_LINK = re.compile(r"^https?://[^/]+/links/[A-Za-z0-9]+/?$")
 STATBROADCAST = re.compile(r"statbroadcast\.com", re.I)
 
 
 def unshorten(url):
-    """The page a short link redirects to, once the Mac's run has resolved it; otherwise the url itself."""
+    """The page a short link redirects to, once the Mac's run resolved it. Otherwise the url itself."""
     return presto_cache().get("links", {}).get(url, url) if url and SHORT_LINK.match(url) else url
 
 
-# A women's schedule page can link the host's men's stats folder: Alvernia's page sent its game at Ursinus to
-# ursinusathletics.com/sidearmstats/mbball (2026-11-11), the card said "no live stats" while the wbball feed showed
-# the final, and the host's other courts (mbball2, mbball3) never include wbball. This site reads women's
-# basketball, so a men's folder means the same host's women's folder.
+# A women's schedule page can link the host's men's stats folder. On 2026-11-11, Alvernia's page sent its game at
+# Ursinus to ursinusathletics.com/sidearmstats/mbball. The card said "no live stats" while the wbball feed showed
+# the final. The host's other courts (mbball2, mbball3) never include wbball. This site reads women's basketball,
+# so a men's folder means the same host's women's folder.
 MENS_FOLDER = re.compile(r"(sidearmstats\.com/[^/]+/|/sidearmstats/)mbball(\d*)(?=[/?#]|$)")
 
 
@@ -455,14 +475,14 @@ def sidearm_rows(url, tz):
         date_m = re.search(r'sidearm-schedule-game-opponent-date[^>]*>(.*?)</div>', b, re.S)
         spans = [text(s) for s in re.findall(r"<span[^>]*>(.*?)</span>", date_m.group(1), re.S)] if date_m else []
         opp_m = re.search(r'sidearm-schedule-game-opponent-name[^>]*>(.*?)</div>', b, re.S)
-        # The class must end there: a postponed game also carries "sidearm-schedule-game-result-final">Final (Hendrix, 2026-11-07).
+        # The class must end there. A postponed game also has "sidearm-schedule-game-result-final">Final (Hendrix, 2026-11-07).
         result_m = re.search(r'sidearm-schedule-game-result[\s"][^>]*>(.*?)</div>', b, re.S)
         note_m = re.search(r'sidearm-schedule-game-tournament[^>]*>(.*?)</div>', b, re.S)
         # "Exhibition" and "Scrimmage" sometimes sit in the promotion line instead.
         promo_m = re.search(r'sidearm-schedule-game-promotion-name[^>]*>(.*?)</span>', b, re.S)
-        # The list layout puts the date and the time in sibling spans with a "/" span between them
-        # (Wooster, Hope, Carthage, Capital, 2026-11-24), so the date region's second span is the "/"; read the time
-        # from its own element and keep the second span for pages without one.
+        # The list layout puts the date and the time in sibling elements with a "/" element between them (Wooster,
+        # Hope, Carthage, Capital, 2026-11-24). So the date region's second element is the "/". Read the time from
+        # its own element, and keep the second element for pages without one.
         time_m = re.search(r'sidearm-schedule-game-time[^>]*>(.*?)</span>', b, re.S)
         label = text(time_m.group(1)) if time_m else (spans[1] if len(spans) > 1 else "")
         day = parse_month_day(spans[0] if spans else "")
@@ -479,10 +499,11 @@ TEXT_COLUMNS = ("Date", "Time", "At", "Opponent", "Location", "Tournament", "Res
 
 
 def sidearm_component_rows(page, url, tz):
-    """Rows of Sidearm's component layout (rhodeslynx.com, 2026-11-14), which embeds games as JSON in
-    `var obj = {"type":"events", ..., "data":[...]}` blocks and draws the list in the browser, so the list reader
-    finds nothing. The JSON carries each game's links and result but only the season's first 20 games; the site's
-    plain-text schedule (schedule_txt.ashx) lists the whole season, so the rest come from there without links."""
+    """Rows of Sidearm's component layout (rhodeslynx.com, 2026-11-14). It embeds games as JSON in `var obj =
+    {"type":"events", ..., "data":[...]}` blocks and draws the list in the browser, so the list reader finds
+    nothing. The JSON has each game's links and result but only the season's first 20 games. The site's
+    plain-text schedule (schedule_txt.ashx) lists the whole season, so the rest come from there without links.
+    """
     decoder, games, schedule_id = json.JSONDecoder(), {}, None
     for m in re.finditer(r"var obj = ", page):
         try:
@@ -521,7 +542,7 @@ def sidearm_component_rows(page, url, tz):
             if not known:
                 out.append(r)
             elif not known["result"]:
-                # The JSON gives a postponed game no result; the text says "Postponed".
+                # The JSON gives a postponed game no result. The text says "Postponed".
                 known["result"] = r["result"]
     return sorted(out, key=lambda r: r["day"])
 
@@ -551,8 +572,10 @@ CARD_LINKS = {"live stats": "live_stats", "stats": "live_stats", "watch": "video
 
 
 def sidearm_card_rows(page, url, tz):
-    """Rows of Sidearm's newer layout (many Division I sites): one game card per game, a "vs" or "at" stamp,
-    "Oct 28 (Wed) 7:00 PM", the opponent linked as "<name> Website", and Live stats, Stats, and Watch links."""
+    """Rows of Sidearm's newer layout (many Division I sites). Each game has one game card. A card has a "vs" or
+    "at" stamp, a date such as "Oct 28 (Wed) 7:00 PM", and the opponent linked as "<name> Website". It also has
+    Live stats, Stats, and Watch links.
+    """
     soup = BeautifulSoup(page, "html.parser")
     out = []
     for card in soup.select('[data-test-id="s-game-card-standard__root"]'):
@@ -582,8 +605,10 @@ def opponent_link(fragment):
 
 
 def sidearm_table_rows(page, url, tz):
-    """Rows of the older Sidearm table layout (conference sites such as gounitedeast.com):
-    date as 11/11/2026, opponent with "at " for away and "vs. " for neutral, time as "6:00 P.M."."""
+    """Rows of the older Sidearm table layout (conference sites such as gounitedeast.com). The date
+    prints as 11/11/2026, and the time as "6:00 P.M.". The opponent has "at " for away and "vs. "
+    for neutral.
+    """
     table = re.search(r'<table[^>]*sidearm-schedule-table.*?</table>', page, re.S)
     out = []
     for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", table.group(0) if table else "", re.S):
@@ -604,9 +629,10 @@ ARIA = re.compile(r"event:\s+([A-Z][a-z]+)\s+(\d{1,2})\s+(\d{1,2}):(\d{2})\s*([A
 
 
 def presto_rows(url, tz):
-    """Rows of a Presto schedule page. Presto has several templates (cards, tables); every one puts
-    "Women's Basketball event: November 14 02:00 PM: ..." in each link's aria-label, so date and
-    tipoff come from there. A time printed with a zone in the row (3:00 PM MST) overrides the school's zone."""
+    """Rows of a Presto schedule page. Presto has several templates (cards, tables). Every one puts "Women's
+    Basketball event: November 14 02:00 PM: ..." in each link's aria-label, so date and tipoff come from there.
+    A time printed with a zone in the row ("3:00 PM MST") overrides the school's zone.
+    """
     soup = BeautifulSoup(get(url), "html.parser")
     out = []
     for r in soup.select(".event-row"):
@@ -623,7 +649,7 @@ def presto_rows(url, tz):
             hour = int(m.group(3)) % 12 + (12 if m.group(5).upper() == "P" else 0)
             printed = (hour, int(m.group(4)), tz)
         else:
-            # A row with no links has no aria-label. Read the printed date; table templates print
+            # A row with no links has no aria-label. Read the printed date. Table templates print
             # only "Sat. 14" under a month heading.
             node = r.select_one(".date") or r.select_one(".event-dateinfo") or r.select_one(".e_date")
             when = " ".join(node.get_text(" ", strip=True).split()) if node else ""
@@ -651,7 +677,7 @@ def presto_rows(url, tz):
 
 
 def season_url(url):
-    """Presto paths name the season; point them at 2026-27."""
+    """Presto paths name the season. Point them at 2026-27."""
     label = f"{SEASON_START_YEAR}-{str(SEASON_START_YEAR + 1)[2:]}"
     return re.sub(r"/\d{4}-\d{2}(?=/|$)", f"/{label}", url)
 
@@ -662,7 +688,7 @@ def schedule_rows(school, fallback=True):
     presto = school["type"] == "Presto"
     reader, url = (presto_rows, season_url(school["schedule"])) if presto else (sidearm_rows, school["schedule"])
     try:
-        # Some sites now and then serve a page with no games and a 200; one more read fixes it.
+        # Some sites now and then serve a page with no games and a 200. One more read fixes it.
         rows = reader(url, school["tz"]) or reader(url, school["tz"])
     except FETCH_ERRORS:
         # Presto's CloudFront answers 405 to every GitHub runner (schedule and box score pages alike, 2026-11-07),
@@ -709,20 +735,26 @@ def cached_box(url):
 
 
 def presto_snapshot(previous=None, live_only=False):
-    """The Mac's run (`fetch_data.py --presto`): read Presto pages one at a time, PRESTO_PACE seconds apart, and
-    write data/presto_cache.json for the runner, which Presto's CloudFront refuses. Order, up to PRESTO_BUDGET
-    requests: the box score pages already known for games past tipoff, the schedule pages of Presto schools with a
-    game in the finals window (teams of games past tipoff first), any box score page those pages add for a game
-    past tipoff, then the other Presto schools. Box scores come first because a Saturday puts more than
-    PRESTO_BUDGET Presto schools in the window, and the schedule pages used up every request before any live box
-    score (2026-11-21: one of today's box scores read by 18:41 UTC). A game before tipoff has no box score to read.
-    A page that fails or comes back empty keeps its last copy. Twelve parallel reads tripped the WAF challenge on
-    every box score page (2026-11-08).
+    """The Mac's run (`fetch_data.py --presto`). It reads Presto pages one at a time, PRESTO_PACE seconds apart. It
+    writes data/presto_cache.json for the runner, which Presto's CloudFront refuses.
 
-    With live_only (`--presto-live`), the run reads only the box scores of games past tipoff, up to
-    PRESTO_LIVE_BUDGET requests, and writes the cache at once. The dispatcher publishes that before it reads the
-    schedule pages, because a full run took 8 minutes and Presto scores reached the site 29 minutes old
-    (2026-11-24). Scott set the limit: no game in progress goes more than 18 minutes between updates."""
+    The run reads in this order, up to PRESTO_BUDGET requests. First come the box score pages already known for
+    games past tipoff. Next come the schedule pages of Presto schools with a game in the finals window, teams of
+    games past tipoff first. Then any box score page those pages add for a game past tipoff. Last come the other
+    Presto schools.
+
+    On a Saturday, more than PRESTO_BUDGET Presto schools are in the window. When the schedule pages came first,
+    they used up every request before any live box score. On 2026-11-21, only one of today's box scores was read
+    by 18:41 UTC.
+    So box scores come first.
+
+    A game before tipoff has no box score to read. A page that fails or comes back empty keeps its last copy. Twelve parallel reads got the WAF challenge on every box score page (2026-11-08).
+
+    With live_only (`--presto-live`), the run reads only the box scores of games past tipoff. It reads up to
+    PRESTO_LIVE_BUDGET requests and writes the cache at once. A full run took 8 minutes. Presto scores then reached
+    the site 29 minutes old (2026-11-24). So the dispatcher publishes the live cache before it reads the schedule
+    pages. Scott set the limit: no game in progress goes more than 18 minutes between updates.
+    """
     out = {"fetched_at": now().isoformat(timespec="seconds"), "errors": []}
     schools = load_schools()
     extra = read_json(EXTRA, {"schools": {}})
@@ -848,9 +880,10 @@ def presto_snapshot(previous=None, live_only=False):
 
 
 def find_row(rows, day, opponent, exhibition=False):
-    """The page's row for the game on `day` against `opponent`. A team rarely plays twice a day,
-    so the date decides; opponent-name overlap breaks a tie. Exhibition rows count only for extra games.
-    With exhibition=None either kind counts: a Division I host and its D3 guest often label the same game differently."""
+    """Return the page's row for the game on `day` against `opponent`. A team rarely plays twice a day, so the date decides.
+    Opponent-name overlap breaks a tie. Exhibition rows count only for extra games. With exhibition=None either kind
+    counts: a Division I host and its D3 guest often label the same game differently.
+    """
     same_day = [r for r in rows if r["day"] == day and (exhibition is None or r["exhibition"] == exhibition)]
     if len(same_day) <= 1:
         return same_day[0] if same_day else None
@@ -913,16 +946,19 @@ def opponent_division(r, members):
 PLACEHOLDER = re.compile(r"\b(?:Tournament|Tourney|Classic|Invitational|Tip-?Off|Challenge|Shootout|Showcase|TBA|TBD|"
                          r"Winner|Loser|Consolation|Semifinals?|Championship)\b|\S\s+(?:vs\.?|v\.|or)\s+\S", re.I)
 # "A or B" is a tournament's second-day opponent before the first day ends. Dickinson listed "Messiah or Gwynedd
-# Mercy" linking gomessiah.com, which read as Dickinson at Messiah on 2026-11-21; Messiah played RIT.
+# Mercy" linking gomessiah.com, which read as Dickinson at Messiah on 2026-11-21. Messiah played RIT.
 
 
 def page_games(day, schools, pages, known, ranks, members):
-    """Games on `day` between two D3 teams that a schedule page lists and `known` (the Stat Lab's list) lacks.
-    A tournament's second-day game shows as TBA on the pages until the first day ends, so games.txt and
-    gameLeverages.json pick it up a day late. The opponent resolves by its link's site, then by a name that fits
-    one D3 school and no Division I or II member (Pacific). A game either page calls an exhibition or scrimmage
-    stays out. Win chance and leverage stay at 0.5 and 0 until the
-    next NPI update lists the game; the slate's previous entry keeps nothing, because the ids match."""
+    """Games on `day` between two D3 teams that a schedule page lists and `known` (the Stat Lab's list) lacks. A
+    tournament's second-day game shows as TBA on the pages until the first day ends. So games.txt and
+    gameLeverages.json list it a day late.
+
+    The opponent resolves by its link's site, then by a name that fits one D3 school and no Division I or II
+    member (Pacific). A game either page calls an exhibition or scrimmage stays out. Win chance and leverage
+    stay at 0.5 and 0 until the next NPI update lists the game. The ids match, so the slate's previous entry
+    keeps nothing.
+    """
     resolve = opponent_resolver(schools, members)
     pairs = {frozenset((g["home"], g["away"])) for g in known}
     games = []
@@ -948,10 +984,12 @@ def page_games(day, schools, pages, known, ranks, members):
 
 
 def opponent_resolver(schools, members):
-    """A function from a schedule row to the D3 school its opponent names, or None: by the link's site, then by a
-    name that fits one D3 school, no Division I or II member, and no Division III team that does not count. A
-    placeholder row ("WashU Tournament" linking the host's site), an undecided opponent ("Messiah or Gwynedd
-    Mercy"), and a host's listing of another game ("Benedictine (Ill.) vs. Central College") name no opponent."""
+    """A function from a schedule row to the D3 school its opponent names, or None. It matches by the link's site,
+    then by a name that fits one D3 school. The name must not fit a Division I or II member, or a Division III
+    team that does not count. A placeholder row ("WashU Tournament" linking the host's site) names no opponent.
+    Neither does an undecided opponent ("Messiah or Gwynedd Mercy"), or a host's listing of another game
+    ("Benedictine (Ill.) vs. Central College").
+    """
     sites, keys, upper, others = team_sites(schools), d3_keys(schools), upper_sites(members), other_d3_keys()
     written = d3_keys(schools, as_written=True)
     own = {}
@@ -968,8 +1006,9 @@ def opponent_resolver(schools, members):
             return None
         site = site_of(r.get("opponent_url"))
         opp = sites.get(site)
-        # A neutral row's link often points at the tournament host, not the opponent (Aurora's "Westminster
-        # University" linked principiaathletics.com, 2026-11-07), so the link counts only when the name fits.
+        # A neutral row's link often points at the tournament host instead of the opponent. Aurora's
+        # "Westminster University" linked principiaathletics.com on 2026-11-07. So the link counts only when
+        # the name fits.
         if opp and r["neutral"] and not any(name_key(r["opponent"]) & name_key(n) for n in aliases(opp)):
             opp = None
         if not opp and site not in upper:
@@ -980,8 +1019,8 @@ def opponent_resolver(schools, members):
             exact = {written[k] for k in name_keys(r["opponent"] or "") if k in written}
             opp = hits.pop() if len(hits) == 1 and not above and (len(exact) == 1 or not row_keys & others) else None
             # A link to another NCAA member's site names that member, whatever the name fits. NC Wesleyan listed
-            # "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15; the name alone read as
-            # Johnson & Wales Providence, and the site carried a game Providence never had.
+            # "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15. By name alone it read
+            # as Johnson & Wales Providence. The site then showed a game Providence never played.
             if opp and site in members["site"] and site not in own_sites(opp):
                 opp = None
         return opp
@@ -992,9 +1031,11 @@ RESCHEDULE_DAYS = 3
 
 
 def rescheduled(g, day, pages, resolve):
-    """The day the schedule pages put a Stat Lab game on, when neither page lists the partner on `day` and the
-    pages agree on one day within RESCHEDULE_DAYS. The Stat Lab listed La Verne vs Pacific on 2026-11-07 and
-    2026-11-08; La Verne's page said Sunday the 8th only. None when the pages list it on `day` or say nothing."""
+    """The day the schedule pages put a Stat Lab game on. It applies when neither page lists the partner on `day`
+    and the pages agree on one day within RESCHEDULE_DAYS. The Stat Lab listed La Verne vs Pacific on 2026-11-07
+    and 2026-11-08. La Verne's page said Sunday the 8th only. None when the pages list it on `day` or say
+    nothing.
+    """
     found = set()
     for team, partner in ((g["home"], g["away"]), (g["away"], g["home"])):
         rows = [r for r in pages.get(team, []) if not r["exhibition"] and resolve(r) == partner]
@@ -1005,9 +1046,10 @@ def rescheduled(g, day, pages, resolve):
 
 
 def unlisted(g, day, pages):
-    """True when both teams' schedule pages were read and neither lists a game on `day`. Massey carried Buena Vista
-    at North Central (MN) on 2026-11-10 and neither page had a row that day. A page that failed to load has no
-    rows and keeps the game, and a row with a TBA opponent counts as a listing."""
+    """True when both teams' schedule pages were read and neither lists a game on `day`. Massey listed Buena Vista at
+    North Central (MN) on 2026-11-10. Neither page had a row that day. A page that failed to load has no rows and
+    keeps the game. A row with a TBA opponent counts as a listing.
+    """
     for team in (g["home"], g["away"]):
         rows = pages.get(team) or []
         if not rows or any(r["day"] == day and not r["exhibition"] for r in rows):
@@ -1016,9 +1058,10 @@ def unlisted(g, day, pages):
 
 
 def place_games(games, days, pages, resolve, notes):
-    """The Stat Lab's games for `days`, by day, after the schedule pages have their say: a projected pairing both
-    pages contradict is left out, so is one neither page lists at all, and a game the pages date differently
-    moves to their day (or goes, when the list already has the pair there)."""
+    """The Stat Lab's games for `days`, by day, after the schedule pages are applied. A projected pairing that both
+    pages contradict stays out. So does one that neither page lists at all. A game that the pages date
+    differently moves to their day. If the list already has the pair on that day, the game goes.
+    """
     by_day = {d: [] for d in days}
     listed = {(g["date"], frozenset((g["home"], g["away"]))) for g in games}
     for g in games:
@@ -1048,9 +1091,11 @@ HOST_ROW = re.compile(r"^(.*\S)\s+(?:vs\.?|v\.)\s+(\S.*)$", re.I)
 
 
 def host_listings(day, pages, schools):
-    """{frozenset((A, B)): row} for the rows a host's page lists as "A vs. B" on `day`, with both names resolving
-    to one D3 school each. The host's live stats link is the feed for that game (Susquehanna listed "SUNY
-    Cobleskill vs. Christopher Newport" with its own feed, 2026-11-07, while CNU's page linked CNU's idle feed)."""
+    """{frozenset((A, B)): row} for the rows a host's page lists as "A vs. B" on `day`, with both names resolving to
+    one D3 school each. The host's live stats link is the feed for that game. On 2026-11-07, Susquehanna listed
+    "SUNY Cobleskill vs. Christopher Newport" with its own feed. Christopher Newport's page linked its own idle
+    feed.
+    """
     keys, out = d3_keys(schools), {}
     for rows in pages.values():
         for r in rows:
@@ -1068,9 +1113,11 @@ def host_listings(day, pages, schools):
 
 
 def contradicted(g, day, pages, resolve):
-    """True when each team's schedule page lists other D3 opponents on `day`, none of them the partner, and one of
-    those opponents' pages names the team back. The Stat Lab's list carries a tournament's projected second-day
-    pairings: Salisbury at Marywood, 2026-11-07, when the pages said Salisbury vs Widener and Marywood vs Centenary."""
+    """True when each team's schedule page lists other D3 opponents on `day`, none of them the partner. One of those
+    opponents' pages must also name the team back. The Stat Lab's list includes a tournament's projected second-day
+    pairings. An example is Salisbury at Marywood, 2026-11-07, when the pages said Salisbury vs Widener and Marywood vs
+    Centenary.
+    """
     def named(team):
         return {resolve(r) for r in pages.get(team, []) if r["day"] == day and not r["exhibition"]} - {None}
     for team, partner in ((g["home"], g["away"]), (g["away"], g["home"])):
@@ -1103,8 +1150,8 @@ def other_games(day, schools, pages, members, ranks, covered):
                           "home_rank": ranks.get(home), "away_rank": ranks.get(away), "pregame_wp": 0.5, "pregame_margin": 0.0,
                           "modeled": False})
             if member["site"] and opp not in schools:
-                # The host's own schedule page fills a tipoff or live stats link the D3 page leaves out, and its
-                # Sidearm feed is a fallback. Its times print without a zone; the D3 team's zone is the best guess.
+                # The host's own schedule page fills a tipoff or live stats link that the D3 page omits. Its
+                # Sidearm feed is a fallback. Its times print without a zone. The D3 team's zone is the best guess.
                 hosts[opp] = {"team": opp, "type": "Sidearm", "schedule": f"https://{member['site']}/sports/womens-basketball/schedule",
                               "tz": school["tz"], "extra": True}
     return games, hosts
@@ -1162,9 +1209,10 @@ SIBLING_FEEDS = 2  # a host's other courts: wbball2 and wbball3
 
 
 def sibling_feeds(feed):
-    """A Sidearm host's other women's basketball feeds. A tournament host runs its own game on wbball and the
-    other game on wbball2 (Hope's Michele Schoon Tournament, 2026-11-07), and the schools' pages can link either
-    folder until the crews settle which game is on which."""
+    """A Sidearm host's other women's basketball feeds. A tournament host runs its own game on wbball and the other
+    game on wbball2 (Hope's Michele Schoon Tournament, 2026-11-07). Until the crews settle which game is on
+    which, the schools' pages can link either folder.
+    """
     if (feed or {}).get("type") != "sidearm":
         return []
     m = re.match(r"(https://sidearmstats\.com/[^/]+/)([a-z]+?)(\d*)/game\.json$", feed["url"])
@@ -1175,7 +1223,7 @@ def sibling_feeds(feed):
 
 
 def sibling_link(link, feed):
-    """The stats page behind `feed` when `link` is the same host's page for another folder; else `link` as is."""
+    """The stats page behind `feed` when `link` is the same host's page for another folder. Else `link` as is."""
     folder = re.search(r"/([a-z]+?\d*)/game\.json$", feed["url"]).group(1)
     return re.sub(r"/sidearmstats/[a-z]+?\d*/", f"/sidearmstats/{folder}/", link) if link else link
 
@@ -1209,8 +1257,9 @@ def adopt_feed(game, feed):
 
 
 def sidearm_over(g):
-    """True when a Sidearm feed's game is over. Some crews never set IsComplete (Butler, 2026-10-28), so the clock
-    at 0:00 in the last period of regulation or later, with no tie, also counts."""
+    """True when a Sidearm feed's game is over. Some crews never set IsComplete (Butler, 2026-10-28). So the clock at
+    0:00 in the last period of regulation or later, with no tie, also counts.
+    """
     regulation = 2 if num((g.get("Rules") or {}).get("PeriodMinutes")) >= 20 else 4
     return bool(g.get("IsComplete")) or (num(g.get("Period")) >= regulation and g.get("ClockSeconds") == 0
                                          and num(g["HomeTeam"].get("Score")) != num(g["VisitingTeam"].get("Score")))
@@ -1233,10 +1282,13 @@ ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-
 
 
 def hub_games(day):
-    """Women's basketball games on `day` from the feed behind sidearmstats.com/hub: every game a Sidearm school
-    lists, with tipoff in UTC, both teams' sites, and the live stats link. It answers only for about yesterday
-    through tomorrow. A TBA game carries midnight UTC on its date, so the window opens then and the date field
-    picks the day. `listing_home` says which side posted the listing; its live stats link belongs to that side."""
+    """Women's basketball games on `day` from the feed behind sidearmstats.com/hub. It lists every game a Sidearm
+    school lists. Each game has the tipoff in UTC, both teams' sites, and the live stats link. The feed answers
+    only for about yesterday through tomorrow.
+
+    A TBA game shows midnight UTC on its date. So the window opens then. The date field picks the day.
+    `listing_home` says which side posted the listing. Its live stats link belongs to that side.
+    """
     start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
     query = urllib.parse.urlencode({"start_date": start.isoformat().replace("+00:00", "Z"),
                                     "end_date": (start + timedelta(hours=36)).isoformat().replace("+00:00", "Z")})
@@ -1288,7 +1340,7 @@ def name_keys(name):
 
 
 def team_sites(schools):
-    """{site: team} for D3 schools whose schedule page sits on their own site (not a conference site several share)."""
+    """{site: team} for D3 schools whose schedule page is on their own site (not a conference site several share)."""
     by_site = {}
     for team, s in schools.items():
         if not s.get("extra") and s.get("schedule"):
@@ -1309,11 +1361,12 @@ def aliases(team):
 
 
 def d3_keys(schools, as_written=False):
-    """{name key: team} for D3 schools, from each school's name and the other names sources use for it, keeping
-    only keys that fit one school. Mary Washington's page listed "The College of New Jersey" on 2026-11-14, which
-    "TCNJ" alone never matched, so the Stat Lab's projected Mary Washington at DeSales pairing stayed on the page.
-    An alias keeps its "University" or "College": cut, "Colorado College" would claim a page's "Colorado". With
-    as_written True, an alias also keeps its qualifier: "Johnson & Wales (RI)" gives no key for "Johnson & Wales"."""
+    """{name key: team} for D3 schools, from each school's name and its aliases. It keeps only keys that fit one school.
+    On 2026-11-14, Mary Washington's page listed "The College of New Jersey", which "TCNJ" alone never matched. So
+    the Stat Lab's projected Mary Washington at DeSales pairing stayed on the page. An alias keeps its "University"
+    or "College": cut, "Colorado College" would claim a page's "Colorado". With as_written True, an alias also keeps
+    its qualifier: "Johnson & Wales (RI)" gives no key for "Johnson & Wales".
+    """
     keys = {}
     for team, s in schools.items():
         if not s.get("extra"):
@@ -1324,10 +1377,11 @@ def d3_keys(schools, as_written=False):
 
 
 def hub_teams(h, sites, keys, others=frozenset(), by_name=True):
-    """(home, away) as D3 team names, None for a team outside Division III. The hub's team sites do not always
-    match ours (SUNY Geneseo: knights.geneseo.edu, schedule on geneseoknights.com), so the listing team's live
-    stats link and then the name are fallbacks. A site in `others` (Division I and II members) rules out a name match,
-    because names repeat across divisions (Pacific). With by_name False, only sites count."""
+    """(home, away) as D3 team names, None for a team outside Division III. The hub's team sites do not always match ours
+    (SUNY Geneseo: knights.geneseo.edu, schedule on geneseoknights.com). So the listing team's live stats link and
+    then the name are fallbacks. Names repeat across divisions (Pacific). So a site in `others` (Division I and II
+    members) rules out a name match. With by_name False, only sites count.
+    """
     def which(name, *hosts):
         found = next((sites[s] for s in hosts if s in sites), None)
         if found or others & set(hosts) or not by_name:
@@ -1350,8 +1404,10 @@ def upper_sites(members):
 
 
 def find_hub(g, hub, schools, others=frozenset()):
-    """The hub's listing of game g: one D3 team matches and the other team's names share a word, so a namesake
-    listing (Thomas University for Thomas in Maine) does not count. NAIA listings are skipped."""
+    """Return the hub's listing of game g. One D3 team must match. The other team's names must share a word,
+    so a namesake listing (Thomas University for Thomas in Maine) does not count. NAIA listings are
+    skipped.
+    """
     sites, keys = team_sites(schools), d3_keys(schools)
     for h in hub:
         if h["division"] not in ("DI", "DII", "DIII"):
@@ -1364,7 +1420,8 @@ def find_hub(g, hub, schools, others=frozenset()):
 
 
 def find_espn(g, espn, keys):
-    """ESPN's listing of game g: the D3 team's name matches ESPN's non-D1 team, and the other names share a word."""
+    """ESPN's listing of game g. The D3 team's name must match ESPN's non-D1 team. The other names must share a word.
+    """
     for e in espn:
         for mine, theirs, other_mine, other_theirs in ((g["home"], e["home"], g["away"], e["away"]), (g["away"], e["away"], g["home"], e["home"])):
             if not theirs["d1"] and any(keys.get(k) == mine for k in name_keys(theirs["name"])) \
@@ -1380,15 +1437,18 @@ def espn_confirmed(g, day, schools, pages):
 
 
 def listed_games(day, hub, espn, schools, members, ranks, taken, blocked):
-    """Games against Division I and II teams that no D3 schedule page gave. From the hub, with the D3 team found by
-    its site only: D3 pages often leave out an exhibition at a Division I school (Spalding at Bellarmine). From
-    ESPN only for a team in `blocked`, whose page could not be read, marked "espn" for collect() to check against
-    the host's page. `taken` holds the D3 teams that already have a game that day. Returns the games and host
-    entries for opponents outside schools.csv, as other_games() does."""
+    """Games against Division I and II teams that no D3 schedule page gave. D3 pages often omit an exhibition at a
+    Division I school (Spalding at Bellarmine). So games come from the hub, with the D3 team found by its site
+    only. They come from ESPN only for a team in `blocked`, whose page could not be read. Those are marked "espn"
+    for collect() to check against the host's page.
+
+    `taken` holds the D3 teams that already have a game that day. Like other_games(), it returns the games and host
+    entries for opponents outside schools.csv.
+    """
     sites, keys, games, hosts = team_sites(schools), d3_keys(schools), [], {}
-    # A team plays once a day. A school's listing can carry the wrong opponent record (Indiana's "Marian" with
-    # Marian of Wisconsin's site, while Marian of Indiana lists the game too), so a team the hub puts against two
-    # different schools that day adds nothing. NAIA listings count here.
+    # A team plays once a day. A school's listing can name the wrong opponent record. Indiana listed "Marian"
+    # with Marian of Wisconsin's site, while Marian of Indiana listed the game too. So a team that the hub puts
+    # against two different schools that day adds nothing. NAIA listings count here.
     faced = {}
     for h in hub:
         if h.get("home_id") and h.get("away_id"):
@@ -1406,7 +1466,8 @@ def listed_games(day, hub, espn, schools, members, ranks, taken, blocked):
                           "tz": schools[team]["tz"], "extra": True}
 
     for h in hub:
-        # The listing school's division; an NAIA school's listing of a game is about NAIA teams.
+        # Return the listing school's division. An NAIA school's listing of a game is about NAIA
+        # teams.
         if h["division"] not in ("DI", "DII", "DIII"):
             continue
         home_team, away_team = hub_teams(h, sites, keys, by_name=False)
@@ -1445,7 +1506,9 @@ TOP_N = 15  # the page shows the 15 best game scores of the night; one team can 
 
 
 def line_name(line):
-    """'First Last' from a box line. Feeds give first and last, 'LAST,FIRST', or 'Last, First'; all-caps words soften."""
+    """Return 'First Last' for one player's name. Feeds give first and last, 'LAST,FIRST', or 'Last, First'. All-caps words
+    soften.
+    """
     if line.get("first") and line.get("last"):
         name = f'{line["first"]} {line["last"]}'
     else:
@@ -1474,7 +1537,7 @@ def sidearm_lines(full):
     """{'H'|'V': [{'first','last','abbr', stats...}]} from a ?detail=full Sidearm feed."""
     out = {}
     for side, key in (("H", "HomeTeam"), ("V", "VisitingTeam")):
-        # A feed read before its game starts can carry no stats block yet.
+        # A feed read before its game starts can have no stats block yet.
         team = (full.get("Stats") or {}).get(key) or {}
         people = {p.get("PersonId"): p for p in team.get("Players") or [] if p.get("PersonId")}
         by_uni = {p.get("UniformNumber"): p for p in team.get("Players") or []}
@@ -1517,8 +1580,9 @@ BOX_COLUMNS = {"MIN": "min", "PTS": "pts", "REB": "reb", "A": "ast", "AST": "ast
 
 
 def sidearm_box(page):
-    """A Sidearm box score page: {'date': 'M/D/YYYY', 'sides': {...}, 'score': {...}, 'lines': {...}}, keyed 'V' and
-    'H' like a feed, or None when the page lacks two player tables. The page lists the visiting team first."""
+    """A Sidearm box score page as {'date': 'M/D/YYYY', 'sides': {...}, 'score': {...}, 'lines': {...}}, keyed 'V' and
+    'H' like a feed. None when the page lacks two player tables. The page lists the visiting team first.
+    """
     soup = BeautifulSoup(page, "html.parser")
     tables = [t for t in soup.select("table.overall-stats") if t.select_one("thead") and "Player" in t.select_one("thead").get_text()]
     board = soup.select_one("table.sidearm-table")
@@ -1568,10 +1632,11 @@ PRESTO_SKIP = {"team", "totals", "starters", "reserves", "bench"}
 
 
 def presto_box(page):
-    """A Presto box score page (the `boxscores/<date>_<id>.xml` link serves HTML): {'status', 'complete', 'sides',
-    'score', 'lines'} keyed 'V' and 'H' like a feed, or None when the page lacks the linescore or two player tables.
-    The page updates during the game, so it also gives a live score. Its date line can run a day ahead (UTC), so
-    the date comes from the link."""
+    """A Presto box score page as {'status', 'complete', 'sides', 'score', 'lines'}, keyed 'V' and 'H' like a feed. The
+    `boxscores/<date>_<id>.xml` link serves HTML. None when the page lacks the linescore or two player tables. The
+    page updates during the game, so it also gives a live score. Its date line can run a day ahead (UTC), so the
+    date comes from the link.
+    """
     soup = BeautifulSoup(page, "html.parser")
     board = soup.select_one(".linescore table") or soup.select_one("table.table")
     teams = [tr for tr in board.select("tr") if tr.find("td")] if board else []
@@ -1592,7 +1657,7 @@ def presto_box(page):
             if len(cells) < len(heads):
                 continue
             v = dict(zip(heads, (c.get_text(" ", strip=True) for c in cells)))
-            # Most templates mark the name (.player-name); others write "F 5 Marissa Nudd" or "25 - Long,Caroline - F".
+            # Most templates mark the name (.player-name). Others write "F 5 Marissa Nudd" or "25 - Long,Caroline - F".
             marked = cells[heads.index("Player")].select_one(".player-name") if "Player" in heads else None
             name = marked.get_text(" ", strip=True) if marked else v.get("Player", "").strip()
             name = re.sub(r"^(?:[A-Z]{1,2}(?:/[A-Z]{1,2})?\s+)?(?:\d+\s*-?|-)\s+", "", name)
@@ -1619,7 +1684,7 @@ def presto_box_date(url):
 
 def espn_lines(summary):
     """{'H'|'V': [...]} from an ESPN summary. Each team's statistics list names its columns (MIN, PTS, FG as
-    "made-attempted", and so on); the header says which team is home."""
+    "made-attempted", and so on). The header says which team is home."""
     side = {c["team"]["id"]: "H" if c["homeAway"] == "home" else "V" for c in summary["header"]["competitions"][0]["competitors"]}
     out = {}
     for team in (summary.get("boxscore") or {}).get("players") or []:
@@ -1652,11 +1717,13 @@ def match_newcomer(line, roster):
 
 
 def newcomer_of(line, newcomers, roster):
-    """The newcomer a box line belongs to, or None. The line is matched against the whole roster first, so a
-    teammate who is not a newcomer still counts as a candidate: Maine Farmington's box score for Springfield,
-    2026-11-14, named "Pingree, Jaydn" (34 points), and against the newcomer list alone, where her sister Jazmine
-    is the only Pingree, the initial-and-last-name step handed the line to Jazmine. With no roster published, the
-    newcomer list is all there is."""
+    """Return the newcomer for a box line, or None. The line is matched against the whole roster first. So a
+    teammate who is not a newcomer still counts as a candidate.
+
+    Maine Farmington's box score for Springfield, 2026-11-14, named "Pingree, Jaydn", who scored 34 points. Her
+    sister Jazmine is the only Pingree on the newcomer list. Against that list alone, the initial-and-last-name
+    step gave the line to Jazmine. With no roster published, only the newcomer list is used.
+    """
     if roster:
         who = match_player(line, roster)
         if who:
@@ -1739,8 +1806,10 @@ def tip_time(r, day):
 
 
 def box_result(game, home_score, away_score, sides, lines):
-    """The stored final: score, newcomer lines, and each team's 15 best lines, oriented to the schedule's home and away."""
-    # The feed's home side follows the stat crew, and so do its labels; flip when the evidence says so.
+    """The stored final, oriented to the schedule's home and away. It holds the score, the newcomer lines, and each team's 15
+    best lines.
+    """
+    # The feed's home side follows the stat crew, and so do its labels. Flip when the evidence says so.
     if should_flip(game, sides, lines):
         home_score, away_score = away_score, home_score
         lines = {"H": lines.get("V", []), "V": lines.get("H", [])}
@@ -1769,9 +1838,11 @@ def box_result(game, home_score, away_score, sides, lines):
 
 
 def sat_out(team, regulars, lines, roster):
-    """The regulars with no minutes in one team's box lines: a 0-minute line or no line at all. A side with fewer than
-    MIN_ROSTER players who played is a box score that lost the team, so it lists no one. A regular whose last name is
-    on a played line that fits no one stays off the list, because that line may be hers under another spelling."""
+    """The regulars with no minutes in one team's box lines, from a 0-minute line or no line at all. A side with fewer
+    than MIN_ROSTER players who played is a box score that lost the team, so it lists no one. A played line that fits
+    no one may be a regular's line under another spelling. So a regular whose last name is on that line stays off the
+    list.
+    """
     played_lines = [line for line in lines if played(line)]
     if len(played_lines) < MIN_ROSTER:
         return []
@@ -1788,9 +1859,10 @@ def sat_out(team, regulars, lines, roster):
 
 def crew_named(game, side, lines):
     """The side's box lines without the ones a stat crew named after the other team's players. Rhodes's box score
-    for Babson at Dallas, 2026-11-14, put six Rhodes names (same jersey numbers) on Babson's side: Menendez with
-    23 points for Babson and 7 for Rhodes. A line is dropped when its name fits the other roster and not its own;
-    both rosters must be published."""
+    for Babson at Dallas, 2026-11-14, put six Rhodes names (same jersey numbers) on Babson's side. Menendez had
+    23 points for Babson and 7 for Rhodes. A line is dropped when its name fits the other roster and not its own.
+    Both rosters must be published.
+    """
     own, other = (roster_of(game, t) for t in (("home", "away") if side == "H" else ("away", "home")))
     if not own or not other:
         return lines
@@ -1806,15 +1878,18 @@ PT3_STATS = {"fgm": "fgm", "fga": "fga", "ftm": "ftm", "fta": "fta", "min": "min
 
 def pt3_source(page, url):
     """The live update URL a new-template Presto box score page loads its numbers from, or None. The page itself
-    holds empty tables and a `conf` block with the event hash (SUNY Delhi, Curry, Eureka, 2026-11-08); the JSON
-    lives on the school's own site at /action/sports/liveupdate?e=<event>&h=<hash>."""
+    holds empty tables and a `conf` block with the event hash (SUNY Delhi, Curry, Eureka, 2026-11-08). The JSON
+    is on the school's own site at /action/sports/liveupdate?e=<event>&h=<hash>.
+    """
     h, e = PT3_HASH.search(page or ""), PT3_ENTRY.search(page or "")
     return absolute(e.group(1) + "h=" + urllib.parse.quote(h.group(1)), url) if h and e else None
 
 
 def pt3_box(data):
-    """{'status', 'complete', 'sides', 'score', 'lines'} like presto_box(), from PrimeTime3 live JSON (the
-    "Basketball LiveStats In-Arena Tool" export: status, venue rules, and team[].linescore, totals, player)."""
+    """{'status', 'complete', 'sides', 'score', 'lines'} like presto_box(), from PrimeTime3 live JSON. That JSON
+    is the "Basketball LiveStats In-Arena Tool" export. It has the status, the venue rules, and
+    team[].linescore, totals, player.
+    """
     if isinstance(data.get("data"), str):
         data = json.loads(data["data"])
 
@@ -1852,8 +1927,10 @@ def pt3_box(data):
 
 
 def presto_page_box(page, url):
-    """The box from a Presto box score page: parsed from the HTML, or, for the new template, read from the live
-    update JSON the page would load (a second request to the same site). None for the XML or an empty page."""
+    """Return the box from a Presto box score page. It is parsed from the HTML. For the new template, it is read from the
+    live update JSON the page would load, as a second request to the same site. None for the XML or an empty
+    page.
+    """
     if page.lstrip().startswith("<?xml"):
         return None
     box = presto_box(page)
@@ -1871,8 +1948,8 @@ def read_presto_page(game, url):
     try:
         box = presto_page_box(get(url), url)
     except FETCH_ERRORS:
-        # Presto refuses the runner the page, or serves the page and answers 403 for the live update JSON behind it
-        # (Carnegie Mellon, Goucher, La Roche, Suffolk, 2026-11-18); the Mac's copy stands in
+        # Presto refuses the runner the page. Or it serves the page and answers 403 for the live update JSON behind
+        # it (Carnegie Mellon, Goucher, La Roche, Suffolk, 2026-11-18). The Mac's copy stands in
         box = cached_box(url)
         if box is None:
             raise
@@ -1890,18 +1967,21 @@ def snapshot(game, box):
 
 
 def is_over(game, today):
-    """True once a game is BOX_PAGE_AFTER past tipoff, or, with no tipoff, once its day has passed."""
+    """True once a game is BOX_PAGE_AFTER past tipoff, or, with no tipoff, once its day is over."""
     if game.get("tip"):
         return datetime.fromisoformat(game["tip"].replace("Z", "+00:00")) < now() - BOX_PAGE_AFTER
     return date.fromisoformat(game["date"]) < today
 
 
 def final_can_exist(game, today=None):
-    """False while the game cannot have ended: before FINAL_EARLIEST past a known tipoff, or, with no tipoff, before
-    its day. A final stored earlier came from something else (a result typed on a page's wrong row, a host's feed
-    showing its earlier game, a development run), and a slate carries a final forward run after run, so the check
-    runs on every build and finals pass. UW-Stevens Point vs St. Scholastica, 2026-11-07, showed a final from a
-    2026-10-27 build for eleven days."""
+    """False while the game cannot be over yet. That is before FINAL_EARLIEST past a known tipoff, or, with no tipoff,
+    before its day.
+
+    A final stored earlier came from something else. It can be a result typed on a page's wrong row,
+    a host's feed showing its earlier game, or a development run. A slate keeps a final from run to run, so the
+    check runs on every build and finals pass. UW-Stevens Point vs St. Scholastica, 2026-11-07, showed a final from
+    a 2026-10-27 build for eleven days.
+    """
     if game.get("tip"):
         return datetime.fromisoformat(game["tip"].replace("Z", "+00:00")) <= now() - FINAL_EARLIEST
     return date.fromisoformat(game["date"]) <= (today or now().astimezone(EASTERN).date())
@@ -1913,7 +1993,8 @@ def drop_final(game):
 
 
 def box_link(game, pages):
-    """The Box Score link and posted result from either team's schedule page: (link, (home, away) or None)."""
+    """The Box Score link and posted result from either team's schedule page, as (link, (home, away) or None).
+    """
     day = date.fromisoformat(game["date"])
     exhibition = None if game.get("division") else game.get("label") == "Exhibition"
     home_row = find_row(pages.get(game["home"], []), day, game["away"], exhibition)
@@ -1924,9 +2005,10 @@ def box_link(game, pages):
 
 def refresh_feed(game, pages, links=None):
     """Take a live stats link a schedule page added or changed since the last full run. Schools post the link on
-    game day, and a tournament host moved its second game from wbball to wbball2 in the hour before tipoff (Hope,
-    2026-11-07). A new link counts when the game has no feed or when it sits on the same site as the old link, so
-    another school's own stats page never replaces the host's. A link set in extra_games.json stays."""
+    game day. A tournament host moved its second game from wbball to wbball2 in the hour before tipoff (Hope,
+    2026-11-07). A new link counts when the game has no feed, or when the link is on the same site as the old
+    link. So another school's own stats page never replaces the host's. A link set in extra_games.json stays.
+    """
     if (links or {}).get(game.get("id")):
         return False
     day = date.fromisoformat(game["date"])
@@ -1940,7 +2022,7 @@ def refresh_feed(game, pages, links=None):
             if feed and feed != game.get("feed"):
                 game["feed"], game["link"] = feed, url
                 return True
-            # A short link the Mac resolved to StatBroadcast gives no feed, but the card can say so from tipoff
+            # A short link the Mac resolved to StatBroadcast gives no feed. But the card can say so from tipoff
             # instead of "no live stats" 45 minutes later (Concordia (MN) vs Minnesota Morris, 2026-11-11).
             if not feed and not game.get("feed") and STATBROADCAST.search(url) and (not old or SHORT_LINK.match(old)):
                 game["link"] = url
@@ -1988,7 +2070,7 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
     keys = d3_keys(schools)
     out = []
     for g in games:
-        # Games against Division I and II teams (extra_games.json can still carry them) stay off the page.
+        # Games against Division I and II teams stay off the page. extra_games.json can still list them.
         if g.get("division"):
             continue
         gid = f'{g["date"]}-{norm(g["away"])}-at-{norm(g["home"])}'
@@ -1997,8 +2079,8 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
         home_row = find_row(pages.get(g["home"], []), day, g["away"], exhibition)
         away_row = find_row(pages.get(g["away"], []), day, g["home"], exhibition)
         listed, espn_game = find_hub(g, hub, schools, others), find_espn(g, espn, keys) if g.get("division") else None
-        # Tipoff order: a D3 page, a tip set by hand in extra_games.json, the hub and ESPN (both UTC), then a
-        # Division I or II host's page, whose zone is a guess.
+        # Tipoff order: a D3 page, then a tip set by hand in extra_games.json. Next come the hub and ESPN
+        # (both UTC). Last is a Division I or II host's page, whose zone is a guess.
         own = [r for t, r in ((g["home"], home_row), (g["away"], away_row)) if r and r["time"] and not schools.get(t, {}).get("extra")]
         hosts = [r for t, r in ((g["home"], home_row), (g["away"], away_row)) if r and r["time"] and schools.get(t, {}).get("extra")]
         tip, tbd = tip_time(own[0] if own else None, day)
@@ -2007,11 +2089,12 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
                 tip, tbd = later, False
         if not tip and hosts:
             tip, tbd = tip_time(hosts[0], day)
-        # Feed order: a third school's listing of the game ("A vs. B" on the host's page), then, for a neutral game,
-        # either page's link to a site that is neither team's own; then the home page's live stats link, the hub's
-        # link when the home school posted the listing, the home school's own Sidearm feed, the away side's links,
-        # then ESPN. A school's link can point at its own idle feed (Christopher Newport's did while it played at
-        # Susquehanna, 2026-11-07), so every other feed found is kept as an alternative to try after tipoff.
+        # Feed order: a third school's listing of the game ("A vs. B" on the host's page) comes first. For a neutral
+        # game, either page's link to a site that is neither team's own comes next. Then come the home page's live
+        # stats link, and the hub's link when the home school posted the listing. After those come the home school's
+        # own Sidearm feed, the away side's links, and ESPN. A school's link can point at its own idle feed
+        # (Christopher Newport's did while it played at Susquehanna, 2026-11-07). So every other feed found is kept
+        # as an alternative to try after tipoff.
         home_link = (home_row or {}).get("links", {}).get("live_stats")
         away_link = (away_row or {}).get("links", {}).get("live_stats")
         hub_link = (listed or {}).get("livestats")
@@ -2028,9 +2111,9 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             feed, link = live_feed(home_link), home_link
         if not feed and hub_link and hub_home:
             feed, link = live_feed(hub_link), link or hub_link
-        # A home page that links StatBroadcast says the crew is not on Sidearm tonight; the house feed then holds an
-        # older game (Millsaps's held its 2026-02-21 game against Oglethorpe for Texas Lutheran at Millsaps,
-        # 2026-11-20), so it rides along only as an alternative.
+        # A home page that links StatBroadcast says the crew is not on Sidearm tonight. The house feed then holds an
+        # older game. For Texas Lutheran at Millsaps (2026-11-20), Millsaps's feed held its 2026-02-21 game against
+        # Oglethorpe. So the house feed is kept only as an alternative.
         if not feed and not g["neutral"] and not STATBROADCAST.search(home_link or ""):
             feed = house_feed(schools.get(g["home"]))
             if feed and not link:
@@ -2109,7 +2192,7 @@ class SchedulePages(dict):
 
 def record_finals(out, today, pages, links=None):
     """For the last FINALS_DAYS_BACK days, read each game without a box score. An unfinished game first takes any
-    live stats link its schedule pages added or changed since the last full run. The live feed comes first; a crew
+    live stats link its schedule pages added or changed since the last full run. The live feed comes first. A crew
     can reuse it for its next game, so once the game is over, the box score page a schedule links is read instead.
     A score a schedule page posts outranks a feed's. A game the browser cannot follow (no feed, but a Presto box
     score page) gets a snapshot of its score while it is on."""
@@ -2142,9 +2225,9 @@ def record_finals(out, today, pages, links=None):
                 elif box:
                     snap = snapshot(g, box)
             # A schedule page that posts the final score has a finished box score behind it. UW-Oshkosh vs Calvin
-            # at UW-Platteville, 2026-11-21: both pages posted 67-58 by 22:28 UTC, but the host's feed had moved to
-            # its next game, and the box score waited for BOX_PAGE_AFTER (23:00), so Sammi Beyer's second game in a
-            # row with no minutes reached the page an hour late.
+            # at UW-Platteville, 2026-11-21: both pages posted 67-58 by 22:28 UTC. The host's feed was already on
+            # its next game. The box score waited for BOX_PAGE_AFTER (23:00). So Sammi Beyer's second game in a row
+            # with no minutes reached the page an hour late.
             if not result and link and (posted or is_over(g, today)):
                 result = read_box_page(g, link)
         except FETCH_ERRORS as exc:
@@ -2196,9 +2279,11 @@ def finals_only(previous):
 def restamp_defense(defense, written):
     """Write the current defense factors into every stored slate not written this run.
 
-    The ratings move with each daily export and the season lists read the factor each slate stores,
-    so an old slate keeps a factor from the day it was last built unless this rewrites it. A slate
-    is rewritten only when a factor changes. An empty factor list leaves every slate as it is."""
+    The ratings move with each daily export. The season lists read the factor each slate stores. So
+    an old slate keeps a factor from the day it was last built, unless this function rewrites it. A
+    slate is rewritten only when a factor changes. An empty factor list leaves every slate as it
+    is.
+    """
     if not defense:
         return
     for path in sorted(SLATES.glob("*.json")):
@@ -2262,8 +2347,8 @@ def collect(previous):
     for g in games:
         by_day.setdefault(g["date"], []).append(g)
 
-    # Every D3 team's schedule page, read in parallel: NPI games need tipoff and feed, and a page
-    # is the only place a game against a Division I or II team shows up.
+    # Read every D3 team's schedule page in parallel. NPI games need tipoff and feed. A page is
+    # the only place a game against a Division I or II team appears.
     window = [today + timedelta(days=i) for i in range(SLATE_DAYS_AHEAD + 1)]
     teams = sorted(set(schools) | {t for d in window for g in by_day.get(d.isoformat(), []) for t in (g["home"], g["away"])})
     pages = {}
@@ -2292,7 +2377,8 @@ def collect(previous):
         try:
             return reader(d)
         except (*FETCH_ERRORS, TypeError, AttributeError, KeyError, IndexError) as exc:
-            # A changed JSON shape costs this listing, not the run.
+            # A changed JSON shape costs this listing only. The run
+            # goes on.
             out["errors"].append(f"{source} {d.isoformat()}: {exc!r}")
             return []
 

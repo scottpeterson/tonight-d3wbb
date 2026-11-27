@@ -16,7 +16,9 @@ PREFIX = "data:image/webp;base64,"
 
 
 def slug(name):
-    """The file name for a team. logoSlug() in build_site.LIVE_JS must match this."""
+    """Return the file name for a team. logoSlug() in build_site.LIVE_JS must match
+    this.
+    """
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 

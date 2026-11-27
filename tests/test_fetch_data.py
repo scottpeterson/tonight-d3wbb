@@ -54,7 +54,8 @@ def test_sidearm_list_page(monkeypatch):
     first = rows[0]
     assert first["day"] == date(2026, 11, 6)
     assert first["home"] and not first["neutral"]
-    # The time sits in its own span after a "/" span, outside the date span.
+    # The time is in its own HTML element after a "/" element, outside the
+    # date element.
     assert first["time"] == (17, 30, "America/New_York")
     assert first["opponent"] == "University of Wisconsin-Platteville"
     assert first["links"]["live_stats"] == "https://athletics.hope.edu/sidearmstats/wbball/summary"
@@ -76,7 +77,7 @@ def test_sidearm_table_page_falls_back_to_the_table_reader(monkeypatch):
 
 
 def test_sidearm_component_page_reads_the_json_and_the_text_schedule(monkeypatch):
-    # rhodeslynx.com, 2026-11-14: the page embeds its games as JSON and draws them in the browser; the list reader
+    # rhodeslynx.com, 2026-11-14: the page embeds its games as JSON and draws them in the browser. The list reader
     # found nothing, so Rhodes's result and box score link for Babson at Dallas never reached the finals pass.
     page, txt = (FIX / "sidearm_component_rhodes.html").read_text(), (FIX / "sidearm_txt_rhodes.txt").read_text()
     asked = []
@@ -93,7 +94,7 @@ def test_sidearm_component_page_reads_the_json_and_the_text_schedule(monkeypatch
     assert babson["links"] == {"live_stats": "https://udallasathletics.com/sidearmstats/wbball/summary", "video": "https://flosports.link/4BkatMw",
                                "boxscore": "https://rhodeslynx.com/boxscore.aspx?id=10654"}
     assert f.result_score(babson, False) == (83, 52)
-    # The JSON stops at the season's first games; the rest come from the text schedule, without links.
+    # The JSON stops at the season's first games. The rest come from the text schedule, without links.
     lyon = f.find_row(rows, date(2027, 2, 10), "Lyon")
     assert (lyon["opponent"], lyon["home"], lyon["neutral"], lyon["time"], lyon["links"]) == ("Lyon College", True, False, (18, 0, "America/Chicago"), {})
     saa = f.find_row(rows, date(2027, 2, 25), "SAA")
@@ -116,7 +117,8 @@ def test_sidearm_table_reader_handles_neutral_and_results():
 
 
 def test_presto_page(monkeypatch):
-    # A 2025-26 page; the reader dates it in the 2026-27 season, which is fine for the structure.
+    # The fixture is a 2025-26 page. The reader dates it in the 2026-27 season, which is fine for
+    # the structure.
     rows = rows_from(monkeypatch, f.presto_rows, "presto_willamette_2025.html",
                      "https://www.wubearcats.com/sports/wbkb/2025-26/schedule", "America/Los_Angeles")
     assert len(rows) == 27
@@ -182,8 +184,8 @@ def test_sibling_feeds_name_the_hosts_other_courts():
 
 
 def test_read_final_adopts_the_hosts_other_feed(monkeypatch):
-    # Hope's Michele Schoon Tournament, 2026-11-07: the slate named wbball, where Hope's own game sat unstarted,
-    # while the game ran on wbball2. The pass adopts wbball2 and reads the final there.
+    # Hope's Michele Schoon Tournament, 2026-11-07. The slate named wbball, where Hope's own game was unstarted.
+    # The game ran on wbball2. The pass adopts wbball2 and reads the final there.
     full = json.loads((FIX / "sidearm_full_nyu.json").read_text())
     idle = {"Game": {"HasStarted": False, "IsComplete": False, "Date": full["Game"]["Date"],
                      "HomeTeam": {"Name": "Hope", "Id": "TB", "Score": 0}, "VisitingTeam": {"Name": "Illinois Wesleyan", "Id": "TA", "Score": 0}}}
@@ -232,7 +234,8 @@ def test_refresh_feed_takes_a_link_a_page_added_on_game_day(monkeypatch):
     # A link set by hand in extra_games.json stays.
     pinned = {k: v for k, v in game.items() if k != "feed"}
     assert not f.refresh_feed(pinned, moved, {game["id"]: "http://stats.statbroadcast.com/x"})
-    # A short link the Mac resolved to StatBroadcast replaces the short link, so the card says where the stats are.
+    # A short link the Mac resolved to StatBroadcast replaces the short link. The card then says where the stats
+    # are.
     sb = "https://www.statbroadcast.com/events/statbroadcast.php?gid=ccmm"
     monkeypatch.setattr(f, "_presto_cache", {"links": {"https://gocobbers.com/links/rsensu": sb}})
     cobbers = {"Concordia (MN)": [f.row(day, (17, 30, "America/Chicago"), True, False, "Minn.-Morris", {"live_stats": sb}, "", "")]}
@@ -289,19 +292,20 @@ def test_match_newcomer():
     assert f.match_newcomer(dict(LINE, abbr="Vila Marti, Judith"), roster)["name"] == "Judith Vila"
     assert f.match_newcomer(dict(LINE, first="Jean", last="Sierra", abbr="J. SIERRA"), roster)["name"] == "Sierra Jean"
     assert f.match_newcomer(dict(LINE, first="Mj", last="van der Horst", abbr="M. VAN DER HORST"), roster)["name"] == "MJ van der Horst"
-    # Two roster players share the words: no guess. A name the roster lacks: None, and the feed's spelling stands.
+    # Two roster players share the words: no guess. A name the roster lacks gives None. The feed's spelling then
+    # stays.
     assert f.match_newcomer(dict(LINE, first="Lee", last="Ann Amy", abbr="L. ANN AMY"), ROSTER) is None
     assert f.roster_player(dict(LINE, first="Nia", last="Brown", abbr="N. BROWN"), ROSTER) == ("Nia Brown", "")
 
 
 def test_newcomer_of_matches_against_the_whole_roster_first():
-    # Maine Farmington, 2026-11-14: Jaydn Pingree (34 points) is not a newcomer; her sister Jazmine is. Against the
-    # newcomer list alone the initial-and-last-name step gave Jaydn's line to Jazmine.
+    # Maine Farmington, 2026-11-14: Jaydn Pingree scored 34 points and is not a newcomer. Her sister Jazmine is.
+    # Against the newcomer list alone, the initial-and-last-name step gave Jaydn's line to Jazmine.
     roster = [{"name": "Jaydn Pingree", "class": "JR"}, {"name": "Jazmine Pingree", "class": "JR"}]
     newcomers = [{"name": "Jazmine Pingree", "reason": "No 2025-26 minutes", "class": "JR"}]
     assert f.newcomer_of(dict(LINE, abbr="Pingree, Jaydn"), newcomers, roster) is None
     assert f.newcomer_of(dict(LINE, abbr="Pingree, Jazmine"), newcomers, roster)["name"] == "Jazmine Pingree"
-    # A newcomer the roster page lacks still matches through the newcomer list; no roster at all, the same.
+    # A newcomer the roster page lacks still matches through the newcomer list. No roster at all, the same.
     assert f.newcomer_of(dict(LINE, abbr="Park, Zoe"), [{"name": "Zoe Park", "reason": "Freshman"}], roster)["name"] == "Zoe Park"
     assert f.newcomer_of(dict(LINE, abbr="Pingree, Jaydn"), newcomers, [])["name"] == "Jazmine Pingree"
 
@@ -347,9 +351,10 @@ def test_read_final_stores_each_line_s_class_year(monkeypatch):
     assert out["newcomers"][0]["class"] == "FR"
     by_name = {x["name"]: x["class"] for x in out["top"]}
     assert by_name["Brooke Batchelor"] == "FR" and set(by_name.values()) == {"FR", ""}
-    # The top list carries the roster's spelling for a matched player and the feed's for the rest.
+    # The top list has the roster's spelling for a matched player and the feed's spelling for the
+    # rest.
     assert "Brooke Batchelor" in by_name and "Ella Fay Smith" not in by_name
-    # A newcomer list entry that carries its own class (the Stat Lab's) needs no roster lookup.
+    # A newcomer list entry that has its own class (the Stat Lab's) needs no roster lookup.
     out = f.read_final(nyu_game(newcomers_home=[{"name": "Brooke Batchelor", "reason": "Freshman", "class": "FR"}]))
     assert out["newcomers"][0]["class"] == "FR"
 
@@ -427,7 +432,7 @@ def test_other_games_keeps_division_one_and_two_opponents_only():
     schools = {t: {"team": t, "type": "Sidearm", "schedule": "https://x.example/", "tz": "America/New_York"} for t in pages}
     games, hosts = f.other_games(day, schools, pages, MEMBERS, {"Christopher Newport": 9, "Hope": 30}, {("2026-10-27", "Calvin")})
     by_d3 = {g["d3"]: g for g in games}
-    # Illinois Wesleyan's opponent is Division III; Calvin's game is covered by an extra game.
+    # Illinois Wesleyan's opponent is Division III. Calvin's game is covered by an extra game.
     assert set(by_d3) == {"Christopher Newport", "Hope"}
     hope = by_d3["Hope"]
     assert (hope["home"], hope["away"], hope["label"], hope["division"], hope["home_rank"]) == ("Hope", "Indianapolis", None, 2, 30)
@@ -549,7 +554,7 @@ def test_hub_matches_by_stats_link_or_name_when_sites_differ(monkeypatch):
 def test_listed_games_add_a_division_one_game_from_the_hub(monkeypatch):
     listing = hub(monkeypatch)
     games, hosts = f.listed_games(date(2026, 10, 28), listing, [], HUB_SCHOOLS, HUB_MEMBERS, {"SUNY Geneseo": 75}, {"Franklin"}, set())
-    # Franklin already has a game; Utica's hub site is not ours; Kent State's guest is Division II.
+    # Franklin already has a game. Utica's hub site is not ours. Kent State's guest is Division II.
     assert [(g["home"], g["away"], g["division"], g["d3"], g["tip"], g["home_rank"]) for g in games] == \
         [("SUNY Geneseo", "Binghamton", 1, "SUNY Geneseo", "2026-10-28T21:30:00Z", 75)]
     assert hosts == {"Binghamton": {"team": "Binghamton", "type": "Sidearm", "schedule": "https://bubearcats.com/sports/womens-basketball/schedule",
@@ -605,10 +610,12 @@ def test_hub_skips_naia_listings_and_other_states_namesakes():
                "name": {f.name_key("College of the Holy Cross"): [{"name": "College of the Holy Cross", "division": 1, "site": "goholycross.com"}]}}
     base = {"neutral": False, "tip": "2026-10-28T23:00:00Z", "livestats": None, "listing_home": True}
     hub = [
-        # Two NAIA schools: neither the Bethel nor the Holy Cross we know.
+        # Two schools in the National Association of Intercollegiate
+        # Athletics (NAIA): neither is the Bethel or the Holy Cross we
+        # know.
         dict(base, home="Holy Cross College (Ind.)", home_site="hcsaints.com", away="Bethel University (Ind.)", away_site="bupilots.com",
              division="NAIA", home_id=1, away_id=2),
-        # The live listings of 2026-10-28: Marian of Indiana lists its game at Indiana, and Indiana's own listing
+        # The live listings of 2026-10-28. Marian of Indiana lists its game at Indiana. Indiana's own listing
         # names "Marian" with Marian of Wisconsin's site and school ID.
         dict(base, home="Indiana University", home_site="iuhoosiers.com", away="Marian University (Ind.)", away_site="muknights.com",
              division="NAIA", listing_home=False, home_id=68, away_id=932),
@@ -669,7 +676,7 @@ def test_should_flip_counts_roster_players_first():
     game = {"home": "Calvin", "away": "Hope", "newcomers_home": roster, "newcomers_away": []}
     lines = [{"first": n.split()[0], "last": n.split()[1], "abbr": n} for n in ("Ann Lee", "Bea Cole")]
     sides = {"H": {"name": "Calvin", "id": "CALV"}, "V": {"name": "Hope", "id": "HOPE"}}
-    # Names and codes say keep (3 each side); two Calvin newcomers on the visiting side say flip.
+    # Names and codes say keep (3 each side). Two Calvin newcomers on the visiting side say flip.
     assert f.should_flip(game, sides, {"H": [], "V": lines})
     assert not f.should_flip(game, sides, {"H": lines, "V": []})
 
@@ -724,8 +731,8 @@ def test_is_over(monkeypatch):
 
 
 def test_a_posted_final_reads_the_box_score_page_before_box_page_after(monkeypatch, tmp_path):
-    # UW-Oshkosh vs Calvin at UW-Platteville, 2026-11-21: the pages posted the final an hour before BOX_PAGE_AFTER,
-    # and the host's feed had moved to its next game. The box score page is read once a page posts the score.
+    # UW-Oshkosh vs Calvin at UW-Platteville, 2026-11-21: the pages posted the final an hour before BOX_PAGE_AFTER.
+    # The host's feed was already on its next game. The box score page is read once a page posts the score.
     monkeypatch.setattr(f, "SLATES", tmp_path)
     monkeypatch.setattr(f, "now", lambda: datetime(2025, 11, 8, 2, 0, tzinfo=timezone.utc))   # 2 hours past tipoff
     assert not f.is_over(BOX_GAME, date(2025, 11, 7))
@@ -744,7 +751,8 @@ def test_a_posted_final_reads_the_box_score_page_before_box_page_after(monkeypat
 
 
 def test_result_score_reads_the_page_teams_side_from_w_or_l():
-    # Centenary's page at ULM, 2026-11-05: winner's score first.
+    # Centenary's page for its game at Louisiana-Monroe (ULM),
+    # 2026-11-05: winner's score first.
     assert f.result_score({"result": "L , 106-26"}, False) == (106, 26)
     assert f.result_score({"result": "L 62-70"}, True) == (62, 70)
     assert f.result_score({"result": "W, 71-44"}, True) == (71, 44)
@@ -752,8 +760,9 @@ def test_result_score_reads_the_page_teams_side_from_w_or_l():
     assert f.result_score({"result": ""}, True) is None
 
 
-# St. Joseph's Brooklyn's crew ran one feed for its whole tournament, 2026-11-06: Pratt at St. Joseph's Brooklyn,
-# then St. Joseph's Long Island vs Medgar Evers, with the names typed on the wrong sides.
+# St. Joseph's Brooklyn's crew ran one feed for its whole tournament on 2026-11-06. The first game was Pratt at
+# St. Joseph's Brooklyn. The second was St. Joseph's Long Island vs Medgar Evers. The crew typed the names on the
+# wrong sides.
 def tourney_game(home, away):
     names, rosters = f.team_names(), f.team_rosters()
     return {"home": home, "away": away, "home_names": names[home], "away_names": names[away],
@@ -795,7 +804,7 @@ def test_a_team_with_no_player_on_the_feed_is_not_playing():
 
 def test_lines_a_crew_named_after_the_other_team_are_dropped():
     # Rhodes's box score for Babson at Dallas, 2026-11-14, named six Babson players after Rhodes players with the
-    # same jersey numbers: Menendez had 23 points for Babson and 7 for Rhodes.
+    # same jersey numbers. Menendez had 23 points for Babson and 7 for Rhodes.
     game = {**tourney_game("Babson", "Rhodes"), "date": "2026-11-14", "neutral": True}
 
     def stats(lines, pts):
@@ -891,7 +900,7 @@ def test_a_final_the_game_cannot_have_yet_is_dropped(monkeypatch, tmp_path):
     game = {"date": "2026-11-07", "home": "St. Scholastica", "away": "UW-Stevens Point", "neutral": True}
     built = f.build_slate(date(2026, 11, 7), [game], {}, {}, {}, {}, {"games": [old]})["games"][0]
     assert (built["final"], built["top_lines"], built["box_read"], built["tip"]) == (None, [], False, "2026-11-07T19:00:00Z")
-    # The same carried final counts once the game can be over, and a game with no tipoff keeps its final on its day.
+    # The same stored final counts once the game can be over. A game with no tipoff keeps its final on its day.
     monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 7, 19, 45, tzinfo=timezone.utc))
     assert f.build_slate(date(2026, 11, 7), [game], {}, {}, {}, {}, {"games": [old]})["games"][0]["final"] == [64, 53]
     assert f.final_can_exist({"date": "2026-11-07"}, date(2026, 11, 7)) and not f.final_can_exist({"date": "2026-11-08"}, date(2026, 11, 7))
@@ -907,8 +916,9 @@ def test_a_final_the_game_cannot_have_yet_is_dropped(monkeypatch, tmp_path):
 
 
 def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
-    # Hope vs Illinois Wesleyan on 2026-11-07: a tournament's second day, TBA on the pages until the first day ended,
-    # so gameLeverages.json did not list it. Both pages list it now; the pair joins once.
+    # Hope vs Illinois Wesleyan on 2026-11-07 was a tournament's second-day game. The pages showed it as TBA (to be
+    # announced) until the first day ended, so gameLeverages.json did not list it. Both pages list it now. The pair
+    # joins once.
     day = date(2026, 11, 7)
     pages = {
         "Hope": [f.row(day, (15, 0, "America/New_York"), True, False, "Illinois Wesleyan University", {}, "", "", "https://www.iwusports.com/")],
@@ -919,7 +929,8 @@ def test_page_games_add_a_d3_game_the_stat_lab_list_lacks():
         # A placeholder row that links the host's site, and a host's listing of another game, name no opponent.
         "Benedictine": [f.row(day, (12, 0, "America/Chicago"), False, True, "WashU Tournament", {}, "", "", "http://washubears.com/")],
         "WashU": [f.row(day, (12, 0, "America/Chicago"), False, True, "Benedictine (Ill.) vs. Central College", {}, "", "")],
-        # A neutral row whose link points at the tournament host (Principia) names a Westminster, not the host.
+        # A neutral row whose link points at the tournament host (Principia) names a Westminster as the
+        # opponent.
         "Aurora": [f.row(day, (14, 0, "America/Chicago"), False, True, "Westminster University", {}, "", "", "http://principiaathletics.com")],
         "Principia": [], "Westminster (MO)": [], "Westminster (PA)": [],
         # An undecided second-day opponent that links one of the two names the host (Dickinson, 2026-11-21).
@@ -952,7 +963,8 @@ HENDRIX_ROW = """<li class="sidearm-schedule-game sidearm-schedule-home-game sid
 
 
 def test_sidearm_result_reads_postponed_not_the_final_label(monkeypatch):
-    # Hendrix vs Rhodes, 2026-11-07: the row carries a "...-result-final">Final</span> before the result "Postponed".
+    # Hendrix vs Rhodes, 2026-11-07: the row has a result-final element that says Final before the result
+    # "Postponed".
     monkeypatch.setattr(f, "get", lambda *a, **k: HENDRIX_ROW)
     r = f.sidearm_rows("https://hendrixwarriors.com/sports/womens-basketball/schedule", "America/Chicago")[0]
     assert (r["opponent"], r["result"]) == ("Rhodes College", "Postponed")
@@ -967,7 +979,7 @@ def test_a_postponed_game_shows_no_final_and_the_finals_pass_skips_it(monkeypatc
     old = {"id": "2026-11-07-rhodes-at-hendrix", "final": [70, 60], "box_read": True, "top_lines": [{"team": "Hendrix"}], "newcomer_games": []}
     built = f.build_slate(day, [game], {}, pages, {}, {}, {"games": [old]})["games"][0]
     assert (built["off"], built["final"], built["box_read"], built["modeled"]) == ("Postponed", None, False, True)
-    # The finals pass reads nothing for it, and drops a final it still carries.
+    # The finals pass reads nothing for it and drops any final it still has.
     monkeypatch.setattr(f, "SLATES", tmp_path)
     monkeypatch.setattr(f, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("read a postponed game")))
     slate_game = {**built, "feed": {"type": "sidearm", "url": "https://sidearmstats.com/hendrix/wbball/game.json"}, "final": [70, 60],
@@ -1005,8 +1017,8 @@ WIDENER_SCHOOLS = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{s}/s
 
 
 def test_a_projected_pairing_both_pages_contradict_is_left_out():
-    # Salisbury at Marywood, 2026-11-07, from the Stat Lab's list: Salisbury's page said Widener, Marywood's said
-    # Centenary, and both of those pages named them back.
+    # Salisbury at Marywood, 2026-11-07, from the Stat Lab's list. Salisbury's page said Widener, and Marywood's
+    # said Centenary. Both of those pages named them back.
     day, pages = date(2026, 11, 7), widener_pages()
     resolve = f.opponent_resolver(WIDENER_SCHOOLS, MEMBERS)
     assert f.contradicted({"home": "Marywood", "away": "Salisbury"}, day, pages, resolve)
@@ -1025,8 +1037,9 @@ YORK_SCHOOLS = {t: {"team": t, "type": "Sidearm", "schedule": f"https://{s}/spor
 
 
 def test_a_page_name_from_team_names_csv_resolves():
-    # Mary Washington's page listed "The College of New Jersey" on 2026-11-14. "TCNJ" never matched it, so the
-    # Stat Lab's projected Mary Washington at DeSales pairing stood while the pages said TCNJ and York (PA).
+    # Mary Washington's page listed "The College of New Jersey" (TCNJ) on 2026-11-14. The name TCNJ never
+    # matched it. So the Stat Lab's projected Mary Washington at DeSales pairing stood while the pages said
+    # TCNJ and York (PA).
     day = date(2026, 11, 14)
     resolve = f.opponent_resolver(YORK_SCHOOLS, MEMBERS)
     assert resolve(f.row(day, None, False, True, "The College of New Jersey", {}, "", "")) == "TCNJ"
@@ -1045,7 +1058,7 @@ def test_a_page_name_from_team_names_csv_resolves():
 
 
 def test_a_game_neither_schedule_page_lists_is_left_out():
-    # Massey carried Buena Vista at North Central (MN) on 2026-11-10; both pages showed Nov 7 and Nov 14 only.
+    # Massey listed Buena Vista at North Central (MN) on 2026-11-10. Both pages showed only Nov 7 and Nov 14.
     day, other = date(2026, 11, 10), date(2026, 11, 14)
     pages = {"Buena Vista": [f.row(other, None, False, False, "Carleton College", {}, "", "")],
              "North Central (MN)": [f.row(other, None, True, False, "Trinity Bible College", {}, "", "")]}
@@ -1059,7 +1072,8 @@ def test_a_game_neither_schedule_page_lists_is_left_out():
     assert not f.unlisted(g, day, {**pages, "Buena Vista": []})
     tba = {**pages, "Buena Vista": pages["Buena Vista"] + [f.row(day, None, False, True, "TBA", {}, "", "")]}
     assert not f.unlisted(g, day, tba)
-    # An exhibition row that day is no listing.
+    # An exhibition row that day does not count as a
+    # listing.
     exhib = {**pages, "Buena Vista": pages["Buena Vista"] + [f.row(day, None, True, False, "Alumni", {}, "", "Exhibition")]}
     assert f.unlisted(g, day, exhib)
 
@@ -1098,7 +1112,7 @@ def test_read_presto_page_uses_the_cached_box_when_presto_refuses(monkeypatch):
     monkeypatch.setattr(f, "_presto_cache", {"boxes": {PRESTO_URL: {"at": at, "box": box}}})
     monkeypatch.setattr(f, "get", refused)
     assert f.read_presto_page(game, PRESTO_URL)["score"] == box["score"]
-    # A score in progress counts only while the Mac's copy is fresh; a final counts at any age.
+    # A score in progress counts only while the Mac's copy is fresh. A final counts at any age.
     stale = (f.now() - f.PRESTO_CACHE_LIVE - f.timedelta(minutes=1)).isoformat(timespec="seconds")
     monkeypatch.setattr(f, "_presto_cache", {"boxes": {PRESTO_URL: {"at": stale, "box": {**box, "complete": False}}}})
     with pytest.raises(f.FETCH_ERRORS):
@@ -1149,7 +1163,7 @@ def test_page_games_skip_a_scrimmage_the_other_page_labels():
 
 
 def test_a_game_the_pages_date_differently_moves_or_goes():
-    # The Stat Lab listed La Verne vs Pacific on 2026-11-07 and 11-08; La Verne's page said Sunday the 8th.
+    # The Stat Lab listed La Verne vs Pacific on 2026-11-07 and 11-08. La Verne's page said Sunday the 8th.
     nov7, nov8 = date(2026, 11, 7), date(2026, 11, 8)
     pages = {"La Verne": [f.row(nov8, (11, 0, "America/Los_Angeles"), True, False, "Pacific University", {}, "", "", "http://www.goboxers.com/")],
              "Pacific": []}
@@ -1158,7 +1172,7 @@ def test_a_game_the_pages_date_differently_moves_or_goes():
     resolve = f.opponent_resolver(schools, MEMBERS)
     game = {"date": "2026-11-07", "home": "La Verne", "away": "Pacific", "neutral": False}
     assert f.rescheduled(game, nov7, pages, resolve) == nov8
-    # With the pair on the 8th in the list too, the 7th copy goes; alone, it moves to the 8th.
+    # With the pair on the 8th in the list too, the 7th copy goes. Alone, it moves to the 8th.
     notes = []
     twice = f.place_games([game, {**game, "date": "2026-11-08"}], [nov7, nov8], pages, resolve, notes)
     assert ([g["date"] for g in twice[nov7]], [g["date"] for g in twice[nov8]]) == ([], ["2026-11-08"]) and "left out" in notes[0]
@@ -1200,8 +1214,8 @@ def feeds_by_client(monkeypatch):
 
 
 def test_a_host_listing_of_a_vs_b_gives_the_neutral_game_its_feed(monkeypatch):
-    # Christopher Newport vs SUNY Cobleskill at Susquehanna, 2026-11-07: CNU's page linked CNU's own idle feed, Cobleskill's
-    # page and Susquehanna's "SUNY Cobleskill vs. Christopher Newport" row linked the host's feed.
+    # Christopher Newport vs SUNY Cobleskill at Susquehanna, 2026-11-07: Christopher Newport's page linked its own idle
+    # feed. Cobleskill's page and Susquehanna's "SUNY Cobleskill vs. Christopher Newport" row linked the host's feed.
     feeds_by_client(monkeypatch)
     schools, pages = host_schools(), host_pages()
     hosted = f.host_listings(date(2026, 11, 7), pages, schools)
@@ -1215,7 +1229,7 @@ def test_a_host_listing_of_a_vs_b_gives_the_neutral_game_its_feed(monkeypatch):
     # Without the host's row, the away page's link to a site that is neither team's own still wins for a neutral game.
     built = f.build_slate(date(2026, 11, 7), [game], schools, pages, {}, {}, {})["games"][0]
     assert built["feed"]["url"] == "https://sidearmstats.com/susquehanna/wbball/game.json"
-    # A home game keeps the home page's link first and carries the rest as alternatives.
+    # A home game keeps the home page's link first and keeps the rest as alternatives.
     built = f.build_slate(date(2026, 11, 7), [dict(game, neutral=False)], schools, pages, {}, {}, {})["games"][0]
     assert built["feed"]["url"] == "https://sidearmstats.com/cnu/wbball/game.json"
     assert [a["feed"]["url"] for a in built["alt_feeds"]] == ["https://sidearmstats.com/susquehanna/wbball/game.json"]
@@ -1243,8 +1257,9 @@ def test_the_finals_pass_tries_the_alternative_feeds(monkeypatch):
 
 
 def test_get_treats_a_waf_challenge_as_a_fetch_error(monkeypatch):
-    # Presto's CloudFront answers a JavaScript challenge after about six requests a minute (2026-11-08): status 202
-    # with x-amzn-waf-action, or a 200 with a short page that loads challenge.js. Either must not pass as the page.
+    # Presto's CloudFront answers a JavaScript challenge after about six requests a minute (2026-11-08). The
+    # challenge is status 202 with x-amzn-waf-action, or a 200 with a short page that loads challenge.js. Neither
+    # may pass as the page.
     import contextlib
 
     class Resp:
@@ -1266,8 +1281,8 @@ def test_get_treats_a_waf_challenge_as_a_fetch_error(monkeypatch):
 
 
 def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_path):
-    # Box scores of games past tipoff first, then the schedule pages of schools with games, then the rest; a failed
-    # or empty read keeps the last copy; PRESTO_BUDGET caps the run.
+    # Box scores of games past tipoff first, then the schedule pages of schools with games, then the rest. A failed
+    # or empty read keeps the last copy. PRESTO_BUDGET caps the run.
     schedule = (FIX / "presto_willamette_2025.html").read_text()
     seen, sleeps = [], []
 
@@ -1301,7 +1316,7 @@ def test_presto_snapshot_paces_requests_and_keeps_old_copies(monkeypatch, tmp_pa
     monkeypatch.setattr(f, "PRESTO_BUDGET", 2)
     seen.clear()
     assert f.presto_snapshot()["requests"] == 2 and len(seen) == 2
-    # A game before tipoff has no box score to read; its school's schedule page still comes before the rest.
+    # A game before tipoff has no box score to read. Its school's schedule page still comes before the rest.
     monkeypatch.setattr(f, "PRESTO_BUDGET", 45)
     monkeypatch.setattr(f, "now", lambda: datetime(2026, 11, 6, 17, 0, tzinfo=timezone.utc))
     games[0]["tip"] = "2026-11-06T23:00:00Z"
@@ -1326,7 +1341,7 @@ def pt3_data():
 
 
 def test_new_template_presto_page_names_its_live_json_and_the_json_gives_the_box():
-    # Bryn Mawr at SUNY Delhi, 2026-11-08: the page's tables are empty; the numbers come from the school's own
+    # Bryn Mawr at SUNY Delhi, 2026-11-08: the page's tables are empty. The numbers come from the school's own
     # /action/sports/liveupdate JSON. The old template still parses from the HTML.
     assert f.presto_box(PT3_PAGE) is None
     assert f.pt3_source(PT3_PAGE, PT3_URL) == PT3_LIVE
@@ -1370,7 +1385,7 @@ def test_presto_snapshot_reads_the_live_json_as_its_own_paced_request(monkeypatc
     # The runner's page reader takes the same path when it can reach the page.
     game = {"home": "SUNY Delhi", "away": "Bryn Mawr", "date": "2026-11-08", "newcomers_home": [], "newcomers_away": []}
     assert f.read_presto_page(game, PT3_URL)["score"] == {"V": 28, "H": 35}
-    # The runner can get the page and still be refused the live update JSON; the Mac's copy stands in.
+    # The runner can get the page and still be refused the live update JSON. The Mac's copy stands in.
     def page_only(url, *a, **k):
         if url == PT3_LIVE:
             refused(url)
@@ -1431,8 +1446,8 @@ def test_live_feed_and_links_read_a_short_link_through_the_cache(monkeypatch):
 
 
 def test_presto_snapshot_resolves_the_short_links_of_games_in_the_window_once(monkeypatch, tmp_path):
-    # Concordia (MN) vs Minnesota Morris, 2026-11-11: both schedule pages gave gocobbers.com/links/rsensu, which no
-    # reader could turn into a feed or a box score page.
+    # Concordia (MN) vs Minnesota Morris, 2026-11-11: both schedule pages gave gocobbers.com/links/rsensu. No
+    # reader could turn that link into a feed or a box score page.
     seen = []
 
     def served(url, *a, **k):
@@ -1469,7 +1484,8 @@ def test_presto_snapshot_resolves_the_short_links_of_games_in_the_window_once(mo
     seen.clear()
     out = f.presto_snapshot(live_only=True)
     assert out["requests"] == 1 and seen == [SHORT_TARGET]
-    # An hour later the full pass reads the box score again.
+    # An hour later the box score is stale. The full pass
+    # reads it again.
     cache = json.loads((tmp_path / "presto_cache.json").read_text())
     cache["boxes"][SHORT_TARGET]["at"] = "2026-11-11T00:00:00+00:00"
     (tmp_path / "presto_cache.json").write_text(json.dumps(cache))
@@ -1510,9 +1526,9 @@ def test_restamp_defense_rewrites_old_slates_with_the_current_factors(monkeypatc
 
 
 def test_a_link_to_another_members_site_overrules_the_name_match():
-    # NC Wesleyan's page listed "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15. The
-    # name, stripped of its parenthetical, fit Johnson & Wales Providence, and the slate carried a game Providence
-    # never had. The link names Johnson & Wales Charlotte, a member outside the NPI list.
+    # NC Wesleyan's page listed "Johnson & Wales (N.C.)" linking charlotte.jwuathletics.com on 2026-11-15. Without
+    # its parenthetical, the name fit Johnson & Wales Providence. The slate then had a game Providence never
+    # played. The link names Johnson & Wales Charlotte, a member outside the NPI list.
     day = date(2026, 11, 15)
     schools = dict(YORK_SCHOOLS, **{"Johnson & Wales Providence": {"team": "Johnson & Wales Providence", "type": "Sidearm",
                                      "schedule": "https://providence.jwuathletics.com/sports/womens-basketball/schedule",
@@ -1530,7 +1546,7 @@ def test_a_link_to_another_members_site_overrules_the_name_match():
     # The same name linking Providence's own site still resolves.
     assert resolve(f.row(day, None, True, False, "Johnson & Wales (N.C.)", {}, "", "", "https://providence.jwuathletics.com/")) == "Johnson & Wales Providence"
     # A name that fits Johnson & Wales Charlotte too (data/other_d3_names.csv) names no one. Hollins listed
-    # "Johnson & Wales University" at Decatur, Ga. on 2026-11-21, linking jwuathletics.com; Providence played Smith.
+    # "Johnson & Wales University" at Decatur, Ga. on 2026-11-21, linking jwuathletics.com. Providence played Smith.
     assert resolve(f.row(day, None, True, False, "Johnson & Wales", {}, "", "")) is None
     assert resolve(f.row(day, None, True, False, "Johnson & Wales University", {}, "", "", "http://www.jwuathletics.com")) is None
     # Providence's own qualified names still fit only Providence.

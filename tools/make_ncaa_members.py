@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Write data/ncaa_members.csv: every NCAA school that sponsors women's basketball,
-with its division, conference, and athletics site.
+"""Write data/ncaa_members.csv: every NCAA school that sponsors women's basketball, with
+its division, conference, and athletics site.
 
-Reads the NCAA directory (web3.ncaa.org/directory), which is open JSON. fetch_data.py
-uses the file to find D3 games against Division I and II teams on schedule pages:
-first by the opponent link's site, then by the opponent's name. Rerun each fall,
-because schools change divisions.
+Reads the NCAA directory (web3.ncaa.org/directory), which is open JSON. The script
+fetch_data.py uses the file to find D3 games against Division I and II teams on schedule
+pages. It matches first by the opponent link's site, then by the opponent's name.
+Schools change divisions, so rerun each fall.
 """
 import csv
 import json

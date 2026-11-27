@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Write data/team_names.csv and data/rosters.csv, the lists fetch_data.py uses to tell whether a live
-stats feed shows the game on the card, and the class year the page shows beside a box line. Also write
-data/other_d3_names.csv: the names of Division III women's teams that play this season but do not count
-(provisional members such as Johnson & Wales Charlotte), so a schedule row naming one is not read as a
-counting team with a similar name.
+"""Write data/team_names.csv and data/rosters.csv. The script fetch_data.py uses them to tell whether a
+live stats feed shows the game on the card. The page shows the class year from rosters.csv beside a box
+line. Also write data/other_d3_names.csv with the names of Division III women's teams that play this
+season but do not count. Provisional members such as Johnson & Wales Charlotte are on it. A schedule
+row that names one is then not read as a counting team with a similar name.
 
-Reads ~/projects/d3-bball-npi/myapp/data: `D3 Schools Name Mapping.csv` for every way a source writes a
-school's name, and 2027/players.csv for this season's rosters. A host's crew can run one feed for every
-game of its tournament, so a feed that names neither team, and holds none of their players, belongs to
-another game. Rerun after a roster update or a name change.
+Reads ~/projects/d3-bball-npi/myapp/data. `D3 Schools Name Mapping.csv` gives every way a source writes
+a school's name, and 2027/players.csv gives this season's rosters. A host's crew can run one feed for
+every game of its tournament. So a feed that names neither team and holds none of their players belongs
+to another game. Rerun after a roster update or a name change.
 """
 import csv
 import re
@@ -40,7 +40,8 @@ def main():
             if row["Display"] in teams:
                 names[row["Display"]] = seen
             elif row["Display"] and row["Conference"].strip("- ") and row["Gender"] != "Men":
-                # A school with a conference and a women's team; closed schools have "-" for conference.
+                # Keep a school with a conference and a women's team. Closed schools have "-" for
+                # conference.
                 others[row["Display"]] = seen
     for path, table in ((OUT / "team_names.csv", names), (OUT / "other_d3_names.csv", others)):
         with open(path, "w", newline="", encoding="utf-8") as f:
