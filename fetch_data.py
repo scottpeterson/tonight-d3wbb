@@ -2184,6 +2184,8 @@ def build_slate(day, games, schools, pages, tourn, newcomers, previous, links=No
             # False for a game no model priced (one the schedule pages added): the page then calls no result an upset.
             "modeled": g.get("modeled", True) and g.get("pregame_margin") is not None, "off": off,
             "home_lev": g.get("home_lev") or 0, "away_lev": g.get("away_lev") or 0,
+            # The teams for which this is a ripple game, from gameLeverages.json (export_scoreboard_inputs.py).
+            "ripple": g.get("ripple") or [],
             "home_tourn": round(tourn.get(g["home"], 0.0), 4), "away_tourn": round(tourn.get(g["away"], 0.0), 4),
             "feed": feed or old.get("feed"), "link": link or old.get("link"), "alt_feeds": alternatives,
             "video": video or old.get("video"),

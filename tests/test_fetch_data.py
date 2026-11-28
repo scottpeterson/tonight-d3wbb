@@ -1033,6 +1033,16 @@ def test_page_games_are_unmodeled_and_stat_lab_games_are_modeled():
     assert [g["modeled"] for g in built] == [False, True]
 
 
+def test_slate_games_carry_the_ripple_teams_from_the_stat_lab():
+    day = date(2026, 11, 28)
+    game = {"date": "2026-11-28", "home": "Trine", "away": "WashU", "neutral": False, "pregame_wp": 0.534,
+            "pregame_margin": 0.9, "ripple": ["Trine", "WashU"]}
+    plain = {"date": "2026-11-28", "home": "Roanoke", "away": "William Peace", "neutral": False, "pregame_wp": 0.59,
+             "pregame_margin": 2.5}
+    built = f.build_slate(day, [game, plain], {}, {}, {}, {}, {})["games"]
+    assert {g["home"]: g["ripple"] for g in built} == {"Trine": ["Trine", "WashU"], "Roanoke": []}
+
+
 def widener_pages():
     day = date(2026, 11, 7)
     return {

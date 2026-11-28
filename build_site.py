@@ -149,7 +149,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .side{grid-area:side;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s2);min-width:0;min-height:24px;font-size:var(--fs-caption);color:var(--muted)}.side>span{white-space:nowrap}.side .wc{display:flex;gap:.3em}.state{font-size:var(--fs-small);font-weight:600;color:var(--ink)}.gc.live .state{color:var(--live);font-weight:600}.gc.final .state{color:var(--muted)}
 .star{grid-area:star;align-self:start;margin:-4px -4px -4px 0;border:0;background:transparent;color:var(--muted);width:32px;height:32px;padding:0;font-size:var(--fs-body);line-height:1}.star[aria-pressed="true"]{color:var(--warn)}
 .meta{grid-area:meta;display:flex;flex-wrap:wrap;gap:0 var(--s3);font-size:var(--fs-caption);color:var(--muted);padding-bottom:var(--s1)}.meta:empty{display:none}
-.tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:600}.tag.close{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
+.tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:600}.tag.close{color:var(--ink)}.tag.ripple{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
 #how{scroll-margin-top:64px}dl.terms{max-width:900px}
 .nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:var(--fs-caption);color:var(--muted);font-weight:400}
 .nc td.m{display:none}.nc .cls{display:none}.nc .times{color:var(--muted);font-weight:400;font-size:var(--fs-sm);white-space:nowrap}
@@ -509,6 +509,15 @@ HOW = f"""<dl class="terms">
 </ul>
 <p>Sometimes the schedule pages list a game before the NPI data does, such as a tournament's second-day game. That game shows an even win probability and no Game Leverage until the next NPI update.</p>
 </dd>
+<dt id="ripple">Ripple games</dt><dd>
+<p>A ripple game is a game against a team from another conference and another region. The result changes the NPI of every team on the conference schedule of each team. Regions 1 and 2 count as one region. Their teams play many of the same opponents.</p>
+<p>A game gets the tag when one of its teams meets all these conditions:</p>
+<ul>
+<li>The team's conference averages at least 1.75 bids in the season simulations.</li>
+<li>The team ranks in the top 200 by median NPI in the simulations.</li>
+<li>The team's pregame win probability is between 10% and 90%.</li>
+</ul>
+</dd>
 <dt>Interest</dt><dd>
 <p>A score from 0 to 100, from four parts:</p>
 <ul>
@@ -567,6 +576,7 @@ HOW = f"""<dl class="terms">
 <li><span class="sym" aria-hidden="true">\U0001F534</span>A game in progress.</li>
 <li><span class="sym" aria-hidden="true">\U0001F525</span>Close: a live game where the trailing team still has better than a 30% chance.</li>
 <li><span class="sym" aria-hidden="true">\U0001F6A8</span>Upset, or an upset alert during play.</li>
+<li><span class="sym" aria-hidden="true">\U0001F30A</span>Ripple game. See <a href="#ripple">Ripple games</a>.</li>
 <li><span class="sym" aria-hidden="true">\U0001F512</span>Decided: the trailing team has under a 2% chance.</li>
 <li><span class="sym" aria-hidden="true">\U0001F4A4</span>Neither team has a tournament chance.</li>
 <li><span class="sym" aria-hidden="true">⚡</span>Game Leverage of 15 or more.</li>
@@ -1160,6 +1170,7 @@ function tags(g,st){
   if(st.live&&Math.min(st.wp,1-st.wp)>0.3)out.push(['close','\u{1F525}','close']);
   const sw=st.live&&st.score?scoreWp(st.score[0]-st.score[1],st.progress||0):0.5;
   if(st.live&&Math.min(st.wp,1-st.wp)<0.02&&Math.min(sw,1-sw)<SCORE_DECIDED)out.push(['quiet','\u{1F512}','decided']);
+  if((g.ripple||[]).length)out.push(['ripple','\u{1F30A}','ripple']);
   if(!g.division&&Math.max(g.home_tourn,g.away_tourn)<0.005)out.push(['quiet','\u{1F4A4}','no tournament stakes']);
   return out.map(t=>'<span class="tag '+t[0]+'">'+(t[1]?t[1]+'\u00a0':'')+esc(t[2])+'</span>').join('');
 }

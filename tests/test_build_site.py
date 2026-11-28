@@ -104,3 +104,9 @@ def test_season_results_list_each_division_iii_final_as_winner_then_loser(tmp_pa
     (tmp_path / "2026-11-06.json").write_text(json.dumps({"date": "2026-11-06", "games": games}))
     monkeypatch.setattr(b, "SLATES", tmp_path)
     assert b.season_results() == [["Hope", "Calvin"], ["Hope", "Alma"]]
+
+
+def test_ripple_games_get_a_tag_and_a_definition():
+    assert "if((g.ripple||[]).length)out.push(['ripple'" in b.LIVE_JS
+    assert '<dt id="ripple">Ripple games</dt>' in b.HOW
+    assert "between 10% and 90%" in b.HOW
