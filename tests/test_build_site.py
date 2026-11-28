@@ -110,3 +110,10 @@ def test_ripple_games_get_a_tag_and_a_definition():
     assert "if((g.ripple||[]).length)out.push(['ripple'" in b.LIVE_JS
     assert '<dt id="ripple">Ripple games</dt>' in b.HOW
     assert "between 10% and 90%" in b.HOW
+
+
+def test_ripple_button_filters_to_ripple_games():
+    page = b.LIVE_JS
+    assert "if(onlyRipple&&!(g.ripple||[]).length)return false;" in page
+    assert "save('ripple',onlyRipple)" in page
+    assert "The \U0001F30A Ripple button" in b.HOW

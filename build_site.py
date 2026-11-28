@@ -134,7 +134,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .toolbar button:disabled{color:var(--faint);cursor:default}.toolbar .step{padding:0;width:var(--pill)}.toolbar .label{font-weight:600;white-space:nowrap;text-align:center;min-width:5.6em}
 .toolbar input{flex:0 1 220px;min-width:0;width:100%;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s3);font:inherit}.toolbar input::placeholder{color:var(--muted)}
 .relrow{display:flex;flex-wrap:wrap;gap:var(--s2);width:100%}.relrow select{-webkit-appearance:none;appearance:none;flex:0 1 300px;text-overflow:ellipsis;min-width:0;height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface) var(--chev) no-repeat right var(--s4) center/12px 8px;color:var(--ink);border-radius:999px;padding:0 calc(var(--s4) + 12px + var(--s3)) 0 var(--s4);font:inherit;font-size:var(--fs-md)}.relrow select:disabled{color:var(--faint)}.relrow button{height:var(--pill);border:1px solid var(--ctl-line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 var(--s4);font:inherit;font-size:var(--fs-md);white-space:nowrap}.relrow button:disabled{color:var(--faint);cursor:default}
-.toolbar .mine{margin-left:auto}.toolbar .mine[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.toolbar .mine{margin-left:auto}.toolbar .mine[aria-pressed="true"],.toolbar .flt[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .sortbar{margin:var(--s3) 0;align-items:flex-start}.sortbar .caption{width:100%}.sortbar .caption{display:flex;justify-content:space-between;gap:var(--s3)}.sortbar .checked{font-size:var(--fs-caption);color:var(--muted)}
 .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));grid-auto-rows:1fr;gap:var(--s3);padding-bottom:var(--s1)}
 .gc{display:grid;grid-template-columns:36px minmax(0,1fr) 32px;grid-template-rows:auto auto 1fr;grid-template-areas:"ix teams teams" ". side star" ". meta meta";gap:0 var(--s1);align-items:start;padding:var(--s2) var(--s2) var(--s1) var(--s2);background:var(--surface);border:1px solid transparent;border-radius:12px;box-shadow:0 0 0 1px var(--edge),var(--lift);font-size:var(--fs-small);line-height:1.25}
@@ -165,7 +165,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .empty{color:var(--muted);padding:var(--s3) var(--s4);margin:0}
 dl.terms{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:var(--s2) var(--s4);margin:0}dl.terms dt{font-weight:600}dl.terms dd{margin:0;color:var(--muted)}dl.terms dd p{margin:0 0 var(--s2)}dl.terms ul{margin:0 0 var(--s2);padding-left:1.2em}dl.terms li{margin:0 0 var(--s1)}dl.terms dd>:last-child{margin-bottom:0}dl.terms b{font-weight:600;color:var(--ink)}dl.terms .sym{display:inline-block;width:1.7em}dl.terms ul.legend{list-style:none;padding-left:0}
 @media (max-width:600px){:root{--pill:44px;--control-h:44px}.seg button{min-height:44px}.toolbar .step{flex:none;min-width:44px}.star{width:44px;height:44px;margin:-10px -10px -10px 0}}
-@media (max-width:640px){.board{grid-auto-rows:auto;gap:var(--s2)}main{padding:var(--s2) var(--s4) 48px}h1{font-size:var(--fs-h3)}.controls{width:100%}th,td{padding:var(--s2)}.toolbar .mine span{display:none}.toolbar{flex-wrap:wrap}.toolbar input{flex:1 1 120px;min-width:120px;order:1;padding:0 var(--s3)}.toolbar .label{flex:none}.toolbar button{padding:0 var(--s2)}.toolbar .step{padding:0}.toolbar .mine{margin-left:auto;flex:none;width:var(--pill);padding:0}.toolbar button,.toolbar input,.settings summary{font-size:var(--fs-sm)}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
+@media (max-width:640px){.board{grid-auto-rows:auto;gap:var(--s2)}main{padding:var(--s2) var(--s4) 48px}h1{font-size:var(--fs-h3)}.controls{width:100%}th,td{padding:var(--s2)}.toolbar .mine span,.toolbar .flt span{display:none}.toolbar{flex-wrap:wrap}.toolbar input{flex:1 1 120px;min-width:120px;order:1;padding:0 var(--s3)}.toolbar .label{flex:none}.toolbar button{padding:0 var(--s2)}.toolbar .step{padding:0}.toolbar .mine{margin-left:auto;flex:none;width:var(--pill);padding:0}.toolbar .flt{flex:none;width:var(--pill);padding:0;order:2}.toolbar button,.toolbar input,.settings summary{font-size:var(--fs-sm)}dl.terms{grid-template-columns:1fr}dl.terms dd{margin-bottom:var(--s2)}}
 @media (max-width:380px){.seg button{padding:var(--s2)}}
 @media (max-width:350px){.seg button{font-size:var(--fs-sm)}}
 """
@@ -429,7 +429,8 @@ def sections():
                '<button type="button" class="step" id="next" aria-label="Next night">&#8250;</button>'
                '<button type="button" id="tonight">Tonight</button>'
                '<input type="search" id="find" placeholder="Team" aria-label="Find a team" autocomplete="off">'
-               '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button></div>')
+               '<button type="button" class="mine" id="mine" aria-pressed="false" aria-label="Show only My Watchlist">\u2605<span> My Watchlist</span></button>'
+               '<button type="button" class="flt" id="ripplef" aria-pressed="false" aria-label="Show only ripple games">\U0001F30A<span> Ripple</span></button></div>')
     def rank_bar(list_id):
         # Both lists share one rank cut; the two button rows stay in step.
         buttons = "".join(f'<button type="button" class="cut" data-cut="{n}">{label}</button>'
@@ -517,6 +518,7 @@ HOW = f"""<dl class="terms">
 <li>The team ranks in the top 200 by median NPI in the simulations.</li>
 <li>The team's pregame win probability is between 10% and 90%.</li>
 </ul>
+<p>The \U0001F30A Ripple button at the top shows only ripple games. This browser remembers your choice.</p>
 </dd>
 <dt>Interest</dt><dd>
 <p>A score from 0 to 100, from four parts:</p>
@@ -627,13 +629,14 @@ const GAME_MS=2*3600000;           // tipoff to expected final
 const SD=11;                       // points, full-game spread of the final margin
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let night=BOOT.night,games=[],timer=null,sortKey='interest',finalKey='board',onlyMine=false,findText='',focusTeam='',relKey='',relTeams=null;
+let night=BOOT.night,games=[],timer=null,sortKey='interest',finalKey='board',onlyMine=false,onlyRipple=false,findText='',focusTeam='',relKey='',relTeams=null;
 // The Sort, Sort finals, and My Watchlist choices this browser last made. A stored value no button offers is ignored.
 const saved=(k,ok)=>{try{const v=JSON.parse(localStorage.getItem(KEY+'-'+k));return ok(v)?v:null}catch(e){return null}};
 const save=(k,v)=>{try{localStorage.setItem(KEY+'-'+k,JSON.stringify(v))}catch(e){}};
 sortKey=saved('sort',v=>[...document.querySelectorAll('.sorter')].some(b=>b.dataset.sort===v))||sortKey;
 finalKey=saved('fsort',v=>[...document.querySelectorAll('.fsorter')].some(b=>b.dataset.fsort===v))||finalKey;
 onlyMine=saved('mine',v=>v===true)||false;
+onlyRipple=saved('ripple',v=>v===true)||false;
 // The team rank cut for both top 15 lists: 0 shows every team. This browser remembers it.
 let rankCut=(()=>{try{const v=+localStorage.getItem(KEY+'-cut');return [0,100,200].includes(v)?v:0}catch(e){return 0}})();
 const LOGOS=new Set(BOOT.logos||[]);
@@ -1235,6 +1238,7 @@ function relSet(team,rel,results,conf){
 }
 function shown(g){
   if(onlyMine&&!stars.has(g.id))return false;
+  if(onlyRipple&&!(g.ripple||[]).length)return false;
   if(relTeams&&!relTeams.has(g.home)&&!relTeams.has(g.away))return false;
   const q=plain(findText);
   return !q||plain(g.home).includes(q)||plain(g.away).includes(q);
@@ -1262,7 +1266,7 @@ function render(){
     d.hidden=!part.length;d.querySelector('.count').textContent=part.length;
     paint(d.querySelector('.board'),part);
   });
-  message(!games.length?'No NPI games on this night.':list.length?'':onlyMine&&!findText?'You have no starred games on this night.':'No game on this night matches.');
+  message(!games.length?'No NPI games on this night.':list.length?'':onlyMine&&!findText?'You have no starred games on this night.':onlyRipple&&!findText?'No ripple games on this night.':'No game on this night matches.');
   document.querySelectorAll('.sorter').forEach(b=>b.classList.toggle('active',b.dataset.sort===sortKey));
   document.querySelectorAll('.fsorter').forEach(b=>b.classList.toggle('active',b.dataset.fsort===finalKey));
   renderNewcomers();
@@ -1394,6 +1398,8 @@ $('#relclear').addEventListener('click',()=>{setFilter('','');render();});
 document.querySelectorAll('.cut').forEach(b=>b.addEventListener('click',()=>{rankCut=+b.dataset.cut;try{localStorage.setItem(KEY+'-cut',rankCut)}catch(err){}renderNewcomers();}));
 $('#mine').setAttribute('aria-pressed',onlyMine);
 $('#mine').addEventListener('click',()=>{onlyMine=!onlyMine;save('mine',onlyMine);$('#mine').setAttribute('aria-pressed',onlyMine);render();});
+$('#ripplef').setAttribute('aria-pressed',onlyRipple);
+$('#ripplef').addEventListener('click',()=>{onlyRipple=!onlyRipple;save('ripple',onlyRipple);$('#ripplef').setAttribute('aria-pressed',onlyRipple);render();});
 // One listener for every star, because cards come and go as scores change.
 document.querySelector('main').addEventListener('click',e=>{
   const b=e.target.closest('.star');if(!b)return;
