@@ -499,7 +499,7 @@ HOW = f"""<dl class="terms">
 <li><b>Its conference</b> shows games with a team from the picked team's conference.</li>
 </ul>
 <p>Wins and opponents come from the final scores on this page since opening night. A game with no final score here does not count. This browser remembers your choice.</p>
-<p>While a team is picked, each card that has not ended names the team the picked team wants to win. A team's NPI averages its game values, and 80% of each game value is the opponent's NPI. A team gains when a team it played wins. It gains less when a team that its opponents played wins. The card names the team with the closer tie. A card shows no line when the picked team plays in the game, or when neither team ties to it.</p>
+<p>While a team is picked, each card for a live or upcoming game names the team the picked team wants to win. A team's NPI averages its game values, and 80% of each game value is the opponent's NPI. A team gains when a team it played wins. It gains less when a team that its opponents played wins. The card names the team with the closer tie. A card shows no line when the picked team plays in the game, or when neither team ties to it.</p>
 </dd>
 <dt>Which games</dt><dd>
 <p>Every game between two teams that count for the NCAA Power Index. A game appears only when a schedule page lists it.</p>
