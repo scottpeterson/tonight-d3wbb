@@ -148,7 +148,7 @@ footer{margin-top:var(--s6);padding-top:var(--s4);border-top:1px solid var(--lin
 .gc.final .team{font-weight:400;color:var(--muted)}.gc.final .pts{font-weight:400;color:var(--muted)}.gc.final .team.win{font-weight:600;color:var(--ink)}.gc.final .pts.win{font-weight:600;color:var(--pos)}
 .side{grid-area:side;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s2);min-width:0;min-height:24px;font-size:var(--fs-caption);color:var(--muted)}.side>span{white-space:nowrap}.side .wc{display:flex;gap:.3em}.state{font-size:var(--fs-small);font-weight:600;color:var(--ink)}.gc.live .state{color:var(--live);font-weight:600}.gc.final .state{color:var(--muted)}
 .star{grid-area:star;align-self:start;margin:-4px -4px -4px 0;border:0;background:transparent;color:var(--muted);width:32px;height:32px;padding:0;font-size:var(--fs-body);line-height:1}.star[aria-pressed="true"]{color:var(--warn)}
-.meta{grid-area:meta;display:flex;flex-wrap:wrap;gap:0 var(--s3);font-size:var(--fs-caption);color:var(--muted);padding-bottom:var(--s1)}.meta:empty{display:none}
+.meta{grid-area:meta;display:flex;flex-wrap:wrap;gap:0 var(--s3);font-size:var(--fs-caption);color:var(--muted);padding-bottom:var(--s1)}.meta:empty{display:none}.meta .root{flex-basis:100%;color:var(--ink)}
 .tag{white-space:nowrap}.tag.upset{color:var(--warn);font-weight:600}.tag.close{color:var(--ink)}.tag.ripple{color:var(--ink)}.tag.quiet{color:var(--faint)}.watch{color:var(--link);font-weight:600;text-decoration:none}.watch:hover{text-decoration:underline}
 #how{scroll-margin-top:64px}dl.terms{max-width:900px}
 .nc td.lead{font-weight:400}.nc td:last-child{white-space:normal;min-width:150px}.nc td.lead:first-child{font-weight:600}.nc td.lead .reason{display:block;font-size:var(--fs-caption);color:var(--muted);font-weight:400}
@@ -499,6 +499,7 @@ HOW = f"""<dl class="terms">
 <li><b>Its conference</b> shows games with a team from the picked team's conference.</li>
 </ul>
 <p>Wins and opponents come from the final scores on this page since opening night. A game with no final score here does not count. This browser remembers your choice.</p>
+<p>While a team is picked, each card that has not ended names the team the picked team wants to win. A team's NPI averages its game values, and 80% of each game value is the opponent's NPI. A team gains when a team it played wins. It gains less when a team that its opponents played wins. The card names the team with the closer tie. A card shows no line when the picked team plays in the game, or when neither team ties to it.</p>
 </dd>
 <dt>Which games</dt><dd>
 <p>Every game between two teams that count for the NCAA Power Index. A game appears only when a schedule page lists it.</p>
@@ -1211,6 +1212,8 @@ function card(g){
   const w=tags(g,st);if(w)meta.push(w);
   const label=statsLabel(g,st);if(label)meta.push('<span class="tag quiet">'+esc(label)+'</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
+  const root=st.final?null:rootFor(focusTeam,g,BOOT.results||[]);
+  if(root)meta.push('<span class="root">'+esc(root)+'</span>');
   return '<article class="gc '+(st.live||snapLive(st)?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+
     (g.link?'<a class="teams" href="'+esc(g.link)+'" target="_blank" rel="noopener">'+teams+'</a>':'<div class="teams">'+teams+'</div>')+
@@ -1235,6 +1238,23 @@ function relSet(team,rel,results,conf){
   const opp=t=>results.filter(r=>r[0]===t||r[1]===t).map(r=>r[0]===t?r[1]:r[0]),out=new Set();
   opp(team).forEach(o=>opp(o).forEach(x=>{if(x!==team)out.add(x);}));
   return out;
+}
+// Which team in a game the picked team wants to win. A team's NPI averages its game values, and each game value is
+// 80% the opponent's NPI. So the picked team gains when a team it played rises (weight 1 per game). It gains less when
+// a team its opponents played rises: weight 0.8 per game, divided by that opponent's game count. Null when the picked
+// team plays in the game, or when neither team connects to it.
+function rootFor(team,g,results){
+  if(!team||g.home===team||g.away===team)return null;
+  const games=t=>results.filter(r=>r[0]===t||r[1]===t),opp=t=>games(t).map(r=>r[0]===t?r[1]:r[0]),mine=opp(team);
+  const weight=x=>mine.filter(o=>o===x).length+[...new Set(mine)].reduce((w,o)=>{const oo=opp(o);return w+0.8*oo.filter(y=>y===x).length/oo.length;},0);
+  const wh=weight(g.home),wa=weight(g.away);
+  if(Math.abs(wh-wa)<1e-9)return null;
+  const pick=wh>wa?g.home:g.away;
+  let why;
+  if(mine.includes(pick)){const r=games(team).find(r=>r.includes(pick));why=r[0]===team?team+' beat '+pick+'.':pick+' beat '+team+'.';}
+  else{const via=[...new Set(mine)].filter(o=>opp(o).includes(pick));
+    why=pick+' played '+(via.length<=2?via.join(' and '):via.slice(0,2).join(', ')+', and '+(via.length-2)+' more')+'.';}
+  return team+' wants '+pick+' to win. '+why;
 }
 function shown(g){
   if(onlyMine&&!stars.has(g.id))return false;

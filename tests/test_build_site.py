@@ -117,3 +117,29 @@ def test_ripple_button_filters_to_ripple_games():
     assert "if(onlyRipple&&!(g.ripple||[]).length)return false;" in page
     assert "save('ripple',onlyRipple)" in page
     assert "The \U0001F30A Ripple button" in b.HOW
+
+
+def test_root_for_names_the_team_the_picked_team_wants_to_win(tmp_path):
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    fn = re.search(r"function rootFor\(team,g,results\)\{.*?\n\}\n", b.LIVE_JS, re.S).group(0)
+    results = [["Hope", "Carthage"], ["Luther", "Carthage"], ["Hope", "Alma"], ["Calvin", "Alma"],
+               ["Calvin", "Luther"], ["Alma", "Wartburg"]]
+    cases = [
+        ("Hope", "Luther", "Wartburg", "Hope wants Luther to win. Luther played Carthage."),
+        ("Hope", "Carthage", "Wartburg", "Hope wants Carthage to win. Hope beat Carthage."),
+        ("Carthage", "Alma", "Zeta", "Carthage wants Alma to win. Alma played Hope."),
+        ("Hope", "Hope", "Luther", None),
+        ("Hope", "Zeta", "Omega", None),
+    ]
+    script = tmp_path / "root.js"
+    script.write_text(fn + f"const R={json.dumps(results)};const C={json.dumps(cases)};"
+                      "console.log(JSON.stringify(C.map(c=>rootFor(c[0],{home:c[1],away:c[2]},R))));")
+    out = json.loads(subprocess.run([node, str(script)], capture_output=True, text=True, check=True).stdout)
+    assert out == [c[3] for c in cases]
