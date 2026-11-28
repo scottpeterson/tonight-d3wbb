@@ -1245,7 +1245,7 @@ def find_sibling(game, day):
             g = get(feed["url"], as_json=True)["Game"]
         except (*FETCH_ERRORS, TypeError, AttributeError):
             continue
-        if g.get("HasStarted") and feed_date_matches(g.get("Date"), day) and feed_is_game(game, sidearm_sides(g), {}):
+        if g.get("HasStarted") and sidearm_date_matches(g.get("Date"), day) and feed_is_game(game, sidearm_sides(g), {}):
             return feed
     return None
 
@@ -1748,6 +1748,15 @@ def feed_date_matches(feed_date, day):
     return feed_date == f"{day.month}/{day.day}/{day.year}"
 
 
+def sidearm_date_matches(feed_date, day):
+    """True when a Sidearm feed's date is `day`, or has the right month and day with a wrong year. The CMS crew set
+    11/27/1926 for SUNY Canton vs Pomona-Pitzer (2026-11-27). The callers also check the teams, as the page does."""
+    if feed_date_matches(feed_date, day):
+        return True
+    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/\d{4}", feed_date or "")
+    return bool(m) and (int(m.group(1)), int(m.group(2))) == (day.month, day.day)
+
+
 def read_final(game):
     """Read a game's feed once. Returns {'home','away','newcomers':[...]} when the feed reports it complete."""
     feed = game.get("feed")
@@ -1767,7 +1776,7 @@ def read_final(game):
     elif feed["type"] == "sidearm":
         full = get(feed["url"] + "?detail=full", as_json=True)
         g = full["Game"]
-        if not feed_date_matches(g.get("Date"), day) or not feed_is_game(game, sidearm_sides(g), sidearm_lines(full)):
+        if not sidearm_date_matches(g.get("Date"), day) or not feed_is_game(game, sidearm_sides(g), sidearm_lines(full)):
             # The feed shows another game. A tournament host runs the other game on another court's feed.
             sibling = find_sibling(game, day)
             if not sibling:
@@ -2016,8 +2025,15 @@ def refresh_feed(game, pages, links=None):
     rows = (find_row(pages.get(game["home"], []), day, game["away"], exhibition),
             find_row(pages.get(game["away"], []), day, game["home"], exhibition))
     old = game.get("link")
+    own = {own_site(game["home"]), own_site(game["away"])} - {""}
     for url in (r["links"].get("live_stats") for r in rows if r):
-        if url and url != old and (not old or not game.get("feed") or site_of(url) == site_of(old)):
+        if not url or url == old:
+            continue
+        # A host's stats page replaces a team's own page. SUNY Canton's page linked the host's page for its game
+        # against Pomona-Pitzer at Claremont-Mudd-Scripps after the last full run, and the card kept
+        # Pomona-Pitzer's idle feed (2026-11-27).
+        host_over_own = site_of(old) in own and site_of(url) not in own
+        if not old or not game.get("feed") or site_of(url) == site_of(old) or host_over_own:
             feed = live_feed(url)
             if feed and feed != game.get("feed"):
                 game["feed"], game["link"] = feed, url
@@ -2027,7 +2043,23 @@ def refresh_feed(game, pages, links=None):
             if not feed and not game.get("feed") and STATBROADCAST.search(url) and (not old or SHORT_LINK.match(old)):
                 game["link"] = url
                 return True
+        # A link the card does not take stays as an alternative. read_final tries it when the feed shows another game.
+        feed = live_feed(url)
+        alts = game.setdefault("alt_feeds", [])
+        if feed and feed != game.get("feed") and all(a["feed"] != feed for a in alts):
+            alts.append({"feed": feed, "link": url})
     return False
+
+
+def own_site(team):
+    """The site of a team's own schedule page: 'sagehens.com' for Pomona-Pitzer. Empty for a team not in schools.csv."""
+    global _SCHOOLS
+    if _SCHOOLS is None:
+        _SCHOOLS = load_schools()
+    return site_of((_SCHOOLS.get(team) or {}).get("schedule"))
+
+
+_SCHOOLS = None
 
 
 def read_box_page(game, url):

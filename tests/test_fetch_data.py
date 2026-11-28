@@ -247,6 +247,39 @@ def test_refresh_feed_takes_a_link_a_page_added_on_game_day(monkeypatch):
     assert not f.refresh_feed(game, cobbers) and game["link"] == "https://sidearmstats.com/morris/wbball/"
 
 
+
+def test_refresh_feed_takes_a_host_link_over_a_teams_own_page(monkeypatch):
+    # SUNY Canton vs Pomona-Pitzer at Claremont-Mudd-Scripps, 2026-11-27. The full run took Pomona-Pitzer's own
+    # page. SUNY Canton's page then linked the host's stats page.
+    f._feed_cache.clear()
+    f._client_cache.clear()
+    monkeypatch.setattr(f, "get", lambda url, *a, **k: 'var client_shortname = "'
+                        + ("claremontmuddscrippsc" if "cmsathletics" in url else "pomapitzer") + '";')
+    day = date(2026, 11, 27)
+    game = {"id": "2026-11-27-sunycanton-at-pomonapitzer", "date": "2026-11-27", "home": "Pomona-Pitzer",
+            "away": "SUNY Canton", "neutral": True, "link": "https://sagehens.com/sidearmstats/wbball/summary",
+            "feed": {"type": "sidearm", "url": "https://sidearmstats.com/pomapitzer/wbball/game.json"}}
+    pages = {"SUNY Canton": [f.row(day, (18, 0, "America/New_York"), False, False, "Pomona-Pitzer",
+                                   {"live_stats": "https://cmsathletics.org/sidearmstats/wbball/summary"}, "", "")]}
+    assert f.refresh_feed(game, pages)
+    assert game["feed"]["url"] == "https://sidearmstats.com/claremontmuddscrippsc/wbball/game.json"
+    assert game["link"] == "https://cmsathletics.org/sidearmstats/wbball/summary"
+    # The team's own page does not take the game back from the host's page. It stays as an alternative.
+    back = {"Pomona-Pitzer": [f.row(day, (15, 0, "America/Los_Angeles"), False, True, "SUNY Canton",
+                                    {"live_stats": "https://sagehens.com/sidearmstats/wbball/summary"}, "", "")]}
+    assert not f.refresh_feed(game, back)
+    assert game["feed"]["url"].endswith("/claremontmuddscrippsc/wbball/game.json")
+    assert [a["feed"]["url"] for a in game["alt_feeds"]] == ["https://sidearmstats.com/pomapitzer/wbball/game.json"]
+
+
+def test_sidearm_date_matches_a_wrong_year():
+    day = date(2026, 11, 27)
+    assert f.sidearm_date_matches("11/27/2026", day)
+    assert f.sidearm_date_matches("11/27/1926", day)
+    assert not f.sidearm_date_matches("11/26/2026", day)
+    assert not f.sidearm_date_matches("1/1/0001", day)
+    assert not f.sidearm_date_matches(None, day)
+
 # ---------------------------------------------------------------- box scores and newcomers
 
 LINE = {"first": "", "last": "", "abbr": "", "min": 30, "pts": 0, "fgm": 0, "fga": 0, "ftm": 0, "fta": 0, "oreb": 0,
