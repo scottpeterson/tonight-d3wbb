@@ -1,6 +1,8 @@
 {
- "fetched_at": "2026-11-28T02:48:18+00:00",
- "errors": [],
+ "fetched_at": "2026-11-28T02:51:25+00:00",
+ "errors": [
+  "Huntingdon schedule: HTTP Error 405: Not Allowed"
+ ],
  "stale": {},
  "conferences": {
   "Amherst": "NESCAC",
