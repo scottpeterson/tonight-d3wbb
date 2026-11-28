@@ -315,6 +315,27 @@ def conferences(rows):
     return {r["Team"]: r["Conf"] for r in rows if r.get("Conf")}
 
 
+QUALITY_LINE = 54.0  # NPI baseline for the quality win bonus (CLAUDE.md NPI formula in d3-bball-npi)
+
+
+def quality_chance(rows):
+    """Team -> chance, 0 to 1, that its final NPI ends above QUALITY_LINE, from seasonSimulations.json rows.
+
+    The rows give the median, smallest, and largest final NPI of 10,000 simulations. The estimate takes a normal
+    curve around the median with a standard deviation of (largest - smallest) / 7.4, because 10,000 draws reach
+    about 3.7 standard deviations each way.
+    """
+    out = {}
+    for r in rows:
+        try:
+            med, low, high = float(r["Med-NPI"]), float(r["Min"]), float(r["Max"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        sd = (high - low) / 7.4
+        out[r["Team"]] = round(0.5 * (1 + math.erf((med - QUALITY_LINE) / (sd * math.sqrt(2)))), 3) if sd > 0 else float(med > QUALITY_LINE)
+    return out
+
+
 def newcomers_by_team():
     out = {}
     for p in statlab("newcomers.json")["players"]:
@@ -2355,6 +2376,7 @@ def collect(previous):
         sims = statlab("seasonSimulations.json")
         tourn = tournament_chance(sims)
         out["conferences"] = conferences(sims)
+        out["quality"] = quality_chance(sims)
         newcomers = newcomers_by_team()
         regulars = regulars_by_team()
     except FETCH_ERRORS as exc:
@@ -2362,6 +2384,7 @@ def collect(previous):
         out["stale"]["statlab"] = previous.get("stale", {}).get("statlab") or previous.get("fetched_at")
         out["dates"] = previous.get("dates", {})
         out["conferences"] = previous.get("conferences", {})
+        out["quality"] = previous.get("quality", {})
         return out
     extra = read_json(EXTRA, {"schools": {}, "games": []})
     names, rosters, classes = team_names(), team_rosters(), team_classes()

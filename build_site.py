@@ -422,7 +422,7 @@ def sections():
     boot = {"dates": dates, "counts": DATA.get("dates", {}), "night": night, "slate": slate,
             "slates": sorted(p.stem for p in SLATES.glob("*.json")),
             "logos": sorted(p.stem for p in (OUT.parent / "logos").glob("*.webp")),
-            "results": season_results(), "conf": DATA.get("conferences", {})}
+            "results": season_results(), "conf": DATA.get("conferences", {}), "quality": DATA.get("quality", {})}
     toolbar = ('<div class="toolbar" role="group" aria-label="Night and filters">'
                '<button type="button" class="step" id="prev" aria-label="Previous night">&#8249;</button>'
                '<span class="label" id="nightlabel"></span>'
@@ -499,7 +499,9 @@ HOW = f"""<dl class="terms">
 <li><b>Its conference</b> shows games with a team from the picked team's conference.</li>
 </ul>
 <p>Wins and opponents come from the final scores on this page since opening night. A game with no final score here does not count. This browser remembers your choice.</p>
-<p>While a team is picked, each card for a live or upcoming game names the team the picked team wants to win. A team's NPI averages its game values, and 80% of each game value is the opponent's NPI. A team gains when a team it played wins. It gains less when a team that its opponents played wins. The card names the team with the closer tie. A card shows no line when the picked team plays in the game, or when neither team ties to it.</p>
+<p>While a team is picked, each card for a live or upcoming game names the team the picked team wants to win. A team's NPI averages its game values. Each game value is 80% of the opponent's NPI. A win also earns a quality bonus of two thirds of each point the opponent ends above 54.</p>
+<p>The picked team gains when a team it played wins. It gains more when it beat that team and that team ends above 54. The page takes each team's chance to end above 54 from its simulated final NPI. A team that the picked team's opponents played counts less. The NPI counts only wins and losses, so the game margin does not matter.</p>
+<p>When both teams give about the same gain, the card names both ties. A card shows no line when the picked team plays in the game, or when neither team ties to it.</p>
 </dd>
 <dt>Which games</dt><dd>
 <p>Every game between two teams that count for the NCAA Power Index. A game appears only when a schedule page lists it.</p>
@@ -1212,7 +1214,7 @@ function card(g){
   const w=tags(g,st);if(w)meta.push(w);
   const label=statsLabel(g,st);if(label)meta.push('<span class="tag quiet">'+esc(label)+'</span>');
   if(g.video&&!st.final)meta.push('<a class="watch" href="'+esc(g.video)+'" target="_blank" rel="noopener">\u{1F4FA} Watch</a>');
-  const root=st.final?null:rootFor(focusTeam,g,BOOT.results||[]);
+  const root=st.final?null:rootFor(focusTeam,g,BOOT.results||[],BOOT.quality||{});
   if(root)meta.push('<span class="root">'+esc(root)+'</span>');
   return '<article class="gc '+(st.live||snapLive(st)?'live':st.final?'final':'pre')+'" data-id="'+esc(g.id)+'">'+
     '<div class="ix" title="Interest score" aria-label="Interest score '+I+'"><span class="int">'+I+'</span><span class="bar"><i style="width:'+I+'%"></i></span></div>'+
@@ -1239,22 +1241,32 @@ function relSet(team,rel,results,conf){
   opp(team).forEach(o=>opp(o).forEach(x=>{if(x!==team)out.add(x);}));
   return out;
 }
-// Which team in a game the picked team wants to win. A team's NPI averages its game values, and each game value is
-// 80% the opponent's NPI. So the picked team gains when a team it played rises (weight 1 per game). It gains less when
-// a team its opponents played rises: weight 0.8 per game, divided by that opponent's game count. Null when the picked
-// team plays in the game, or when neither team connects to it.
-function rootFor(team,g,results){
+// Which team in a game the picked team wants to win. A team's NPI averages its game values. Each game value is 80%
+// the opponent's NPI, plus, for a win, a quality bonus of 2/3 of each point the opponent ends above 54. So the picked
+// team gains 0.8 per point a team it played rises, plus 2/3 times that team's chance (BOOT.quality) to end above 54
+// when the picked team won. A team its opponents played counts through those opponents, divided by ROOT_SEASON_GAMES.
+// The comparison is for the final NPI, when both teams have about the same game count. Null when the picked team plays
+// in the game, or when neither team ties to it.
+const ROOT_SEASON_GAMES=25,ROOT_EVEN=0.02,QWB=2/3;
+function rootFor(team,g,results,q){
   if(!team||g.home===team||g.away===team)return null;
-  const games=t=>results.filter(r=>r[0]===t||r[1]===t),opp=t=>games(t).map(r=>r[0]===t?r[1]:r[0]),mine=opp(team);
-  const weight=x=>mine.filter(o=>o===x).length+[...new Set(mine)].reduce((w,o)=>{const oo=opp(o);return w+0.8*oo.filter(y=>y===x).length/oo.length;},0);
+  q=q||{};
+  const games=t=>results.filter(r=>r[0]===t||r[1]===t),opp=t=>games(t).map(r=>r[0]===t?r[1]:r[0]),mine=[...new Set(opp(team))];
+  const per=(a,x)=>games(a).filter(r=>r.includes(x)).reduce((s,r)=>s+0.8+(r[0]===a?QWB*(q[x]||0):0),0);
+  const weight=x=>per(team,x)+mine.reduce((w,o)=>w+per(team,o)*per(o,x)/ROOT_SEASON_GAMES,0);
   const wh=weight(g.home),wa=weight(g.away);
-  if(Math.abs(wh-wa)<1e-9)return null;
-  const pick=wh>wa?g.home:g.away;
-  let why;
-  if(mine.includes(pick)){const r=games(team).find(r=>r.includes(pick));why=r[0]===team?team+' beat '+pick+'.':pick+' beat '+team+'.';}
-  else{const via=[...new Set(mine)].filter(o=>opp(o).includes(pick));
-    why=pick+' played '+(via.length<=2?via.join(' and '):via.slice(0,2).join(', ')+', and '+(via.length-2)+' more')+'.';}
-  return team+' wants '+pick+' to win. '+why;
+  if(!wh&&!wa)return null;
+  const why=x=>{
+    if(mine.includes(x)){const r=games(team).find(r=>r.includes(x));return r[0]===team?team+' beat '+x+'.':x+' beat '+team+'.';}
+    const via=mine.filter(o=>opp(o).includes(x));
+    return x+' played '+(via.length<=2?via.join(' and '):via.slice(0,2).join(', ')+', and '+(via.length-2)+' more')+'.';
+  };
+  const both=wh>0&&wa>0,beat=team+' beat ',a=why(g.away),h=why(g.home);
+  const ties=!both?(wh>0?h:a):a.startsWith(beat)&&h.startsWith(beat)?beat+g.away+' and '+g.home+'.':a+' '+h;
+  if(both&&Math.abs(wh-wa)<=ROOT_EVEN*Math.max(wh,wa))return ties+' '+team+' gains about the same from either result.';
+  const pick=wh>wa?g.home:g.away,other=pick===g.home?g.away:g.home;
+  const bonus=both&&ties.startsWith(beat)&&(q[pick]||0)-(q[other]||0)>=0.05?' '+pick+' is more likely to end above 54 NPI, where a win over it earns a quality bonus.':'';
+  return team+' wants '+pick+' to win. '+ties+bonus;
 }
 function shown(g){
   if(onlyMine&&!stars.has(g.id))return false;

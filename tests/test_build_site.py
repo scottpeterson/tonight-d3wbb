@@ -128,18 +128,23 @@ def test_root_for_names_the_team_the_picked_team_wants_to_win(tmp_path):
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed")
-    fn = re.search(r"function rootFor\(team,g,results\)\{.*?\n\}\n", b.LIVE_JS, re.S).group(0)
-    results = [["Hope", "Carthage"], ["Luther", "Carthage"], ["Hope", "Alma"], ["Calvin", "Alma"],
-               ["Calvin", "Luther"], ["Alma", "Wartburg"]]
+    fn = re.search(r"const ROOT_SEASON_GAMES=.*?;", b.LIVE_JS).group(0) + re.search(
+        r"function rootFor\(team,g,results,q\)\{.*?\n\}\n", b.LIVE_JS, re.S).group(0)
+    results = [["Hope", "Carthage"], ["Luther", "Carthage"], ["Hope", "Alma"], ["Calvin", "Alma"], ["Calvin", "Luther"]]
+    quality = {"Alma": 0.9, "Carthage": 0.2}
     cases = [
-        ("Hope", "Luther", "Wartburg", "Hope wants Luther to win. Luther played Carthage."),
-        ("Hope", "Carthage", "Wartburg", "Hope wants Carthage to win. Hope beat Carthage."),
-        ("Carthage", "Alma", "Zeta", "Carthage wants Alma to win. Alma played Hope."),
-        ("Hope", "Hope", "Luther", None),
-        ("Hope", "Zeta", "Omega", None),
+        ("Hope", "Luther", "Wartburg", quality, "Hope wants Luther to win. Luther played Carthage."),
+        ("Hope", "Carthage", "Wartburg", quality, "Hope wants Carthage to win. Hope beat Carthage."),
+        ("Carthage", "Alma", "Zeta", quality, "Carthage wants Alma to win. Alma played Hope."),
+        # Hope beat both. Alma is likelier to end above 54, so its win is worth more to Hope.
+        ("Hope", "Carthage", "Alma", quality, "Hope wants Alma to win. Hope beat Alma and Carthage. "
+         "Alma is more likely to end above 54 NPI, where a win over it earns a quality bonus."),
+        ("Hope", "Carthage", "Alma", {}, "Hope beat Alma and Carthage. Hope gains about the same from either result."),
+        ("Hope", "Hope", "Luther", quality, None),
+        ("Hope", "Zeta", "Omega", quality, None),
     ]
     script = tmp_path / "root.js"
     script.write_text(fn + f"const R={json.dumps(results)};const C={json.dumps(cases)};"
-                      "console.log(JSON.stringify(C.map(c=>rootFor(c[0],{home:c[1],away:c[2]},R))));")
+                      "console.log(JSON.stringify(C.map(c=>rootFor(c[0],{home:c[1],away:c[2]},R,c[3]))));")
     out = json.loads(subprocess.run([node, str(script)], capture_output=True, text=True, check=True).stdout)
-    assert out == [c[3] for c in cases]
+    assert out == [c[4] for c in cases]

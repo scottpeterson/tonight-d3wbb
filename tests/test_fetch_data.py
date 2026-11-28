@@ -1707,3 +1707,14 @@ def test_an_honorees_honors_ride_along_onto_the_sat_out_list():
     star = dict(regular("Bea Cole", 12.0), honors=["2025-26 All-American, 2nd team"])
     lines = [floor_line(*p["name"].split()) for p in SAT_ROSTER[2:7]]
     assert f.sat_out("Hope", [star], lines, SAT_ROSTER) == [{"team": "Hope", **star}]
+
+
+
+def test_quality_chance_reads_the_simulated_final_npi():
+    rows = [{"Team": "Illinois Wesleyan", "Med-NPI": 55.45, "Min": 47.65, "Max": 64.35},
+            {"Team": "DePauw", "Med-NPI": 54.27, "Min": 47.57, "Max": 60.99},
+            {"Team": "Wartburg", "Med-NPI": 63.7, "Min": 58.3, "Max": 66.9},
+            {"Team": "Flat", "Med-NPI": 50, "Min": 50, "Max": 50}, {"Team": "Bad", "Med-NPI": "-"}]
+    q = f.quality_chance(rows)
+    assert 0.5 < q["DePauw"] < q["Illinois Wesleyan"] < 0.9
+    assert q["Wartburg"] > 0.99 and q["Flat"] == 0.0 and "Bad" not in q
