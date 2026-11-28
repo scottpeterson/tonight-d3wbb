@@ -140,6 +140,8 @@ def test_root_for_names_the_team_the_picked_team_wants_to_win(tmp_path):
         ("Hope", "Carthage", "Alma", quality, "Hope wants Alma to win. Hope beat Alma and Carthage. "
          "Alma is more likely to end above 54 NPI, where a win over it earns a quality bonus."),
         ("Hope", "Carthage", "Alma", {}, "Hope beat Alma and Carthage. Hope gains about the same from either result."),
+        ("Hope", "Calvin", "Zeta", quality, "Hope wants Calvin to win. Calvin played Alma."),
+        ("Luther", "Calvin", "Zeta", quality, "Luther wants Calvin to win. Calvin beat Luther."),
         ("Hope", "Hope", "Luther", quality, None),
         ("Hope", "Zeta", "Omega", quality, None),
     ]

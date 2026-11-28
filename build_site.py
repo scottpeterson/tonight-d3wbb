@@ -459,7 +459,7 @@ def sections():
     team_filter = ('<div class="sortbar ctl"><span class="seglabel caption" id="lbl-rel">Team filter</span>'
                    '<div class="relrow"><select id="focus" aria-label="Team"><option value="">Pick a team</option></select>'
                    '<select id="rel" aria-label="Games to show" disabled><option value="">All games</option>'
-                   '<option value="beat">Teams it beat</option><option value="oo">Its opponents’ opponents</option>'
+                   '<option value="played">Teams it played</option><option value="oo">Its opponents’ opponents</option>'
                    '<option value="conf">Its conference</option></select>'
                    '<button type="button" id="relclear" disabled>Clear</button></div></div>')
     board = f'{team_filter}{sort}<p class="empty" id="boardmsg" hidden></p>{groups}'
@@ -494,7 +494,7 @@ HOW = f"""<dl class="terms">
 <dt>Team filter</dt><dd>
 <p>Pick a team, then pick which games to show:</p>
 <ul>
-<li><b>Teams it beat</b> shows games with a team the picked team beat.</li>
+<li><b>Teams it played</b> shows games with a team the picked team beat or lost to. 80% of each game value is the opponent's NPI, win or lose. So the picked team wants those teams to win. The line on each card says which teams beat the picked team.</li>
 <li><b>Its opponents’ opponents</b> shows games with a team that one of the picked team's opponents played.</li>
 <li><b>Its conference</b> shows games with a team from the picked team's conference.</li>
 </ul>
@@ -1236,7 +1236,7 @@ const plain=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 function relSet(team,rel,results,conf){
   if(!team||!rel)return null;
   if(rel==='conf'){const c=conf[team];return new Set(c?Object.keys(conf).filter(t=>conf[t]===c):[team]);}
-  if(rel==='beat')return new Set(results.filter(r=>r[0]===team).map(r=>r[1]));
+  if(rel==='played'||rel==='beat')return new Set(results.filter(r=>r.includes(team)).map(r=>r[0]===team?r[1]:r[0]));
   const opp=t=>results.filter(r=>r[0]===t||r[1]===t).map(r=>r[0]===t?r[1]:r[0]),out=new Set();
   opp(team).forEach(o=>opp(o).forEach(x=>{if(x!==team)out.add(x);}));
   return out;
@@ -1257,7 +1257,8 @@ function rootFor(team,g,results,q){
   const wh=weight(g.home),wa=weight(g.away);
   if(!wh&&!wa)return null;
   const why=x=>{
-    if(mine.includes(x)){const r=games(team).find(r=>r.includes(x));return r[0]===team?team+' beat '+x+'.':x+' beat '+team+'.';}
+    if(mine.includes(x)){const g2=games(team).filter(r=>r.includes(x)),w=g2.filter(r=>r[0]===team).length;
+      return w&&w<g2.length?team+' and '+x+' split their games.':w?team+' beat '+x+'.':x+' beat '+team+'.';}
     const via=mine.filter(o=>opp(o).includes(x));
     return x+' played '+(via.length<=2?via.join(' and '):via.slice(0,2).join(', ')+', and '+(via.length-2)+' more')+'.';
   };
@@ -1414,7 +1415,7 @@ function setFilter(team,rel){
   const conf=BOOT.conf||{};focusTeam=conf[team]||(BOOT.results||[]).some(r=>r.includes(team))?team:'';relKey=focusTeam?rel:'';
   $('#focus').value=focusTeam;const sel=$('#rel');sel.disabled=!focusTeam;sel.value=relKey;
   // The first select names the team, so these labels stay short enough for a phone.
-  const labels={'':'All games',beat:'Teams it beat',oo:'Its opponents\u2019 opponents',conf:focusTeam&&conf[focusTeam]?conf[focusTeam]+' teams':'Its conference'};
+  const labels={'':'All games',played:'Teams it played',oo:'Its opponents\u2019 opponents',conf:focusTeam&&conf[focusTeam]?conf[focusTeam]+' teams':'Its conference'};
   [...sel.options].forEach(o=>{o.textContent=labels[o.value];});
   $('#relclear').disabled=!focusTeam;
   relTeams=relSet(focusTeam,relKey,BOOT.results||[],conf);
@@ -1423,7 +1424,7 @@ function setFilter(team,rel){
 {const teams=new Set(Object.keys(BOOT.conf||{}));(BOOT.results||[]).forEach(r=>r.forEach(t=>teams.add(t)));
  [...teams].sort((a,b)=>a.localeCompare(b)).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;$('#focus').append(o);});
  let saved=['',''];try{saved=JSON.parse(localStorage.getItem(KEY+'-focus'))||saved}catch(err){}
- setFilter(saved[0]||'',saved[1]||'');}
+ setFilter(saved[0]||'',saved[1]==='beat'?'played':saved[1]||'');}
 $('#focus').addEventListener('change',e=>{setFilter(e.target.value,relKey);render();});
 $('#rel').addEventListener('change',e=>{setFilter(focusTeam,e.target.value);render();});
 $('#relclear').addEventListener('click',()=>{setFilter('','');render();});

@@ -576,12 +576,14 @@ CONF = {"Hope": "MIAA", "Calvin": "MIAA", "Trine": "MIAA", "Albion": "MIAA", "Al
 
 def test_team_filter_sets():
     rel = lambda team, key: run(f"[...(relSet({json.dumps(team)},{json.dumps(key)},{json.dumps(RESULTS)},{json.dumps(CONF)})||['ALL'])].sort()")
-    assert rel("Hope", "beat") == ["Calvin", "Trine"]
+    assert rel("Hope", "played") == ["Albion", "Calvin", "Trine"]
+    # A browser that saved the old "beat" choice gets the same set.
+    assert rel("Hope", "beat") == ["Albion", "Calvin", "Trine"]
     # Opponents of Hope's opponents (Calvin, Trine, Albion), without Hope itself.
     assert rel("Hope", "oo") == ["Alma", "Wittenberg"]
     assert rel("Hope", "conf") == ["Albion", "Alma", "Calvin", "Hope", "Trine"]
-    assert rel("Hope", "") == ["ALL"] and rel("", "beat") == ["ALL"]
-    assert rel("Albion", "beat") == ["Hope"] and rel("Alma", "beat") == []
+    assert rel("Hope", "") == ["ALL"] and rel("", "played") == ["ALL"]
+    assert rel("Albion", "played") == ["Hope"] and rel("Alma", "played") == ["Calvin"] and rel("Smith", "played") == ["Amherst"]
 
 
 def test_honorees_lead_the_sat_out_list_and_all_stay_past_the_cap():
